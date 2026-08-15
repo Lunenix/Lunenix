@@ -17,6 +17,7 @@ import {
   FolderKanban,
   ListChecks,
   Loader2,
+  Mail,
   Receipt,
   Users,
 } from "lucide-react";
@@ -30,19 +31,21 @@ export default function DashboardPage() {
     activeContracts: 0,
     outstandingInvoices: 0,
     formSubmissions: 0,
+    emailsSent: 0,
   });
 
   useEffect(() => {
     if (!activeWorkspace) return;
     let cancelled = false;
     (async () => {
-      const [cRes, pRes, tRes, ctRes, iRes, sRes] = await Promise.all([
+      const [cRes, pRes, tRes, ctRes, iRes, sRes, eRes] = await Promise.all([
         fetch(`/api/contacts?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/projects?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/tasks?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/contracts?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/invoices?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/submissions?workspaceId=${activeWorkspace.id}`),
+        fetch(`/api/emails/logs?workspaceId=${activeWorkspace.id}`),
       ]);
       const cJson = await cRes.json().catch(() => ({}));
       const pJson = await pRes.json().catch(() => ({}));
@@ -50,12 +53,14 @@ export default function DashboardPage() {
       const ctJson = await ctRes.json().catch(() => ({}));
       const iJson = await iRes.json().catch(() => ({}));
       const sJson = await sRes.json().catch(() => ({}));
+      const eJson = await eRes.json().catch(() => ({}));
       if (cancelled) return;
       const projects = pJson.projects ?? [];
       const tasks = tJson.tasks ?? [];
       const contracts = ctJson.contracts ?? [];
       const invoices = iJson.invoices ?? [];
       const submissions = sJson.submissions ?? [];
+      const emails = eJson.logs ?? [];
       setCounts({
         contacts: (cJson.contacts ?? []).length,
         activeProjects: projects.filter(
@@ -71,6 +76,9 @@ export default function DashboardPage() {
           (i: { status: string }) => i.status === "sent" || i.status === "overdue"
         ).length,
         formSubmissions: submissions.length,
+        emailsSent: emails.filter(
+          (e: { status: string }) => e.status === "sent"
+        ).length,
       });
     })();
     return () => {
@@ -109,6 +117,12 @@ export default function DashboardPage() {
       value: counts.formSubmissions,
       icon: ClipboardList,
       href: "/submissions",
+    },
+    {
+      label: "Emails Sent",
+      value: counts.emailsSent,
+      icon: Mail,
+      href: "/emails",
     },
   ];
 

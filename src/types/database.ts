@@ -348,3 +348,128 @@ export const FORM_FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
   radio: "Multiple Choice",
   checkbox: "Checkboxes",
 };
+
+// ---------------------------------------------------------------------------
+// Phase 6 tables: Emails + Automation
+// ---------------------------------------------------------------------------
+
+export interface TemplateVariable {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  workspace_id: string;
+  name: string;
+  subject: string;
+  body: string; // HTML content
+  variables: TemplateVariable[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type EmailStatus = "pending" | "sent" | "failed";
+
+export interface EmailLog {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  template_id: string | null;
+  recipient_email: string;
+  recipient_name: string | null;
+  subject: string;
+  body: string; // HTML content
+  status: EmailStatus;
+  error_message: string | null;
+  sent_at: string;
+  sent_by: string | null;
+  // Optional relations for list + detail views.
+  contact?: Contact | null;
+  template?: Pick<EmailTemplate, "id" | "name"> | null;
+}
+
+export type AutomationTriggerType =
+  | "form_submission"
+  | "lead_stage_change"
+  | "contact_created"
+  | "task_completed"
+  | "invoice_sent"
+  | "contract_signed";
+
+export type AutomationActionType =
+  | "send_email"
+  | "create_task"
+  | "update_contact"
+  | "move_lead"
+  | "delay";
+
+export interface AutomationAction {
+  type: AutomationActionType;
+  config: Record<string, unknown>;
+}
+
+export interface AutomationWorkflow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  trigger_type: AutomationTriggerType;
+  trigger_config: Record<string, unknown>;
+  actions: AutomationAction[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type AutomationLogStatus = "success" | "failed" | "partial";
+
+export interface AutomationActionResult {
+  action_type: string;
+  status: string;
+  error?: string;
+}
+
+export interface AutomationLog {
+  id: string;
+  workflow_id: string;
+  workspace_id: string;
+  trigger_data: Record<string, unknown>;
+  status: AutomationLogStatus;
+  error_message: string | null;
+  action_results: AutomationActionResult[];
+  executed_at: string;
+  // Optional relation for list + detail views.
+  workflow?: Pick<AutomationWorkflow, "id" | "name"> | null;
+}
+
+// Labels + badge styling helpers for emails and automation.
+export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
+  pending: "Pending",
+  sent: "Sent",
+  failed: "Failed",
+};
+
+export const AUTOMATION_TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
+  form_submission: "Form Submission",
+  lead_stage_change: "Lead Stage Change",
+  contact_created: "Contact Created",
+  task_completed: "Task Completed",
+  invoice_sent: "Invoice Sent",
+  contract_signed: "Contract Signed",
+};
+
+export const AUTOMATION_ACTION_LABELS: Record<AutomationActionType, string> = {
+  send_email: "Send Email",
+  create_task: "Create Task",
+  update_contact: "Update Contact",
+  move_lead: "Move Lead",
+  delay: "Delay",
+};
+
+export const AUTOMATION_LOG_STATUS_LABELS: Record<AutomationLogStatus, string> = {
+  success: "Success",
+  failed: "Failed",
+  partial: "Partial",
+};

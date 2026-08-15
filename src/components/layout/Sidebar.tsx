@@ -26,11 +26,13 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Mail,
   Receipt,
   Settings,
   KanbanSquare,
   Users,
   X,
+  Zap,
 } from "lucide-react";
 
 const navItems = [
@@ -42,6 +44,9 @@ const navItems = [
   { href: "/contracts", label: "Contracts", icon: FileSignature },
   { href: "/invoices", label: "Invoices", icon: Receipt },
   { href: "/forms", label: "Forms", icon: ClipboardList },
+  { href: "/emails", label: "Emails", icon: Mail },
+  { href: "/email-templates", label: "Email Templates", icon: Mail },
+  { href: "/automation", label: "Automation", icon: Zap },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

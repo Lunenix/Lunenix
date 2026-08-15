@@ -32,3 +32,18 @@ export function invoiceStatusClasses(status: InvoiceStatus): string {
   };
   return classes[status] || "";
 }
+
+/** Get Badge variant for status-based badges. */
+export function getStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  // Map common status types to badge variants
+  if (status === "sent" || status === "active" || status === "success") {
+    return "default";
+  }
+  if (status === "failed" || status === "overdue" || status === "cancelled") {
+    return "destructive";
+  }
+  if (status === "pending" || status === "draft") {
+    return "secondary";
+  }
+  return "outline";
+}
