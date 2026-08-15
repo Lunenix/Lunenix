@@ -16,6 +16,13 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Lunenix | Business Hub",
   description: "Lunenix Business Hub — your private multi-business management platform",
+  icons: {
+    icon: [
+      { url: "/icon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [{ url: "/icon-180.png", sizes: "180x180" }],
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -16,7 +17,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Building2,
   CalendarDays,
   Check,
   ChevronsUpDown,
@@ -106,9 +106,14 @@ export function Sidebar({
         {/* Brand */}
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Building2 className="h-5 w-5" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Lunenix"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full object-contain"
+              priority
+            />
             <div className="flex flex-col leading-tight">
               <span className="text-lg font-semibold tracking-tight leading-none">
                 Lunenix
