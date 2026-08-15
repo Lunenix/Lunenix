@@ -20,6 +20,7 @@ import {
   CalendarDays,
   Check,
   ChevronsUpDown,
+  ClipboardList,
   FileSignature,
   FolderKanban,
   LayoutDashboard,
@@ -40,6 +41,7 @@ const navItems = [
   { href: "/tasks", label: "Tasks", icon: ListChecks },
   { href: "/contracts", label: "Contracts", icon: FileSignature },
   { href: "/invoices", label: "Invoices", icon: Receipt },
+  { href: "/forms", label: "Forms", icon: ClipboardList },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

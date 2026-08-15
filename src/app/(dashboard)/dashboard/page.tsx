@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  ClipboardList,
   FileSignature,
   FolderKanban,
   ListChecks,
@@ -28,29 +29,33 @@ export default function DashboardPage() {
     openTasks: 0,
     activeContracts: 0,
     outstandingInvoices: 0,
+    formSubmissions: 0,
   });
 
   useEffect(() => {
     if (!activeWorkspace) return;
     let cancelled = false;
     (async () => {
-      const [cRes, pRes, tRes, ctRes, iRes] = await Promise.all([
+      const [cRes, pRes, tRes, ctRes, iRes, sRes] = await Promise.all([
         fetch(`/api/contacts?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/projects?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/tasks?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/contracts?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/invoices?workspaceId=${activeWorkspace.id}`),
+        fetch(`/api/submissions?workspaceId=${activeWorkspace.id}`),
       ]);
       const cJson = await cRes.json().catch(() => ({}));
       const pJson = await pRes.json().catch(() => ({}));
       const tJson = await tRes.json().catch(() => ({}));
       const ctJson = await ctRes.json().catch(() => ({}));
       const iJson = await iRes.json().catch(() => ({}));
+      const sJson = await sRes.json().catch(() => ({}));
       if (cancelled) return;
       const projects = pJson.projects ?? [];
       const tasks = tJson.tasks ?? [];
       const contracts = ctJson.contracts ?? [];
       const invoices = iJson.invoices ?? [];
+      const submissions = sJson.submissions ?? [];
       setCounts({
         contacts: (cJson.contacts ?? []).length,
         activeProjects: projects.filter(
@@ -65,6 +70,7 @@ export default function DashboardPage() {
         outstandingInvoices: invoices.filter(
           (i: { status: string }) => i.status === "sent" || i.status === "overdue"
         ).length,
+        formSubmissions: submissions.length,
       });
     })();
     return () => {
@@ -98,6 +104,12 @@ export default function DashboardPage() {
       icon: Receipt,
       href: "/invoices",
     },
+    {
+      label: "Form Submissions",
+      value: counts.formSubmissions,
+      icon: ClipboardList,
+      href: "/submissions",
+    },
   ];
 
   if (isLoading) {
@@ -116,7 +128,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <DashboardWelcome />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (

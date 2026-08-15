@@ -274,3 +274,77 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   overdue: "Overdue",
   cancelled: "Cancelled",
 };
+
+// ---------------------------------------------------------------------------
+// Phase 5 tables: Forms + Questionnaires
+// ---------------------------------------------------------------------------
+
+export type FormStatus = "draft" | "active" | "archived";
+
+export type FormFieldType =
+  | "text"
+  | "textarea"
+  | "email"
+  | "phone"
+  | "number"
+  | "date"
+  | "select"
+  | "radio"
+  | "checkbox";
+
+export interface FormField {
+  id: string;
+  type: FormFieldType;
+  label: string;
+  placeholder?: string;
+  required: boolean;
+  options?: string[]; // For select, radio, checkbox
+}
+
+export interface Form {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  status: FormStatus;
+  fields: FormField[];
+  submit_button_text: string;
+  success_message: string;
+  allow_multiple_submissions: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  form_id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  submitted_data: Record<string, string | string[] | number | boolean>;
+  submitted_at: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  auto_created_contact: boolean;
+  // Optional relations for list + detail views.
+  form?: Pick<Form, "id" | "name" | "fields"> | null;
+  contact?: Contact | null;
+}
+
+// Labels + badge styling helpers for forms.
+export const FORM_STATUS_LABELS: Record<FormStatus, string> = {
+  draft: "Draft",
+  active: "Active",
+  archived: "Archived",
+};
+
+export const FORM_FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
+  text: "Short Text",
+  textarea: "Long Text",
+  email: "Email",
+  phone: "Phone",
+  number: "Number",
+  date: "Date",
+  select: "Dropdown",
+  radio: "Multiple Choice",
+  checkbox: "Checkboxes",
+};
