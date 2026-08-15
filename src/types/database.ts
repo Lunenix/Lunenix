@@ -390,6 +390,16 @@ export interface EmailLog {
   template?: Pick<EmailTemplate, "id" | "name"> | null;
 }
 
+export interface EmailSettings {
+  id: string;
+  workspace_id: string;
+  from_email: string;
+  from_name: string;
+  reply_to: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type AutomationTriggerType =
   | "form_submission"
   | "lead_stage_change"

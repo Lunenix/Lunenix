@@ -5,13 +5,16 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Default "from" address - use onboarding@resend.dev for testing
-// In production, replace with your verified domain email (e.g., hello@yourdomain.com)
+// Default "from" address and name (used when workspace has no email settings)
 const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+const DEFAULT_FROM_NAME = "Lunenix";
 
 /**
  * POST /api/emails/send
  * Send an email (single or bulk) via Resend and log it
+ * 
+ * Uses workspace-specific email settings (from_email, from_name, reply_to) if configured,
+ * otherwise falls back to platform defaults.
  * 
  * Body options:
  * - Single: { workspace_id, contact_id?, template_id?, recipient_email, recipient_name?, subject, body }
@@ -37,17 +40,31 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Fetch workspace email settings (from_email, from_name, reply_to)
+  const { data: settings } = await supabase
+    .from("email_settings")
+    .select("*")
+    .eq("workspace_id", workspace_id)
+    .maybeSingle();
+
+  // Use workspace settings if configured, otherwise use platform defaults
+  const fromEmail = settings?.from_email || DEFAULT_FROM_EMAIL;
+  const fromName = settings?.from_name || DEFAULT_FROM_NAME;
+  const from = `${fromName} <${fromEmail}>`;
+  const replyTo = settings?.reply_to || undefined;
+
   // Handle bulk email sending
   if (emails && Array.isArray(emails)) {
     const results = await Promise.allSettled(
       emails.map(async (email) => {
         try {
-          // Send via Resend
+          // Send via Resend using workspace email settings
           await resend.emails.send({
-            from: DEFAULT_FROM_EMAIL,
+            from,
             to: email.recipient_email,
             subject: email.subject,
             html: email.body,
+            replyTo: replyTo,
           });
 
           // Log success
@@ -126,12 +143,13 @@ export async function POST(request: NextRequest) {
   let errorMessage: string | null = null;
 
   try {
-    // Send via Resend
+    // Send via Resend using workspace email settings
     await resend.emails.send({
-      from: DEFAULT_FROM_EMAIL,
+      from,
       to: recipient_email,
       subject,
       html: emailBody,
+      replyTo: replyTo,
     });
   } catch (err) {
     status = "failed";

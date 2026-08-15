@@ -48,7 +48,7 @@ const navItems = [
   { href: "/email-templates", label: "Email Templates", icon: Mail },
   { href: "/automation", label: "Automation", icon: Zap },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings/email", label: "Settings", icon: Settings },
 ];
 
 interface SidebarProps {
