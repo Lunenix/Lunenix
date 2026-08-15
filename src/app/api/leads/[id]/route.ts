@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /**
  * PATCH /api/leads/[id]
@@ -32,6 +33,13 @@ export async function PATCH(
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
   }
+  
+  // Fetch old lead to detect stage change
+  const { data: oldLead } = await supabase
+    .from("leads")
+    .select("stage_id, workspace_id")
+    .eq("id", params.id)
+    .single();
 
   const { data, error } = await supabase
     .from("leads")
@@ -43,6 +51,21 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  
+  // Trigger automation workflows if stage changed
+  if (data && oldLead && "stage_id" in update && oldLead.stage_id !== data.stage_id) {
+    executeWorkflowsForTrigger("lead_stage_change", {
+      lead_id: data.id,
+      lead: data,
+      from_stage_id: oldLead.stage_id,
+      to_stage_id: data.stage_id,
+      contact_id: data.contact_id,
+      user_id: user.id,
+    }, data.workspace_id).catch((err) => {
+      console.error("Error executing lead_stage_change workflows:", err);
+    });
+  }
+  
   return NextResponse.json({ lead: data });
 }
 

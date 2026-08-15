@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /**
  * GET /api/contracts/[id]
@@ -62,6 +63,13 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
+  
+  // Fetch old contract to detect status change
+  const { data: oldContract } = await supabase
+    .from("contracts")
+    .select("status, workspace_id")
+    .eq("id", id)
+    .single();
 
   // Build update object with only provided fields
   const updates: Record<string, unknown> = {};
@@ -93,6 +101,20 @@ export async function PATCH(
       { error: "Failed to update contract" },
       { status: 500 }
     );
+  }
+  
+  // Trigger automation workflows if contract was just signed
+  if (contract && oldContract && body.status !== undefined && 
+      oldContract.status !== "signed" && contract.status === "signed") {
+    executeWorkflowsForTrigger("contract_signed", {
+      contract_id: contract.id,
+      contract,
+      contact_id: contract.contact_id,
+      project_id: contract.project_id,
+      user_id: user.id,
+    }, contract.workspace_id).catch((err) => {
+      console.error("Error executing contract_signed workflows:", err);
+    });
   }
 
   return NextResponse.json({ contract });

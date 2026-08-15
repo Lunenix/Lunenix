@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /**
  * PATCH /api/tasks/[id]
@@ -33,6 +34,13 @@ export async function PATCH(
     if (key in body) update[key] = body[key];
   }
 
+  // Fetch old task to detect completion
+  const { data: oldTask } = await supabase
+    .from("tasks")
+    .select("status, workspace_id")
+    .eq("id", params.id)
+    .single();
+
   // Keep completed_at in sync with status changes.
   if ("status" in body) {
     update.completed_at = body.status === "done" ? new Date().toISOString() : null;
@@ -48,6 +56,20 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  
+  // Trigger automation workflows if task was just completed
+  if (data && oldTask && "status" in update && 
+      oldTask.status !== "done" && data.status === "done") {
+    executeWorkflowsForTrigger("task_completed", {
+      task_id: data.id,
+      task: data,
+      project_id: data.project_id,
+      user_id: user.id,
+    }, data.workspace_id).catch((err) => {
+      console.error("Error executing task_completed workflows:", err);
+    });
+  }
+  
   return NextResponse.json({ task: data });
 }
 

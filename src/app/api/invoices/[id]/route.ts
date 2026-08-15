@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /**
  * GET /api/invoices/[id]
@@ -63,6 +64,13 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
+  
+  // Fetch old invoice to detect status change
+  const { data: oldInvoice } = await supabase
+    .from("invoices")
+    .select("status, workspace_id")
+    .eq("id", id)
+    .single();
 
   // Build update object with only provided fields
   const updates: Record<string, unknown> = {};
@@ -118,6 +126,20 @@ export async function PATCH(
       { error: "Failed to update invoice" },
       { status: 500 }
     );
+  }
+  
+  // Trigger automation workflows if invoice was just sent
+  if (invoice && oldInvoice && body.status !== undefined && 
+      oldInvoice.status !== "sent" && invoice.status === "sent") {
+    executeWorkflowsForTrigger("invoice_sent", {
+      invoice_id: invoice.id,
+      invoice,
+      contact_id: invoice.contact_id,
+      project_id: invoice.project_id,
+      user_id: user.id,
+    }, invoice.workspace_id).catch((err) => {
+      console.error("Error executing invoice_sent workflows:", err);
+    });
   }
 
   return NextResponse.json({ invoice });

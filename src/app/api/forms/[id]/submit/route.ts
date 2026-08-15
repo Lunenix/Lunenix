@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import type { FormField } from "@/types/database";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /**
  * POST /api/forms/[id]/submit
@@ -156,6 +157,19 @@ export async function POST(
         { error: "Failed to submit form" },
         { status: 500 }
       );
+    }
+    
+    // Trigger automation workflows for form_submission
+    if (submission) {
+      executeWorkflowsForTrigger("form_submission", {
+        form_id: formId,
+        submission_id: submission.id,
+        submission,
+        contact_id,
+        submitted_data,
+      }, form.workspace_id).catch((err) => {
+        console.error("Error executing form_submission workflows:", err);
+      });
     }
 
     return NextResponse.json(

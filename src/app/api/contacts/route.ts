@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /**
  * GET /api/contacts?workspaceId=...
@@ -72,5 +73,17 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  
+  // Trigger automation workflows for contact_created
+  if (data) {
+    executeWorkflowsForTrigger("contact_created", {
+      contact_id: data.id,
+      contact: data,
+      user_id: user.id,
+    }, workspace_id).catch((err) => {
+      console.error("Error executing contact_created workflows:", err);
+    });
+  }
+  
   return NextResponse.json({ contact: data }, { status: 201 });
 }
