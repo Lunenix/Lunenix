@@ -25,17 +25,19 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  KanbanSquare,
   Users,
   X,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/contacts", label: "Contacts", icon: Users },
-  { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
-  { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/contacts", label: "Contacts", icon: Users },
+  { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/invoices", label: "Invoices", icon: FileText },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 interface SidebarProps {

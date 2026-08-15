@@ -1,4 +1,8 @@
+"use client";
+
 import { DashboardWelcome } from "@/components/layout/DashboardWelcome";
+import { CreateWorkspaceForm } from "@/components/workspace/CreateWorkspaceForm";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Card,
   CardContent,
@@ -9,6 +13,7 @@ import {
   CalendarClock,
   FileText,
   FolderKanban,
+  Loader2,
   Users,
 } from "lucide-react";
 
@@ -20,6 +25,20 @@ const stats = [
 ];
 
 export default function DashboardPage() {
+  const { activeWorkspace, isLoading } = useWorkspace();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!activeWorkspace) {
+    return <CreateWorkspaceForm />;
+  }
+
   return (
     <div className="space-y-8">
       <DashboardWelcome />
