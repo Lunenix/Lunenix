@@ -109,9 +109,14 @@ export function Sidebar({
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Building2 className="h-5 w-5" />
             </div>
-            <span className="text-lg font-semibold tracking-tight">
-              Lunenix
-            </span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-lg font-semibold tracking-tight leading-none">
+                Lunenix
+              </span>
+              <span className="text-xs text-muted-foreground leading-none mt-0.5">
+                Business Hub
+              </span>
+            </div>
           </Link>
           <Button
             variant="ghost"

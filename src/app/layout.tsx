@@ -14,8 +14,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Lunenix",
-  description: "Private CRM & business management platform",
+  title: "Lunenix | Business Hub",
+  description: "Lunenix Business Hub — your private multi-business management platform",
 };
 
 export default function RootLayout({

@@ -11,7 +11,7 @@ export default function AuthLayout({
             Lunenix
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Private CRM &amp; business management
+            Business Hub
           </p>
         </div>
         {children}
