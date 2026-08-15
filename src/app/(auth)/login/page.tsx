@@ -180,16 +180,19 @@ function LoginForm() {
             Sign in
           </Button>
 
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full"
-            onClick={handleMagicLink}
-            disabled={magicLoading || isLoading || googleLoading}
-          >
-            {magicLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Email me a magic link
-          </Button>
+          {/* Magic link button - only show for info@lunenix.com */}
+          {email.toLowerCase().trim() === "info@lunenix.com" && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={handleMagicLink}
+              disabled={magicLoading || isLoading || googleLoading}
+            >
+              {magicLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Email me a magic link
+            </Button>
+          )}
 
           {magicSent && (
             <p className="text-center text-sm font-medium text-green-500">
