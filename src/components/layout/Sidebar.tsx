@@ -1,0 +1,226 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Building2,
+  CalendarDays,
+  Check,
+  ChevronsUpDown,
+  FileText,
+  FolderKanban,
+  LayoutDashboard,
+  LogOut,
+  Settings,
+  Users,
+  X,
+} from "lucide-react";
+
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/contacts", label: "Contacts", icon: Users },
+  { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
+  { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+];
+
+interface SidebarProps {
+  userEmail?: string | null;
+  userName?: string | null;
+  avatarUrl?: string | null;
+  /** Mobile open state controlled by the dashboard layout. */
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+function initialsOf(name?: string | null, email?: string | null) {
+  const base = name?.trim() || email?.split("@")[0] || "U";
+  const parts = base.split(/\s+/);
+  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : base.slice(0, 2);
+  return letters.toUpperCase();
+}
+
+export function Sidebar({
+  userEmail,
+  userName,
+  avatarUrl,
+  isOpen = false,
+  onClose,
+}: SidebarProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { workspaces, activeWorkspace, setActiveWorkspace, isLoading } =
+    useWorkspace();
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  return (
+    <>
+      {/* Mobile backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 md:static md:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Brand */}
+        <div className="flex h-16 items-center justify-between border-b border-border px-4">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <span className="text-lg font-semibold tracking-tight">
+              Lunenix
+            </span>
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={onClose}
+            aria-label="Close sidebar"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Workspace switcher */}
+        <div className="border-b border-border p-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-between"
+                disabled={isLoading}
+              >
+                <span className="truncate">
+                  {activeWorkspace?.name ??
+                    (isLoading ? "Loading…" : "No workspace")}
+                </span>
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
+            >
+              <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {workspaces.length === 0 && (
+                <DropdownMenuItem disabled>No workspaces yet</DropdownMenuItem>
+              )}
+              {workspaces.map((ws) => (
+                <DropdownMenuItem
+                  key={ws.id}
+                  onClick={() => setActiveWorkspace(ws)}
+                  className="cursor-pointer"
+                >
+                  <span className="truncate">{ws.name}</span>
+                  {activeWorkspace?.id === ws.id && (
+                    <Check className="ml-auto h-4 w-4" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {navItems.map((item) => {
+            const active =
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* User area */}
+        <div className="border-t border-border p-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex h-auto w-full items-center justify-start gap-3 px-2 py-2"
+              >
+                <Avatar className="h-8 w-8">
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+                  <AvatarFallback className="text-xs">
+                    {initialsOf(userName, userEmail)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-col items-start">
+                  <span className="max-w-[9rem] truncate text-sm font-medium">
+                    {userName || userEmail || "User"}
+                  </span>
+                  {userName && userEmail && (
+                    <span className="max-w-[9rem] truncate text-xs text-muted-foreground">
+                      {userEmail}
+                    </span>
+                  )}
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel className="truncate">
+                {userEmail}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </aside>
+    </>
+  );
+}
