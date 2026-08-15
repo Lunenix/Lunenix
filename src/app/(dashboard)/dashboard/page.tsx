@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { DashboardWelcome } from "@/components/layout/DashboardWelcome";
 import { CreateWorkspaceForm } from "@/components/workspace/CreateWorkspaceForm";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -10,22 +12,74 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  CalendarClock,
   FileText,
   FolderKanban,
+  ListChecks,
   Loader2,
   Users,
 } from "lucide-react";
 
-const stats = [
-  { label: "Contacts", value: 0, icon: Users },
-  { label: "Active Projects", value: 0, icon: FolderKanban },
-  { label: "Upcoming Appointments", value: 0, icon: CalendarClock },
-  { label: "Outstanding Invoices", value: 0, icon: FileText },
-];
-
 export default function DashboardPage() {
   const { activeWorkspace, isLoading } = useWorkspace();
+  const [counts, setCounts] = useState({
+    contacts: 0,
+    activeProjects: 0,
+    openTasks: 0,
+    outstandingInvoices: 0,
+  });
+
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    let cancelled = false;
+    (async () => {
+      const [cRes, pRes, tRes] = await Promise.all([
+        fetch(`/api/contacts?workspaceId=${activeWorkspace.id}`),
+        fetch(`/api/projects?workspaceId=${activeWorkspace.id}`),
+        fetch(`/api/tasks?workspaceId=${activeWorkspace.id}`),
+      ]);
+      const cJson = await cRes.json().catch(() => ({}));
+      const pJson = await pRes.json().catch(() => ({}));
+      const tJson = await tRes.json().catch(() => ({}));
+      if (cancelled) return;
+      const projects = pJson.projects ?? [];
+      const tasks = tJson.tasks ?? [];
+      setCounts({
+        contacts: (cJson.contacts ?? []).length,
+        activeProjects: projects.filter(
+          (p: { status: string }) => p.status === "active"
+        ).length,
+        openTasks: tasks.filter(
+          (t: { status: string }) => t.status !== "done"
+        ).length,
+        outstandingInvoices: 0,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkspace]);
+
+  const stats = [
+    { label: "Contacts", value: counts.contacts, icon: Users, href: "/contacts" },
+    {
+      label: "Active Projects",
+      value: counts.activeProjects,
+      icon: FolderKanban,
+      href: "/projects",
+    },
+    {
+      label: "Open Tasks",
+      value: counts.openTasks,
+      icon: ListChecks,
+      href: "/tasks",
+    },
+    {
+      label: "Outstanding Invoices",
+      value: counts.outstandingInvoices,
+      icon: FileText,
+      href: "/invoices",
+    },
+  ];
 
   if (isLoading) {
     return (
@@ -47,20 +101,19 @@ export default function DashboardPage() {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.label}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stat.value}</div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  No data yet
-                </p>
-              </CardContent>
-            </Card>
+            <Link key={stat.label} href={stat.href}>
+              <Card className="transition-colors hover:border-primary/50">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.label}
+                  </CardTitle>
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{stat.value}</div>
+                </CardContent>
+              </Card>
+            </Link>
           );
         })}
       </div>

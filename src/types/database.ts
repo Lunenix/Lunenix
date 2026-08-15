@@ -111,14 +111,82 @@ export function contactDisplayName(c: Pick<Contact, "type" | "first_name" | "las
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder types for future tables (Phase 3+). Minimal for now.
+// Phase 3 tables: Projects/Jobs + Tasks
 // ---------------------------------------------------------------------------
+
+export type ProjectStatus =
+  | "planning"
+  | "active"
+  | "on_hold"
+  | "completed"
+  | "cancelled";
 
 export interface Project {
   id: string;
   workspace_id: string;
+  contact_id: string | null;
+  lead_id: string | null;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  start_date: string | null;
+  due_date: string | null;
+  budget: number | null;
+  currency: string;
   created_at: string;
+  updated_at: string;
+  // Optional relations / computed fields for list + detail views.
+  contact?: Contact | null;
+  task_count?: number;
+  open_task_count?: number;
 }
+
+export type TaskStatus = "todo" | "in_progress" | "done";
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
+
+export interface Task {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignee_id: string | null;
+  due_date: string | null;
+  position: number;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Optional relation for cross-workspace task views.
+  project?: Pick<Project, "id" | "name"> | null;
+}
+
+// Labels + badge styling helpers shared across project/task UIs.
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  planning: "Planning",
+  active: "Active",
+  on_hold: "On hold",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  todo: "To do",
+  in_progress: "In progress",
+  done: "Done",
+};
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  urgent: "Urgent",
+};
+
+// ---------------------------------------------------------------------------
+// Placeholder types for future tables (Phase 4+). Minimal for now.
+// ---------------------------------------------------------------------------
 
 export interface Invoice {
   id: string;
