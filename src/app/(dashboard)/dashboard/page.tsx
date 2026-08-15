@@ -12,10 +12,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  FileText,
+  FileSignature,
   FolderKanban,
   ListChecks,
   Loader2,
+  Receipt,
   Users,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ export default function DashboardPage() {
     contacts: 0,
     activeProjects: 0,
     openTasks: 0,
+    activeContracts: 0,
     outstandingInvoices: 0,
   });
 
@@ -32,17 +34,23 @@ export default function DashboardPage() {
     if (!activeWorkspace) return;
     let cancelled = false;
     (async () => {
-      const [cRes, pRes, tRes] = await Promise.all([
+      const [cRes, pRes, tRes, ctRes, iRes] = await Promise.all([
         fetch(`/api/contacts?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/projects?workspaceId=${activeWorkspace.id}`),
         fetch(`/api/tasks?workspaceId=${activeWorkspace.id}`),
+        fetch(`/api/contracts?workspaceId=${activeWorkspace.id}`),
+        fetch(`/api/invoices?workspaceId=${activeWorkspace.id}`),
       ]);
       const cJson = await cRes.json().catch(() => ({}));
       const pJson = await pRes.json().catch(() => ({}));
       const tJson = await tRes.json().catch(() => ({}));
+      const ctJson = await ctRes.json().catch(() => ({}));
+      const iJson = await iRes.json().catch(() => ({}));
       if (cancelled) return;
       const projects = pJson.projects ?? [];
       const tasks = tJson.tasks ?? [];
+      const contracts = ctJson.contracts ?? [];
+      const invoices = iJson.invoices ?? [];
       setCounts({
         contacts: (cJson.contacts ?? []).length,
         activeProjects: projects.filter(
@@ -51,7 +59,12 @@ export default function DashboardPage() {
         openTasks: tasks.filter(
           (t: { status: string }) => t.status !== "done"
         ).length,
-        outstandingInvoices: 0,
+        activeContracts: contracts.filter(
+          (c: { status: string }) => c.status === "active"
+        ).length,
+        outstandingInvoices: invoices.filter(
+          (i: { status: string }) => i.status === "sent" || i.status === "overdue"
+        ).length,
       });
     })();
     return () => {
@@ -74,9 +87,15 @@ export default function DashboardPage() {
       href: "/tasks",
     },
     {
+      label: "Active Contracts",
+      value: counts.activeContracts,
+      icon: FileSignature,
+      href: "/contracts",
+    },
+    {
       label: "Outstanding Invoices",
       value: counts.outstandingInvoices,
-      icon: FileText,
+      icon: Receipt,
       href: "/invoices",
     },
   ];
@@ -97,7 +116,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <DashboardWelcome />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (

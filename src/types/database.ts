@@ -185,11 +185,92 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Placeholder types for future tables (Phase 4+). Minimal for now.
+// Phase 4 tables: Contracts + Invoices
 // ---------------------------------------------------------------------------
+
+export type ContractStatus = 
+  | "draft" 
+  | "sent" 
+  | "active" 
+  | "completed" 
+  | "cancelled";
+
+export interface Contract {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  contract_number: string;
+  name: string;
+  description: string | null;
+  status: ContractStatus;
+  start_date: string | null;
+  end_date: string | null;
+  signed_at: string | null;
+  value: number | null;
+  currency: string;
+  terms: string | null;
+  created_at: string;
+  updated_at: string;
+  // Optional relations for list + detail views.
+  contact?: Contact | null;
+  project?: Pick<Project, "id" | "name"> | null;
+}
+
+export type InvoiceStatus = 
+  | "draft" 
+  | "sent" 
+  | "paid" 
+  | "overdue" 
+  | "cancelled";
+
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+}
 
 export interface Invoice {
   id: string;
   workspace_id: string;
+  contact_id: string;
+  contract_id: string | null;
+  project_id: string | null;
+  invoice_number: string;
+  status: InvoiceStatus;
+  issue_date: string;
+  due_date: string;
+  paid_at: string | null;
+  line_items: InvoiceLineItem[];
+  subtotal: number;
+  tax_rate: number;
+  tax_amount: number;
+  total: number;
+  currency: string;
+  notes: string | null;
+  payment_terms: string | null;
   created_at: string;
+  updated_at: string;
+  // Optional relations for list + detail views.
+  contact?: Contact | null;
+  contract?: Pick<Contract, "id" | "contract_number" | "name"> | null;
+  project?: Pick<Project, "id" | "name"> | null;
 }
+
+// Labels + badge styling helpers for contracts and invoices.
+export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  active: "Active",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  paid: "Paid",
+  overdue: "Overdue",
+  cancelled: "Cancelled",
+};
