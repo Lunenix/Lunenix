@@ -25,6 +25,33 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [magicLoading, setMagicLoading] = useState(false);
+  const [magicSent, setMagicSent] = useState(false);
+
+  async function handleMagicLink() {
+    if (!email) {
+      setError("Enter your email address first, then request a magic link.");
+      return;
+    }
+    setError(null);
+    setMagicLoading(true);
+    setMagicSent(false);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    setMagicLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setMagicSent(true);
+  }
 
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
@@ -148,10 +175,28 @@ function LoginForm() {
           )}
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={isLoading || googleLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || googleLoading || magicLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Sign in
           </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={handleMagicLink}
+            disabled={magicLoading || isLoading || googleLoading}
+          >
+            {magicLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Email me a magic link
+          </Button>
+
+          {magicSent && (
+            <p className="text-center text-sm font-medium text-green-500">
+              Magic link sent! Check {email} and click the link to sign in.
+            </p>
+          )}
+
           <p className="text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link
