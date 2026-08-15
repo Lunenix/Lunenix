@@ -22,9 +22,24 @@ function isPublicPath(pathname: string): boolean {
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // If Supabase env vars are missing at runtime (e.g. not configured in the
+  // deployment platform), do NOT crash the middleware with a 500. Let the
+  // request pass through so pages can render / show a config error instead.
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error(
+      "[middleware] Missing Supabase env vars: " +
+        `NEXT_PUBLIC_SUPABASE_URL=${supabaseUrl ? "set" : "MISSING"}, ` +
+        `NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnonKey ? "set" : "MISSING"}`
+    );
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
