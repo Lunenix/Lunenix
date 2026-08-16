@@ -149,47 +149,48 @@ export default function FormsPage() {
                 </div>
 
                 <div className="flex flex-col gap-2 pt-2">
-                  {form.status === "active" && (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => copyFormLink(form.id)}
-                      className="w-full"
-                    >
-                      {copiedId === form.id ? (
-                        <>
-                          <Check className="mr-2 h-4 w-4" />
-                          Link Copied!
-                        </>
-                      ) : (
-                        <>
-                          <LinkIcon className="mr-2 h-4 w-4" />
-                          Copy Form Link
-                        </>
-                      )}
-                    </Button>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => copyFormLink(form.id)}
+                    className="w-full"
+                  >
+                    {copiedId === form.id ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Link Copied!
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="mr-2 h-4 w-4" />
+                        Copy Form Link
+                      </>
+                    )}
+                  </Button>
+                  {form.status !== "active" && (
+                    <p className="text-xs text-amber-500/90">
+                      ⚠️ Set status to <strong>Active</strong> so people can submit this form.
+                    </p>
                   )}
                   <div className="flex gap-2">
                     <Button asChild size="sm" variant="outline" className="flex-1">
                       <Link href={`/forms/${form.id}`}>Edit</Link>
                     </Button>
-                    {form.status === "active" && (
-                      <Button
-                        asChild
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <Link
+                        href={`${publicUrl}/f/${form.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
-                        <Link
-                          href={`${publicUrl}/f/${form.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink className="mr-1 h-3 w-3" />
-                          Preview
-                        </Link>
-                      </Button>
-                    )}
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        Preview
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               </CardContent>

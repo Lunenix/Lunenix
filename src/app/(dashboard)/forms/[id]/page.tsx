@@ -313,7 +313,7 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
           </Card>
 
           {/* Public URL */}
-          {!isNew && status === "active" && (
+          {!isNew && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -370,6 +370,11 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
                   </Button>
                 </div>
 
+                {status !== "active" && (
+                  <p className="text-xs text-amber-500/90 border-t pt-3">
+                    ⚠️ This form is <strong>{status}</strong>. Set status to <strong>Active</strong> and Save so people can actually submit it.
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground border-t pt-3">
                   💡 Tip: Embed this link as a button on your website or share it directly with clients.
                 </p>
