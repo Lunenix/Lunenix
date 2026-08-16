@@ -21,6 +21,7 @@ import {
   INVOICE_STATUS_LABELS,
   Contact,
   Contract,
+  EsignDocument,
   Project,
   contactDisplayName,
 } from "@/types/database";
@@ -51,7 +52,8 @@ export default function InvoicesPage() {
         await Promise.all([
           fetch(`/api/invoices?workspaceId=${activeWorkspace.id}`),
           fetch(`/api/contacts?workspaceId=${activeWorkspace.id}`),
-          fetch(`/api/contracts?workspaceId=${activeWorkspace.id}`),
+          // Contracts are now the e-signature documents (unified section).
+          fetch(`/api/esign?workspaceId=${activeWorkspace.id}`),
           fetch(`/api/projects?workspaceId=${activeWorkspace.id}`),
         ]);
 
@@ -65,7 +67,17 @@ export default function InvoicesPage() {
 
       setInvoices(invoicesData.invoices || []);
       setContacts(contactsData.contacts || []);
-      setContracts(contractsData.contracts || []);
+      // Map e-sign documents to the {id, contract_number, name} shape the
+      // invoice picker expects. Only include ones that have a contract number.
+      setContracts(
+        ((contractsData.documents || []) as EsignDocument[])
+          .filter((d) => !!d.contract_number)
+          .map((d) => ({
+            id: d.id,
+            contract_number: d.contract_number,
+            name: d.name,
+          })) as unknown as Contract[]
+      );
       setProjects(projectsData.projects || []);
     } catch (error) {
       console.error("Error fetching data:", error);

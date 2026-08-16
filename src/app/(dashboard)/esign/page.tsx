@@ -44,7 +44,7 @@ import {
   Project,
   contactDisplayName,
 } from "@/types/database";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatCurrency } from "@/lib/format";
 import { esignStatusClasses } from "@/lib/status";
 
 export default function EsignPage() {
@@ -114,9 +114,10 @@ export default function EsignPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">E-Signatures</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Contracts</h1>
           <p className="text-sm text-muted-foreground">
-            Upload a document, place signature fields, and send it for signing.
+            Create a contract, place signature fields, and send it out for
+            e-signature — all in one place.
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
@@ -180,6 +181,11 @@ export default function EsignPage() {
                       <span className="flex items-center gap-1">
                         <FolderOpen className="h-3 w-3" />
                         {doc.project.name}
+                      </span>
+                    )}
+                    {doc.value != null && (
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(doc.value, doc.currency || "USD")}
                       </span>
                     )}
                     {doc.signer_email && <span>Signer: {doc.signer_email}</span>}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -95,6 +96,14 @@ export default function EsignEditorPage({
   const [signerEmail, setSignerEmail] = useState("");
   const [assignedWorkflowId, setAssignedWorkflowId] = useState("none");
 
+  // Contract/business metadata (unified contracts section).
+  const [value, setValue] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [terms, setTerms] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
@@ -116,6 +125,12 @@ export default function EsignEditorPage({
       setSignerName(d.signer_name || (d.contact ? contactDisplayName(d.contact) : ""));
       setSignerEmail(d.signer_email || d.contact?.email || "");
       setAssignedWorkflowId(d.assigned_workflow_id || "none");
+      setValue(d.value != null ? String(d.value) : "");
+      setCurrency(d.currency || "USD");
+      setStartDate(d.start_date || "");
+      setEndDate(d.end_date || "");
+      setDescription(d.description || "");
+      setTerms(d.terms || "");
       setFields(
         (d.fields || []).map((f) => ({
           localId: uid(),
@@ -241,6 +256,12 @@ export default function EsignEditorPage({
           signer_email: signerEmail || null,
           assigned_workflow_id:
             assignedWorkflowId === "none" ? null : assignedWorkflowId,
+          value: value.trim() === "" ? null : Number(value),
+          currency: currency || "USD",
+          start_date: startDate || null,
+          end_date: endDate || null,
+          description: description.trim() || null,
+          terms: terms.trim() || null,
         }),
       });
       if (!silent) setNotice("Saved.");
@@ -565,6 +586,80 @@ export default function EsignEditorPage({
                 </CardContent>
               </Card>
             )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Contract details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Value</Label>
+                    <Input
+                      className="h-8"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Currency</Label>
+                    <Select value={currency} onValueChange={setCurrency}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                        <SelectItem value="CAD">CAD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Start date</Label>
+                    <Input
+                      className="h-8"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">End date</Label>
+                    <Input
+                      className="h-8"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Description</Label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Short summary of what this contract covers"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Terms</Label>
+                  <Textarea
+                    value={terms}
+                    onChange={(e) => setTerms(e.target.value)}
+                    placeholder="Key terms, scope, or notes"
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="pb-3">

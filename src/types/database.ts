@@ -588,6 +588,13 @@ export interface EsignDocument {
   last_reminder_at: string | null;
   cloned_from: string | null;
   contract_number: string | null;
+  // Business/contract metadata (folded in from the former standalone contracts module).
+  value: number | null;
+  currency: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  terms: string | null;
+  description: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

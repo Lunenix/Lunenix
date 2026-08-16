@@ -97,8 +97,14 @@ export async function PATCH(
     "assigned_workflow_id",
     "signer_name",
     "signer_email",
+    "value",
+    "currency",
+    "start_date",
+    "end_date",
+    "terms",
+    "description",
   ]) {
-    if (key in body) allowed[key] = body[key] || null;
+    if (key in body) allowed[key] = body[key] === "" ? null : body[key] ?? null;
   }
 
   const { data, error } = await supabase
