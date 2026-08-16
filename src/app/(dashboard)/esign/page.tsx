@@ -165,6 +165,11 @@ export default function EsignPage() {
                     </Badge>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {doc.contract_number && (
+                      <span className="font-mono font-medium text-foreground">
+                        {doc.contract_number}
+                      </span>
+                    )}
                     {doc.contact && (
                       <span className="flex items-center gap-1">
                         <User className="h-3 w-3" />

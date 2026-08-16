@@ -334,11 +334,14 @@ export default function EsignEditorPage({
                 {ESIGN_STATUS_LABELS[doc.status]}
               </Badge>
             </div>
-            {doc.project && (
-              <p className="text-xs text-muted-foreground">
-                Project: {doc.project.name}
-              </p>
-            )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {doc.contract_number && (
+                <span className="font-mono font-medium text-foreground">
+                  {doc.contract_number}
+                </span>
+              )}
+              {doc.project && <span>Project: {doc.project.name}</span>}
+            </div>
           </div>
         </div>
         {!isLocked && (

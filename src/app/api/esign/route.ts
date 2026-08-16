@@ -131,9 +131,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to upload PDF" }, { status: 500 });
   }
 
+  // Generate contract number atomically.
+  const currentYear = new Date().getFullYear();
+  const { data: contractNumberResult } = await admin.rpc("generate_contract_number", {
+    p_workspace_id: workspace_id,
+    p_year: currentYear,
+  });
+  const contractNumber = contractNumberResult as string;
+
   await admin
     .from("esign_documents")
-    .update({ original_file_path: path })
+    .update({ original_file_path: path, contract_number: contractNumber })
     .eq("id", doc.id);
 
   await admin.from("esign_events").insert({
@@ -143,7 +151,7 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json(
-    { document: { ...doc, original_file_path: path } },
+    { document: { ...doc, original_file_path: path, contract_number: contractNumber } },
     { status: 201 }
   );
 }

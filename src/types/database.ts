@@ -587,6 +587,7 @@ export interface EsignDocument {
   reminder_count: number;
   last_reminder_at: string | null;
   cloned_from: string | null;
+  contract_number: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
