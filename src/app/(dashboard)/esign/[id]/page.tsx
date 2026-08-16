@@ -1282,7 +1282,8 @@ function DraggableField({
             onPointerDown={onPointerDown("resize")}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            className="absolute -bottom-1 -right-1 h-3 w-3 cursor-se-resize rounded-sm border border-primary bg-white"
+            className="absolute -bottom-1 -right-1 h-3 w-3 cursor-se-resize rounded-sm border-2 bg-white"
+            style={{ borderColor: '#9333ea' }}
           />
         </>
       )}
