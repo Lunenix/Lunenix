@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PdfPages, type PageSize } from "@/components/esign/PdfPages";
 import { SignaturePad, type SignatureValue } from "@/components/esign/SignaturePad";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -26,11 +35,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertTriangle,
   ArrowLeft,
   Loader2,
+  MoreVertical,
+  Pencil,
   PenLine,
   Type as TypeIcon,
   Calendar as CalendarIcon,
+  Upload,
   User as UserIcon,
   Baseline,
   Trash2,
@@ -44,13 +57,17 @@ import {
 } from "lucide-react";
 import {
   EsignDocument,
+  EsignDocumentType,
   EsignField,
   EsignFieldType,
   EsignEvent,
   EsignSignature,
   ESIGN_FIELD_LABELS,
   ESIGN_STATUS_LABELS,
+  ESIGN_TYPE_LABELS,
   AutomationWorkflow,
+  Contact,
+  Project,
   contactDisplayName,
 } from "@/types/database";
 import { esignStatusClasses } from "@/lib/status";
@@ -82,6 +99,7 @@ export default function EsignEditorPage({
   params: { id: string };
 }) {
   const { id } = params;
+  const router = useRouter();
 
   const [doc, setDoc] = useState<EsignDocument | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -91,6 +109,8 @@ export default function EsignEditorPage({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armedType, setArmedType] = useState<EsignFieldType | null>(null);
   const [workflows, setWorkflows] = useState<AutomationWorkflow[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const [signerName, setSignerName] = useState("");
   const [signerEmail, setSignerEmail] = useState("");
@@ -111,6 +131,22 @@ export default function EsignEditorPage({
   const [notice, setNotice] = useState<string | null>(null);
   const [sendUrl, setSendUrl] = useState<string | null>(null);
   const [countersigning, setCountersigning] = useState(false);
+
+  // Document action dialogs.
+  const [editOpen, setEditOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState<EsignDocumentType>("contract");
+  const [editContactId, setEditContactId] = useState("none");
+  const [editProjectId, setEditProjectId] = useState("none");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [replaceFile, setReplaceFile] = useState<File | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [replaceError, setReplaceError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,11 +183,19 @@ export default function EsignEditorPage({
         }))
       );
       if (d.workspace_id) {
-        const wfRes = await fetch(
-          `/api/automation-workflows?workspaceId=${d.workspace_id}`
-        );
-        const wfData = await wfRes.json();
+        const [wfRes, contactsRes, projectsRes] = await Promise.all([
+          fetch(`/api/automation-workflows?workspaceId=${d.workspace_id}`),
+          fetch(`/api/contacts?workspaceId=${d.workspace_id}`),
+          fetch(`/api/projects?workspaceId=${d.workspace_id}`),
+        ]);
+        const [wfData, contactsData, projectsData] = await Promise.all([
+          wfRes.json(),
+          contactsRes.json(),
+          projectsRes.json(),
+        ]);
         setWorkflows(wfData.workflows || []);
+        setContacts(contactsData.contacts || []);
+        setProjects(projectsData.projects || []);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load document");
@@ -365,26 +409,70 @@ export default function EsignEditorPage({
             </div>
           </div>
         </div>
-        {!isLocked && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => saveFields(false)} disabled={saving}>
-              {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
+        <div className="flex gap-2">
+          {!isLocked && (
+            <>
+              <Button variant="outline" onClick={() => saveFields(false)} disabled={saving}>
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save
+              </Button>
+              <Button onClick={send} disabled={sending}>
+                {sending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                Send for signing
+              </Button>
+            </>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" title="Document actions">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  setEditName(doc.name);
+                  setEditType(doc.type as EsignDocumentType);
+                  setEditContactId(doc.contact_id || "none");
+                  setEditProjectId(doc.project_id || "none");
+                  setEditError(null);
+                  setEditOpen(true);
+                }}
+              >
+                <Pencil className="mr-2 h-4 w-4" /> Edit details
+              </DropdownMenuItem>
+              {!isLocked && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setReplaceFile(null);
+                    setReplaceError(null);
+                    setReplaceOpen(true);
+                  }}
+                >
+                  <Upload className="mr-2 h-4 w-4" /> Replace PDF
+                </DropdownMenuItem>
               )}
-              Save
-            </Button>
-            <Button onClick={send} disabled={sending}>
-              {sending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
-              )}
-              Send for signing
-            </Button>
-          </div>
-        )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteOpen(true);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete document
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {(error || notice) && (
@@ -712,6 +800,217 @@ export default function EsignEditorPage({
           </div>
         </div>
       )}
+
+      {/* ─────────── Edit details dialog ─────────── */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit document details</DialogTitle>
+            <DialogDescription>
+              Update the name, type, or linked client and project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={editType} onValueChange={(v) => setEditType(v as EsignDocumentType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(ESIGN_TYPE_LABELS) as EsignDocumentType[]).map((t) => (
+                    <SelectItem key={t} value={t}>{ESIGN_TYPE_LABELS[t]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Client</Label>
+              <Select value={editContactId} onValueChange={setEditContactId}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {contacts.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{contactDisplayName(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Project</Label>
+              <Select value={editProjectId} onValueChange={setEditProjectId}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {editError && <p className="text-sm text-destructive">{editError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              Cancel
+            </Button>
+            <Button
+              disabled={editSaving}
+              onClick={async () => {
+                if (!editName.trim()) { setEditError("Name is required."); return; }
+                setEditSaving(true);
+                setEditError(null);
+                try {
+                  const res = await fetch(`/api/esign/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: editName.trim(),
+                      type: editType,
+                      contact_id: editContactId === "none" ? null : editContactId,
+                      project_id: editProjectId === "none" ? null : editProjectId,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Failed to update");
+                  setEditOpen(false);
+                  await load();
+                } catch (e) {
+                  setEditError(e instanceof Error ? e.message : "Failed to update");
+                } finally {
+                  setEditSaving(false);
+                }
+              }}
+            >
+              {editSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─────────── Replace PDF dialog ─────────── */}
+      <Dialog open={replaceOpen} onOpenChange={setReplaceOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Replace PDF</DialogTitle>
+            <DialogDescription>
+              Upload a new PDF to replace the current document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                All existing signature field placements will be cleared. You will need to re-add
+                them on the new document. The document will return to <strong>draft</strong> status.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="replace-pdf">New PDF file</Label>
+              <Input
+                id="replace-pdf"
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setReplaceFile(e.target.files?.[0] || null)}
+              />
+            </div>
+            {replaceError && <p className="text-sm text-destructive">{replaceError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReplaceOpen(false)} disabled={replacing}>
+              Cancel
+            </Button>
+            <Button
+              disabled={replacing || !replaceFile}
+              onClick={async () => {
+                if (!replaceFile) { setReplaceError("Please select a PDF file."); return; }
+                setReplacing(true);
+                setReplaceError(null);
+                try {
+                  const fd = new FormData();
+                  fd.append("file", replaceFile);
+                  const res = await fetch(`/api/esign/${id}/replace-file`, {
+                    method: "PUT",
+                    body: fd,
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Failed to replace PDF");
+                  setReplaceOpen(false);
+                  setFields([]);
+                  await load();
+                } catch (e) {
+                  setReplaceError(e instanceof Error ? e.message : "Failed to replace PDF");
+                } finally {
+                  setReplacing(false);
+                }
+              }}
+            >
+              {replacing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-2 h-4 w-4" />
+              )}
+              Replace PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─────────── Delete confirmation dialog ─────────── */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete document</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete{" "}
+              <strong>{doc?.name}</strong>? This will remove the document, all
+              field placements, signatures, and the stored PDF. This cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                setDeleteError(null);
+                try {
+                  const res = await fetch(`/api/esign/${id}`, { method: "DELETE" });
+                  if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || "Failed to delete");
+                  }
+                  router.push("/esign");
+                } catch (e) {
+                  setDeleteError(e instanceof Error ? e.message : "Failed to delete");
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
