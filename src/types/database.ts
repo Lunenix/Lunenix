@@ -390,14 +390,51 @@ export interface EmailLog {
   template?: Pick<EmailTemplate, "id" | "name"> | null;
 }
 
+export type EmailProvider = "resend" | "smtp";
+
 export interface EmailSettings {
   id: string;
   workspace_id: string;
-  from_email: string;
-  from_name: string;
+  from_email: string | null;
+  from_name: string | null;
   reply_to: string | null;
+  provider: EmailProvider;
+  // Outgoing SMTP
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_secure: boolean;
+  smtp_username: string | null;
+  // Incoming IMAP
+  imap_enabled: boolean;
+  imap_host: string | null;
+  imap_port: number | null;
+  imap_secure: boolean;
+  imap_username: string | null;
+  imap_last_synced_at: string | null;
+  imap_last_error: string | null;
+  // Server-derived flags (passwords themselves are never sent to the client).
+  has_smtp_password?: boolean;
+  has_imap_password?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface InboundEmail {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  message_id: string | null;
+  imap_uid: number | null;
+  from_email: string;
+  from_name: string | null;
+  to_email: string | null;
+  subject: string | null;
+  body_text: string | null;
+  body_html: string | null;
+  received_at: string;
+  is_read: boolean;
+  created_at: string;
+  contact?: Contact | null;
 }
 
 export type AutomationTriggerType =

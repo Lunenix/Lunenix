@@ -3,6 +3,10 @@
     {
       "path": "/api/esign/reminders/run",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/emails/inbound/run",
+      "schedule": "0 * * * *"
     }
   ]
 }
