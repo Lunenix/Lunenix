@@ -36,6 +36,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   AlertTriangle,
   ArrowLeft,
   Eye,
@@ -53,11 +66,14 @@ import {
   Send,
   Save,
   CheckCircle2,
+  Check,
+  ChevronsUpDown,
   Copy,
   Sparkles,
   Download,
   ShieldCheck,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   EsignDocument,
   EsignDocumentType,
@@ -118,6 +134,7 @@ export default function EsignEditorPage({
   const [signerName, setSignerName] = useState("");
   const [signerEmail, setSignerEmail] = useState("");
   const [assignedWorkflowId, setAssignedWorkflowId] = useState("none");
+  const [signerPickerOpen, setSignerPickerOpen] = useState(false);
 
   // Contract/business metadata (unified contracts section).
   const [value, setValue] = useState("");
@@ -911,10 +928,69 @@ export default function EsignEditorPage({
               <CardContent className="space-y-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Signer name</Label>
+                  {contacts.length > 0 && (
+                    <Popover open={signerPickerOpen} onOpenChange={setSignerPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          size="sm"
+                          className="h-8 w-full justify-between font-normal"
+                        >
+                          <span className="truncate text-muted-foreground">
+                            Select from contacts…
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search contacts…" />
+                          <CommandList>
+                            <CommandEmpty>No contacts found.</CommandEmpty>
+                            <CommandGroup>
+                              {contacts.map((c) => {
+                                const name = contactDisplayName(c);
+                                return (
+                                  <CommandItem
+                                    key={c.id}
+                                    value={name + " " + (c.email || "") + " " + c.id}
+                                    onSelect={() => {
+                                      setSignerName(name);
+                                      if (c.email) setSignerEmail(c.email);
+                                      setSignerPickerOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        signerName === name
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    <span className="flex flex-col">
+                                      <span>{name}</span>
+                                      {c.email && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {c.email}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   <Input
                     className="h-8"
                     value={signerName}
                     onChange={(e) => setSignerName(e.target.value)}
+                    placeholder="Type a name or select a contact above"
                   />
                 </div>
                 <div className="space-y-1.5">
