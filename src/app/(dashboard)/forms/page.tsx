@@ -12,6 +12,8 @@ import {
   Plus,
   ExternalLink,
   FileText,
+  Link as LinkIcon,
+  Check,
 } from "lucide-react";
 import { Form, FORM_STATUS_LABELS } from "@/types/database";
 import { formatDateTime } from "@/lib/format";
@@ -29,6 +31,7 @@ export default function FormsPage() {
   const { activeWorkspace, isLoading: workspaceLoading } = useWorkspace();
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeWorkspace?.id) {
@@ -68,6 +71,13 @@ export default function FormsPage() {
   }
 
   const publicUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const copyFormLink = (formId: string) => {
+    const url = `${publicUrl}/f/${formId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(formId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   return (
     <div className="space-y-6">
@@ -138,27 +148,49 @@ export default function FormsPage() {
                   Created {formatDateTime(form.created_at)}
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button asChild size="sm" className="flex-1">
-                    <Link href={`/forms/${form.id}`}>Edit</Link>
-                  </Button>
+                <div className="flex flex-col gap-2 pt-2">
                   {form.status === "active" && (
                     <Button
-                      asChild
                       size="sm"
-                      variant="outline"
-                      className="flex-1"
+                      variant="default"
+                      onClick={() => copyFormLink(form.id)}
+                      className="w-full"
                     >
-                      <Link
-                        href={`${publicUrl}/f/${form.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="mr-1 h-3 w-3" />
-                        View
-                      </Link>
+                      {copiedId === form.id ? (
+                        <>
+                          <Check className="mr-2 h-4 w-4" />
+                          Link Copied!
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="mr-2 h-4 w-4" />
+                          Copy Form Link
+                        </>
+                      )}
                     </Button>
                   )}
+                  <div className="flex gap-2">
+                    <Button asChild size="sm" variant="outline" className="flex-1">
+                      <Link href={`/forms/${form.id}`}>Edit</Link>
+                    </Button>
+                    {form.status === "active" && (
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <Link
+                          href={`${publicUrl}/f/${form.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="mr-1 h-3 w-3" />
+                          Preview
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -25,6 +25,8 @@ import {
   Loader2,
   Save,
   Trash2,
+  Check,
+  Link as LinkIcon,
 } from "lucide-react";
 import { Form, FormField, FormStatus } from "@/types/database";
 
@@ -53,6 +55,7 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!isNew && id && activeWorkspace?.id) {
@@ -161,7 +164,8 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
   const copyPublicUrl = () => {
     const publicUrl = `${window.location.origin}/f/${isNew ? "FORM_ID" : id}`;
     navigator.clipboard.writeText(publicUrl);
-    alert("Public form URL copied to clipboard!");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) {
@@ -312,26 +316,48 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
           {!isNew && status === "active" && (
             <Card>
               <CardHeader>
-                <CardTitle>Public Form URL</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <LinkIcon className="h-5 w-5" />
+                  Share Form
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Share this URL to collect submissions
+                  Use this link on your website, in emails, or anywhere you want to collect form submissions.
                 </p>
-                <div className="flex gap-2">
+                
+                {/* URL Display */}
+                <div className="rounded-md bg-muted p-3">
+                  <p className="text-xs font-mono break-all text-muted-foreground">
+                    {publicUrl}
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col gap-2">
                   <Button
-                    variant="outline"
+                    variant="default"
                     size="sm"
-                    className="flex-1"
+                    className="w-full"
                     onClick={copyPublicUrl}
                   >
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy URL
+                    {copied ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Link Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy Link
+                      </>
+                    )}
                   </Button>
                   <Button
                     asChild
                     size="sm"
                     variant="outline"
+                    className="w-full"
                   >
                     <Link
                       href={publicUrl}
@@ -339,10 +365,14 @@ export default function FormBuilderPage({ params }: FormBuilderPageProps) {
                       rel="noopener noreferrer"
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Open
+                      Preview Form
                     </Link>
                   </Button>
                 </div>
+
+                <p className="text-xs text-muted-foreground border-t pt-3">
+                  💡 Tip: Embed this link as a button on your website or share it directly with clients.
+                </p>
               </CardContent>
             </Card>
           )}
