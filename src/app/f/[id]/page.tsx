@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +19,11 @@ import { Loader2, CheckCircle2 } from "lucide-react";
 import { Form, FormField } from "@/types/database";
 
 interface PublicFormPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function PublicFormPage({ params }: PublicFormPageProps) {
-  const { id } = use(params);
+  const { id } = params;
 
   const [form, setForm] = useState<Form | null>(null);
   const [formData, setFormData] = useState<Record<string, string | string[] | number | boolean>>({});

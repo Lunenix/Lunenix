@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { PdfPages } from "@/components/esign/PdfPages";
 import { SignaturePad, type SignatureValue } from "@/components/esign/SignaturePad";
@@ -30,9 +30,9 @@ interface SignDoc {
 export default function SignPage({
   params,
 }: {
-  params: Promise<{ token: string }>;
+  params: { token: string };
 }) {
-  const { token } = use(params);
+  const { token } = params;
 
   const [doc, setDoc] = useState<SignDoc | null>(null);
   const [fields, setFields] = useState<EsignField[]>([]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -29,11 +29,11 @@ import {
 import { Form, FormField, FormStatus } from "@/types/database";
 
 interface FormBuilderPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function FormBuilderPage({ params }: FormBuilderPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const { activeWorkspace } = useWorkspace();
 

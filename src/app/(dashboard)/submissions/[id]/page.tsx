@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -26,13 +26,13 @@ import { FormSubmission, contactDisplayName } from "@/types/database";
 import { formatDateTime } from "@/lib/format";
 
 interface SubmissionDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function SubmissionDetailPage({
   params,
 }: SubmissionDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
 
   const [submission, setSubmission] = useState<FormSubmission | null>(null);

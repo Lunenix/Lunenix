@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { use } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { EmailTemplateEditor } from "@/components/emails/EmailTemplateEditor";
@@ -13,9 +12,9 @@ import type { EmailTemplate, TemplateVariable } from "@/types/database";
 export default function EmailTemplateEditorPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const resolvedParams = use(params);
+  const resolvedParams = params;
   const router = useRouter();
   const { activeWorkspace } = useWorkspace();
   const [name, setName] = useState("");

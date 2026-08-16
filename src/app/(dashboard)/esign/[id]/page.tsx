@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PdfPages, type PageSize } from "@/components/esign/PdfPages";
 import { SignaturePad, type SignatureValue } from "@/components/esign/SignaturePad";
@@ -79,9 +79,9 @@ const uid = () =>
 export default function EsignEditorPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = use(params);
+  const { id } = params;
 
   const [doc, setDoc] = useState<EsignDocument | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);

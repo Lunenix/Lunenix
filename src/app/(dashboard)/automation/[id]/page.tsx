@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { use } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { WorkflowBuilder } from "@/components/automation/WorkflowBuilder";
@@ -18,9 +17,9 @@ import type {
 export default function AutomationEditorPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const resolvedParams = use(params);
+  const resolvedParams = params;
   const router = useRouter();
   const { activeWorkspace } = useWorkspace();
   const [name, setName] = useState("");

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -45,13 +45,13 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { invoiceStatusClasses } from "@/lib/status";
 
 interface InvoiceDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function InvoiceDetailPage({
   params,
 }: InvoiceDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const { activeWorkspace } = useWorkspace();
 
