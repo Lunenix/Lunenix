@@ -551,7 +551,8 @@ export type EsignEventType =
   | "signed"
   | "countersigned"
   | "void"
-  | "downloaded";
+  | "downloaded"
+  | "reminded";
 
 export interface EsignEvent {
   id: string;
@@ -582,6 +583,10 @@ export interface EsignDocument {
   viewed_at: string | null;
   signed_at: string | null;
   countersigned_at: string | null;
+  reminders_enabled: boolean;
+  reminder_count: number;
+  last_reminder_at: string | null;
+  cloned_from: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

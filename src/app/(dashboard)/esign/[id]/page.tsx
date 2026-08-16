@@ -3,12 +3,20 @@
 import { use, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PdfPages, type PageSize } from "@/components/esign/PdfPages";
+import { SignaturePad, type SignatureValue } from "@/components/esign/SignaturePad";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -93,6 +101,7 @@ export default function EsignEditorPage({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [sendUrl, setSendUrl] = useState<string | null>(null);
+  const [countersigning, setCountersigning] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -384,7 +393,31 @@ export default function EsignEditorPage({
       )}
 
       {isLocked ? (
-        <SignedView doc={doc} signedUrl={signedUrl} fileUrl={fileUrl} />
+        doc.status === "signed" &&
+        (doc.fields || []).some((f) => f.assigned_to === "owner") &&
+        countersigning ? (
+          <CountersignView
+            doc={doc}
+            fileUrl={fileUrl}
+            onCancel={() => setCountersigning(false)}
+            onDone={async () => {
+              setCountersigning(false);
+              setNotice("Document countersigned and executed.");
+              await load();
+            }}
+          />
+        ) : (
+          <SignedView
+            doc={doc}
+            signedUrl={signedUrl}
+            fileUrl={fileUrl}
+            canCountersign={
+              doc.status === "signed" &&
+              (doc.fields || []).some((f) => f.assigned_to === "owner")
+            }
+            onStartCountersign={() => setCountersigning(true)}
+          />
+        )
       ) : (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           {/* PDF + fields */}
@@ -712,10 +745,14 @@ function SignedView({
   doc,
   signedUrl,
   fileUrl,
+  canCountersign,
+  onStartCountersign,
 }: {
   doc: EsignDocument;
   signedUrl: string | null;
   fileUrl: string | null;
+  canCountersign?: boolean;
+  onStartCountersign?: () => void;
 }) {
   const url = signedUrl || fileUrl;
   const events = (doc.events || []) as EsignEvent[];
@@ -732,6 +769,23 @@ function SignedView({
         )}
       </div>
       <div className="space-y-4">
+        {canCountersign && (
+          <Card className="border-primary/40 bg-primary/5">
+            <CardContent className="space-y-2 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <PenLine className="h-4 w-4 text-primary" /> Awaiting your
+                countersignature
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The client has signed. Complete the owner fields to fully execute
+                this document.
+              </p>
+              <Button className="w-full" onClick={onStartCountersign}>
+                <PenLine className="mr-2 h-4 w-4" /> Countersign now
+              </Button>
+            </CardContent>
+          </Card>
+        )}
         {signedUrl && (
           <Button asChild className="w-full">
             <a href={signedUrl} target="_blank" rel="noreferrer">
@@ -775,5 +829,307 @@ function SignedView({
         </Card>
       </div>
     </div>
+  );
+}
+
+
+/* ---------------- Countersign (owner) view ---------------- */
+
+function CountersignView({
+  doc,
+  fileUrl,
+  onCancel,
+  onDone,
+}: {
+  doc: EsignDocument;
+  fileUrl: string | null;
+  onCancel: () => void;
+  onDone: () => void | Promise<void>;
+}) {
+  const fields = (doc.fields || []) as EsignField[];
+  const ownerFields = fields.filter((f) => f.assigned_to === "owner");
+  const hasOwnerSig = ownerFields.some(
+    (f) => f.field_type === "signature" || f.field_type === "initials"
+  );
+
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [signature, setSignature] = useState<SignatureValue | null>(null);
+  const [signerName, setSignerName] = useState("");
+  const [sigDialogOpen, setSigDialogOpen] = useState(false);
+  const [draftSig, setDraftSig] = useState<SignatureValue | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const setValue = (id: string, v: string) =>
+    setValues((prev) => ({ ...prev, [id]: v }));
+
+  const validate = (): string | null => {
+    if (hasOwnerSig && !signerName.trim())
+      return "Please enter your name to countersign.";
+    for (const f of ownerFields) {
+      if (!f.required) continue;
+      if (f.field_type === "signature" || f.field_type === "initials") {
+        if (!signature) return "Please add your signature.";
+      } else if (f.field_type === "date" || f.field_type === "name") {
+        // Auto-filled server-side if empty.
+      } else if (!values[f.id]?.trim()) {
+        return "Please complete all required fields.";
+      }
+    }
+    if (hasOwnerSig && !signature) return "Please add your signature.";
+    return null;
+  };
+
+  const submit = async () => {
+    const v = validate();
+    if (v) {
+      setError(v);
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/esign/${doc.id}/countersign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          field_values: values,
+          signature,
+          signer_name: signerName || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to countersign");
+      await onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to countersign");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
+        <div>
+          <p className="text-sm font-medium">Countersign this document</p>
+          <p className="text-xs text-muted-foreground">
+            Complete the owner fields highlighted on the document, then finish to
+            fully execute it.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={submitting}>
+            {submitting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <PenLine className="mr-2 h-4 w-4" />
+            )}
+            Finish &amp; Countersign
+          </Button>
+        </div>
+      </div>
+
+      {hasOwnerSig && (
+        <div className="grid gap-3 rounded-lg border bg-background p-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Your name</Label>
+            <Input
+              value={signerName}
+              onChange={(e) => setSignerName(e.target.value)}
+              placeholder="Your full name"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button
+              variant={signature ? "outline" : "default"}
+              onClick={() => {
+                setDraftSig(signature);
+                setSigDialogOpen(true);
+              }}
+            >
+              <PenLine className="mr-2 h-4 w-4" />
+              {signature ? "Change signature" : "Adopt your signature"}
+            </Button>
+            {signature && (
+              <span className="ml-3 text-xs text-green-600">Signature ready</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      <div className="rounded-lg border bg-muted/20 p-3">
+        {fileUrl ? (
+          <PdfPages
+            fileUrl={fileUrl}
+            renderOverlay={(pageIndex) => (
+              <>
+                {fields
+                  .filter((f) => f.page === pageIndex)
+                  .map((f) => (
+                    <CountersignFieldBox
+                      key={f.id}
+                      field={f}
+                      value={values[f.id] || ""}
+                      signature={signature}
+                      signerName={signerName}
+                      onChangeValue={(v) => setValue(f.id, v)}
+                      onRequestSignature={() => {
+                        setDraftSig(signature);
+                        setSigDialogOpen(true);
+                      }}
+                    />
+                  ))}
+              </>
+            )}
+          />
+        ) : (
+          <p className="p-8 text-center text-sm text-muted-foreground">
+            Could not load the document.
+          </p>
+        )}
+      </div>
+
+      <Dialog open={sigDialogOpen} onOpenChange={setSigDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adopt your signature</DialogTitle>
+          </DialogHeader>
+          <SignaturePad defaultName={signerName} onChange={(v) => setDraftSig(v)} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSigDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setSignature(draftSig);
+                setSigDialogOpen(false);
+              }}
+              disabled={!draftSig}
+            >
+              Adopt &amp; Sign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function CountersignFieldBox({
+  field,
+  value,
+  signature,
+  signerName,
+  onChangeValue,
+  onRequestSignature,
+}: {
+  field: EsignField;
+  value: string;
+  signature: SignatureValue | null;
+  signerName: string;
+  onChangeValue: (v: string) => void;
+  onRequestSignature: () => void;
+}) {
+  const isOwner = field.assigned_to === "owner";
+  const style: React.CSSProperties = {
+    position: "absolute",
+    left: `${field.pos_x * 100}%`,
+    top: `${field.pos_y * 100}%`,
+    width: `${field.width * 100}%`,
+    height: `${field.height * 100}%`,
+  };
+  const isSig =
+    field.field_type === "signature" || field.field_type === "initials";
+
+  // Client fields — already completed, show read-only.
+  if (!isOwner) {
+    return (
+      <div
+        style={style}
+        className="flex items-center justify-center overflow-hidden rounded-sm border border-green-500/40 bg-green-500/5 px-1 text-[10px] text-green-700"
+        title="Signed by client"
+      >
+        {isSig ? (
+          <span className="flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" /> Signed
+          </span>
+        ) : (
+          <span className="truncate">{field.value || "—"}</span>
+        )}
+      </div>
+    );
+  }
+
+  // Owner signature / initials.
+  if (isSig) {
+    const showTyped = signature?.type === "typed";
+    const showDrawn = signature?.type === "drawn";
+    return (
+      <button
+        type="button"
+        style={style}
+        onClick={onRequestSignature}
+        className={`flex items-center justify-center overflow-hidden rounded-sm border-2 ${
+          signature
+            ? "border-green-500/60 bg-green-500/5"
+            : "border-primary bg-primary/10 animate-pulse"
+        }`}
+      >
+        {showDrawn ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={signature!.data}
+            alt="signature"
+            className="max-h-full max-w-full object-contain"
+          />
+        ) : showTyped ? (
+          <span
+            className="truncate px-1 text-[#12123a]"
+            style={{
+              fontFamily: "'Brush Script MT','Segoe Script',cursive",
+              fontSize: "min(2vw,20px)",
+            }}
+          >
+            {field.field_type === "initials"
+              ? (signerName || signature!.data)
+                  .split(/\s+/)
+                  .map((p) => p[0]?.toUpperCase() || "")
+                  .join("")
+              : signature!.data}
+          </span>
+        ) : (
+          <span className="text-[9px] font-medium text-primary">
+            {field.field_type === "initials" ? "Initial" : "Sign"}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  // Owner text / name / date fillable inputs.
+  return (
+    <input
+      style={style}
+      value={value}
+      onChange={(e) => onChangeValue(e.target.value)}
+      placeholder={
+        field.field_type === "date"
+          ? "Date (auto)"
+          : field.field_type === "name"
+          ? "Full name (auto)"
+          : field.placeholder || "Enter text"
+      }
+      className="rounded-sm border-2 border-primary/60 bg-primary/5 px-1 text-[11px] outline-none focus:border-primary focus:bg-white"
+    />
   );
 }

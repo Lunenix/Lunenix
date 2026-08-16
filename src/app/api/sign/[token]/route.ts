@@ -161,6 +161,8 @@ export async function POST(
   // Resolve the effective value for each field and validate required ones.
   const missing: string[] = [];
   const stampFields: StampField[] = [];
+  // Resolved client values we persist so countersigning can re-stamp them.
+  const resolvedClientValues: Record<string, string> = {};
 
   for (const f of fields) {
     let value: string | null = fieldValues[f.id] ?? f.value ?? null;
@@ -182,6 +184,15 @@ export async function POST(
         value = value || signerName;
       } else if (f.field_type === "date") {
         value = value || todayStr;
+      }
+      // Record the resolved value for non-signature client fields so a later
+      // countersign can reproduce them exactly.
+      if (
+        f.field_type !== "signature" &&
+        f.field_type !== "initials" &&
+        value
+      ) {
+        resolvedClientValues[f.id] = value;
       }
     }
 
@@ -233,11 +244,16 @@ export async function POST(
     signedBytes = await generateSignedPdf(originalBytes, stampFields, {
       documentName: doc.name,
       documentId: doc.id,
-      signerName,
-      signerEmail,
-      ipAddress: ip,
-      userAgent: ua,
-      signedAt: signedAtIso,
+      signers: [
+        {
+          role: "client",
+          name: signerName,
+          email: signerEmail,
+          ipAddress: ip,
+          userAgent: ua,
+          signedAt: signedAtIso,
+        },
+      ],
       sentAt: doc.sent_at,
       viewedAt: doc.viewed_at,
     });
@@ -259,12 +275,10 @@ export async function POST(
     return NextResponse.json({ error: "Failed to store signed document" }, { status: 500 });
   }
 
-  // Persist field values.
-  for (const f of fields) {
-    const v = fieldValues[f.id];
-    if (v !== undefined) {
-      await admin.from("esign_fields").update({ value: v }).eq("id", f.id);
-    }
+  // Persist resolved client field values (including auto-filled name/date), so
+  // a later countersign can reproduce them exactly.
+  for (const [fieldId, v] of Object.entries(resolvedClientValues)) {
+    await admin.from("esign_fields").update({ value: v }).eq("id", fieldId);
   }
 
   // Record the signature (immutable).

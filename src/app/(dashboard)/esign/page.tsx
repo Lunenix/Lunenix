@@ -32,6 +32,8 @@ import {
   User,
   FolderOpen,
   ExternalLink,
+  BellRing,
+  Copy,
 } from "lucide-react";
 import {
   EsignDocument,
@@ -53,6 +55,24 @@ export default function EsignPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [cloneSource, setCloneSource] = useState<EsignDocument | null>(null);
+
+  const remind = async (doc: EsignDocument) => {
+    setRemindingId(doc.id);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/esign/${doc.id}/remind`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send reminder");
+      setNotice(`Reminder sent to ${doc.signer_email}.`);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Failed to send reminder");
+    } finally {
+      setRemindingId(null);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!activeWorkspace?.id) return;
@@ -103,6 +123,12 @@ export default function EsignPage() {
           <Plus className="mr-2 h-4 w-4" /> New Document
         </Button>
       </div>
+
+      {notice && (
+        <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+          {notice}
+        </div>
+      )}
 
       {documents.length === 0 ? (
         <Card>
@@ -156,6 +182,31 @@ export default function EsignPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">
+                  {["sent", "viewed"].includes(doc.status) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => remind(doc)}
+                      disabled={remindingId === doc.id}
+                      title="Send a signing reminder to the signer"
+                    >
+                      {remindingId === doc.id ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <BellRing className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Remind
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCloneSource(doc)}
+                    title="Clone into a new sub-agreement draft"
+                  >
+                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                    Clone
+                  </Button>
                   <Button asChild variant="outline" size="sm">
                     <Link href={`/esign/${doc.id}`}>
                       {["signed", "countersigned", "void"].includes(doc.status)
@@ -179,7 +230,119 @@ export default function EsignPage() {
         projects={projects}
         onCreated={(id) => router.push(`/esign/${id}`)}
       />
+
+      <CloneDialog
+        source={cloneSource}
+        onOpenChange={(v) => {
+          if (!v) setCloneSource(null);
+        }}
+        onCloned={(id) => router.push(`/esign/${id}`)}
+      />
     </div>
+  );
+}
+
+function CloneDialog({
+  source,
+  onOpenChange,
+  onCloned,
+}: {
+  source: EsignDocument | null;
+  onOpenChange: (v: boolean) => void;
+  onCloned: (id: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState<EsignDocumentType>("sub_agreement");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (source) {
+      setName(`${source.name} (Sub-Agreement)`);
+      setType("sub_agreement");
+      setError(null);
+    }
+  }, [source]);
+
+  const handleClone = async () => {
+    if (!source || !name.trim()) {
+      setError("A name is required.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/esign/${source.id}/clone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to clone document");
+      onOpenChange(false);
+      onCloned(data.document.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!source} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Clone document</DialogTitle>
+          <DialogDescription>
+            Creates a new draft with the same PDF and field placements. Field
+            values are reset so you can send it to a new signer.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="clonename">New document name</Label>
+            <Input
+              id="clonename"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as EsignDocumentType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sub_agreement">Sub-Agreement</SelectItem>
+                <SelectItem value="contract">Contract (primary)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleClone} disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cloning…
+              </>
+            ) : (
+              "Create clone"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

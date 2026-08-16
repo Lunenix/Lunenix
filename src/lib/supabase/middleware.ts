@@ -15,6 +15,8 @@ const PUBLIC_PATHS = [
   // Public e-signature signing pages + their API (tokenized, no auth).
   "/sign",
   "/api/sign",
+  // Scheduled reminder scan (protected by CRON_SECRET, not a session cookie).
+  "/api/esign/reminders/run",
 ];
 
 function isPublicPath(pathname: string): boolean {

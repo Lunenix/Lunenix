@@ -32,14 +32,20 @@ export interface StampField {
   signature_type?: "typed" | "drawn" | null;
 }
 
-export interface AuditInfo {
-  documentName: string;
-  documentId: string;
-  signerName: string;
-  signerEmail?: string | null;
+export interface AuditSigner {
+  role: "client" | "owner";
+  name: string;
+  email?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
   signedAt: string; // ISO
+}
+
+export interface AuditInfo {
+  documentName: string;
+  documentId: string;
+  /** One entry per party who signed (client, then owner countersigner). */
+  signers: AuditSigner[];
   sentAt?: string | null; // ISO
   viewedAt?: string | null; // ISO
 }
@@ -174,19 +180,33 @@ function appendAuditPage(
   });
   cursor -= 34;
 
-  const rows: Array<[string, string]> = [
+  const docRows: Array<[string, string]> = [
     ["Document", audit.documentName],
     ["Document ID", audit.documentId],
-    ["Signer name", audit.signerName],
-    ["Signer email", audit.signerEmail || "—"],
     ["Sent", fmt(audit.sentAt)],
     ["Viewed", fmt(audit.viewedAt)],
-    ["Signed", fmt(audit.signedAt)],
-    ["Signer IP address", audit.ipAddress || "—"],
-    ["Signer device", (audit.userAgent || "—").slice(0, 90)],
   ];
 
+  // Then one block of rows per signer.
+  const roleLabel = (r: "client" | "owner") =>
+    r === "owner" ? "Countersigner (owner)" : "Signer";
+  const signerRows: Array<[string, string]> = [];
+  audit.signers.forEach((s, i) => {
+    if (i > 0) signerRows.push(["", ""]); // spacer between signers
+    signerRows.push([`${roleLabel(s.role)} name`, s.name]);
+    signerRows.push([`${roleLabel(s.role)} email`, s.email || "—"]);
+    signerRows.push(["Signed", fmt(s.signedAt)]);
+    signerRows.push(["IP address", s.ipAddress || "—"]);
+    signerRows.push(["Device", (s.userAgent || "—").slice(0, 90)]);
+  });
+
+  const rows: Array<[string, string]> = [...docRows, ...signerRows];
+
   for (const [label, value] of rows) {
+    if (!label && !value) {
+      cursor -= 10; // spacer row
+      continue;
+    }
     page.drawText(label, {
       x: left,
       y: cursor,
