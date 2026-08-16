@@ -162,8 +162,53 @@ function checkTriggerConditions(
   const config = workflow.trigger_config as Record<string, unknown>;
   
   // For form_submission trigger
-  if (workflow.trigger_type === "form_submission" && config.form_id) {
-    return triggerData.form_id === config.form_id;
+  if (workflow.trigger_type === "form_submission") {
+    // 1) Optionally restrict to a specific form.
+    if (config.form_id && triggerData.form_id !== config.form_id) {
+      return false;
+    }
+
+    // 2) Optionally restrict to a specific answer to one field
+    //    (e.g. a dropdown/radio/checkbox choice the client picked).
+    if (config.field_id) {
+      const submitted =
+        (triggerData.submitted_data as Record<string, unknown>) ?? {};
+      const answer = submitted[config.field_id as string];
+      const operator = (config.operator as string) || "equals";
+
+      // Normalise the submitted answer to an array of strings so that
+      // single-select (string) and multi-select (string[]) fields compare
+      // the same way.
+      const answerValues: string[] = Array.isArray(answer)
+        ? answer.map((a) => String(a))
+        : answer === undefined || answer === null || answer === ""
+        ? []
+        : [String(answer)];
+
+      // "any" (or no expected value) -> fire when the field was answered.
+      if (
+        operator === "any" ||
+        config.value === undefined ||
+        config.value === null ||
+        config.value === ""
+      ) {
+        return answerValues.length > 0;
+      }
+
+      const expected = String(config.value).toLowerCase();
+      const normalised = answerValues.map((v) => v.toLowerCase());
+
+      if (operator === "not_equals") {
+        return !normalised.includes(expected);
+      }
+      if (operator === "contains") {
+        return normalised.some((v) => v.includes(expected));
+      }
+      // default: equals (the picked option matches exactly)
+      return normalised.includes(expected);
+    }
+
+    return true;
   }
   
   // For lead_stage_change trigger
@@ -234,6 +279,35 @@ async function buildExecutionContext(
     }
   }
   
+  // For form submissions, expose the answers by their human-readable field
+  // label so actions can personalise ({{form.name}}, {{form.answers.<label>}}).
+  if (triggerData.form_id) {
+    const { data: form } = await supabase
+      .from("forms")
+      .select("id, name, fields")
+      .eq("id", triggerData.form_id as string)
+      .maybeSingle();
+
+    if (form) {
+      const submitted =
+        (triggerData.submitted_data as Record<string, unknown>) ?? {};
+      const answersByLabel: Record<string, string> = {};
+      const fields = (form.fields as { id: string; label: string }[]) || [];
+      for (const f of fields) {
+        const raw = submitted[f.id];
+        if (raw === undefined || raw === null) continue;
+        answersByLabel[f.label] = Array.isArray(raw)
+          ? raw.map((v) => String(v)).join(", ")
+          : String(raw);
+      }
+      context.form = {
+        id: form.id,
+        name: form.name,
+        answers: answersByLabel,
+      };
+    }
+  }
+
   // Fetch project if project_id is provided
   if (triggerData.project_id) {
     const { data: project } = await supabase

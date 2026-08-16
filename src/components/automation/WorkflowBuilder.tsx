@@ -73,6 +73,19 @@ export function WorkflowBuilder({
   templates = [],
   forms = [],
 }: WorkflowBuilderProps) {
+  // Choice-type fields of the currently selected form, used to let the user
+  // trigger only when the client picks a specific dropdown/radio/checkbox answer.
+  const CHOICE_TYPES = ["select", "radio", "checkbox"];
+  const selectedFormId = (triggerConfig.form_id as string) || "";
+  const selectedForm = forms.find((f) => f.id === selectedFormId);
+  const choiceFields = (selectedForm?.fields || []).filter((f) =>
+    CHOICE_TYPES.includes(f.type)
+  );
+  const selectedFieldId = (triggerConfig.field_id as string) || "";
+  const selectedField = choiceFields.find((f) => f.id === selectedFieldId);
+
+  const ANY = "__any__";
+
   const addAction = () => {
     onActionsChange([
       ...actions,
@@ -159,16 +172,22 @@ export function WorkflowBuilder({
             <div className="space-y-2">
               <Label htmlFor="form-id">Specific Form (Optional)</Label>
               <Select
-                value={triggerConfig.form_id as string || ""}
-                onValueChange={(value) =>
-                  onTriggerConfigChange({ ...triggerConfig, form_id: value })
-                }
+                value={selectedFormId || ANY}
+                onValueChange={(value) => {
+                  // Changing the form invalidates any previously chosen field
+                  // condition (field IDs are per-form), so reset it.
+                  if (value === ANY) {
+                    onTriggerConfigChange({});
+                  } else {
+                    onTriggerConfigChange({ form_id: value });
+                  }
+                }}
               >
                 <SelectTrigger id="form-id">
                   <SelectValue placeholder="Any form" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any form</SelectItem>
+                  <SelectItem value={ANY}>Any form</SelectItem>
                   {forms.map((form) => (
                     <SelectItem key={form.id} value={form.id}>
                       {form.name}
@@ -178,6 +197,85 @@ export function WorkflowBuilder({
               </Select>
             </div>
           )}
+
+          {/* Answer condition: only run when a specific choice is picked */}
+          {triggerType === "form_submission" &&
+            selectedForm &&
+            choiceFields.length > 0 && (
+              <div className="space-y-4 rounded-md border border-dashed p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="condition-field">
+                    Only when a specific answer is chosen (optional)
+                  </Label>
+                  <Select
+                    value={selectedFieldId || ANY}
+                    onValueChange={(value) => {
+                      if (value === ANY) {
+                        // Drop the field condition, keep the form filter.
+                        onTriggerConfigChange({ form_id: selectedFormId });
+                      } else {
+                        const field = choiceFields.find((f) => f.id === value);
+                        onTriggerConfigChange({
+                          form_id: selectedFormId,
+                          field_id: value,
+                          field_label: field?.label ?? null,
+                          operator: "equals",
+                          value: "",
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="condition-field">
+                      <SelectValue placeholder="Any answer (run on every submission)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY}>
+                        Any answer (run on every submission)
+                      </SelectItem>
+                      {choiceFields.map((field) => (
+                        <SelectItem key={field.id} value={field.id}>
+                          {field.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Pick a dropdown / multiple-choice question to run this
+                    workflow only when the client selects a particular option.
+                  </p>
+                </div>
+
+                {selectedField && (
+                  <div className="space-y-2">
+                    <Label htmlFor="condition-value">
+                      When the answer is
+                    </Label>
+                    <Select
+                      value={(triggerConfig.value as string) || ANY}
+                      onValueChange={(value) =>
+                        onTriggerConfigChange({
+                          ...triggerConfig,
+                          operator: value === ANY ? "any" : "equals",
+                          value: value === ANY ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="condition-value">
+                        <SelectValue placeholder="Choose an option" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ANY}>Any option (just answered)</SelectItem>
+                        {(selectedField.options || []).map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
         </CardContent>
       </Card>
 
