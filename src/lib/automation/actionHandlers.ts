@@ -3,12 +3,15 @@
  * Each handler executes a specific automation action
  */
 
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { sendServerEmail } from "@/lib/email/sendServerEmail";
 import type { AutomationAction } from "@/types/database";
 
-// Initialize Supabase client for server-side operations
+// Automation runs from trusted server contexts (including public routes such
+// as form submission and contract signing), so it uses the admin client to
+// bypass RLS. Access is always scoped by an explicit workspace_id.
 async function getSupabaseClient() {
-  return await createServerClient();
+  return createAdminClient();
 }
 
 /**
@@ -95,27 +98,27 @@ export async function handleSendEmailAction(
     
     // Type assertions for context properties
     const contactData = context.contact as { id?: string; first_name?: string; company_name?: string } | undefined;
-    
-    // Send the email via API
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('.supabase.co', '')}/api/emails/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspace_id: context.workspace_id,
-        contact_id: contactData?.id,
-        template_id,
-        recipient_email: recipientEmail,
-        recipient_name: contactData?.first_name || contactData?.company_name,
-        subject: finalSubject,
-        body: finalBody,
-      }),
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      return { success: false, error: error.message || "Failed to send email" };
+
+    if (!recipientEmail) {
+      return { success: false, error: "No recipient email resolved" };
     }
-    
+
+    // Send the email directly server-side (works from public/unauthenticated
+    // trigger contexts, bypassing the auth-gated /api/emails/send route).
+    const result = await sendServerEmail({
+      workspaceId: context.workspace_id,
+      to: recipientEmail,
+      toName: contactData?.first_name || contactData?.company_name || null,
+      contactId: contactData?.id || null,
+      templateId: (template_id as string) || null,
+      subject: finalSubject,
+      html: finalBody,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error || "Failed to send email" };
+    }
+
     return { success: true };
   } catch (err) {
     return {

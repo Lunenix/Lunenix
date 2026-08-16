@@ -483,3 +483,135 @@ export const AUTOMATION_LOG_STATUS_LABELS: Record<AutomationLogStatus, string> =
   failed: "Failed",
   partial: "Partial",
 };
+
+
+
+// ============================================
+// E-SIGNATURE MODULE
+// ============================================
+
+export type EsignDocumentType = "contract" | "sub_agreement";
+
+export type EsignDocumentStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "signed"
+  | "countersigned"
+  | "void";
+
+export type EsignFieldType =
+  | "signature"
+  | "initials"
+  | "date"
+  | "text"
+  | "name";
+
+export type EsignAssignedTo = "client" | "owner";
+
+export interface EsignField {
+  id: string;
+  document_id: string;
+  page: number;
+  field_type: EsignFieldType;
+  // Normalized geometry (0..1), origin top-left of the page.
+  pos_x: number;
+  pos_y: number;
+  width: number;
+  height: number;
+  assigned_to: EsignAssignedTo;
+  required: boolean;
+  placeholder: string | null;
+  value: string | null;
+  created_at: string;
+}
+
+// Field payload used before it is persisted (no id yet).
+export type EsignFieldInput = Omit<EsignField, "id" | "document_id" | "created_at"> & {
+  id?: string;
+};
+
+export interface EsignSignature {
+  id: string;
+  document_id: string;
+  signer_name: string;
+  signer_email: string | null;
+  signature_type: "typed" | "drawn";
+  signature_data: string;
+  role: EsignAssignedTo;
+  ip_address: string | null;
+  user_agent: string | null;
+  signed_at: string;
+}
+
+export type EsignEventType =
+  | "created"
+  | "sent"
+  | "viewed"
+  | "signed"
+  | "countersigned"
+  | "void"
+  | "downloaded";
+
+export interface EsignEvent {
+  id: string;
+  document_id: string;
+  event_type: EsignEventType;
+  ip_address: string | null;
+  user_agent: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface EsignDocument {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  name: string;
+  type: EsignDocumentType;
+  status: EsignDocumentStatus;
+  original_file_path: string | null;
+  signed_file_path: string | null;
+  page_count: number;
+  sign_token: string | null;
+  signer_name: string | null;
+  signer_email: string | null;
+  assigned_workflow_id: string | null;
+  sent_at: string | null;
+  viewed_at: string | null;
+  signed_at: string | null;
+  countersigned_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Optional relations
+  contact?: Contact | null;
+  project?: Pick<Project, "id" | "name"> | null;
+  fields?: EsignField[];
+  signatures?: EsignSignature[];
+  events?: EsignEvent[];
+  assigned_workflow?: Pick<AutomationWorkflow, "id" | "name"> | null;
+}
+
+export const ESIGN_STATUS_LABELS: Record<EsignDocumentStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  viewed: "Viewed",
+  signed: "Signed",
+  countersigned: "Countersigned",
+  void: "Void",
+};
+
+export const ESIGN_TYPE_LABELS: Record<EsignDocumentType, string> = {
+  contract: "Contract",
+  sub_agreement: "Sub-Agreement",
+};
+
+export const ESIGN_FIELD_LABELS: Record<EsignFieldType, string> = {
+  signature: "Signature",
+  initials: "Initials",
+  date: "Date",
+  text: "Text",
+  name: "Full Name",
+};

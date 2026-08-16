@@ -3,7 +3,7 @@
  * Executes automation workflows when triggers fire
  */
 
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import type {
   AutomationWorkflow,
   AutomationTriggerType,
@@ -26,7 +26,7 @@ export async function executeWorkflowsForTrigger(
   workspaceId: string
 ): Promise<void> {
   try {
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
     
     // Fetch active workflows for this trigger type and workspace
     const { data: workflows, error } = await supabase
@@ -55,13 +55,36 @@ export async function executeWorkflowsForTrigger(
 }
 
 /**
+ * Execute one specific workflow by id, regardless of its trigger type.
+ * Used for "assigned workflows" that a document explicitly starts on signing.
+ */
+export async function executeWorkflowById(
+  workflowId: string,
+  triggerData: Record<string, unknown>
+): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+    const { data: workflow, error } = await supabase
+      .from("automation_workflows")
+      .select("*")
+      .eq("id", workflowId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (error || !workflow) return;
+    await executeWorkflow(workflow as AutomationWorkflow, triggerData);
+  } catch (err) {
+    console.error("Error executing workflow by id:", err);
+  }
+}
+
+/**
  * Execute a single workflow
  */
 async function executeWorkflow(
   workflow: AutomationWorkflow,
   triggerData: Record<string, unknown>
 ): Promise<void> {
-  const supabase = await createServerClient();
+  const supabase = createAdminClient();
   
   const actionResults: Array<{
     action_type: string;
@@ -164,7 +187,7 @@ async function buildExecutionContext(
   workspaceId: string,
   triggerData: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const supabase = await createServerClient();
+  const supabase = createAdminClient();
   
   const context: Record<string, unknown> = {
     workspace_id: workspaceId,
@@ -224,14 +247,19 @@ async function buildExecutionContext(
     }
   }
   
-  // Get current user (from trigger data or fetch)
+  // Get current user from trigger data (admin client has no auth session).
   if (triggerData.user_id) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    const { data: userRow } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", triggerData.user_id as string)
+      .maybeSingle();
+    if (userRow) {
+      const row = userRow as Record<string, unknown>;
       context.user = {
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.full_name || user.email,
+        id: row.id,
+        email: row.email ?? null,
+        name: row.full_name ?? row.email ?? null,
       };
     }
   }

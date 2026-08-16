@@ -1,4 +1,22 @@
-import type { ProjectStatus, ContractStatus, InvoiceStatus } from "@/types/database";
+import type {
+  ProjectStatus,
+  ContractStatus,
+  InvoiceStatus,
+  EsignDocumentStatus,
+} from "@/types/database";
+
+/** Tailwind classes for e-signature document status badges (outline variant). */
+export function esignStatusClasses(status: EsignDocumentStatus): string {
+  const classes: Record<EsignDocumentStatus, string> = {
+    draft: "border-slate-500/40 text-slate-400",
+    sent: "border-blue-500/40 text-blue-400",
+    viewed: "border-amber-500/40 text-amber-400",
+    signed: "border-green-500/40 text-green-400",
+    countersigned: "border-emerald-500/40 text-emerald-400",
+    void: "border-red-500/40 text-red-400",
+  };
+  return classes[status] || "";
+}
 
 /** Tailwind classes for project status badges (outline variant). */
 export const projectStatusClasses: Record<ProjectStatus, string> = {
