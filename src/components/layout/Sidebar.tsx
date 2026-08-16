@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -80,6 +82,37 @@ export function Sidebar({
   const router = useRouter();
   const { workspaces, activeWorkspace, setActiveWorkspace, isLoading } =
     useWorkspace();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Poll the unread inbound-email count for the Inbox badge. Refreshes when the
+  // workspace changes, on navigation, and every 60s.
+  useEffect(() => {
+    if (!activeWorkspace) {
+      setUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+
+    async function loadCount() {
+      try {
+        const res = await fetch(
+          `/api/emails/inbound/unread-count?workspaceId=${activeWorkspace!.id}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setUnreadCount(data.count || 0);
+      } catch {
+        /* non-fatal */
+      }
+    }
+
+    loadCount();
+    const interval = setInterval(loadCount, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeWorkspace, pathname]);
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -198,7 +231,15 @@ export function Sidebar({
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.href === "/inbox" && unreadCount > 0 && (
+                  <Badge
+                    variant={active ? "secondary" : "default"}
+                    className="ml-auto h-5 min-w-5 justify-center px-1.5 text-xs"
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Badge>
+                )}
               </Link>
             );
           })}

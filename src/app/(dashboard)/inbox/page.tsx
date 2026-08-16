@@ -11,10 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Inbox, RefreshCw, Trash2, Mail } from "lucide-react";
+import { Loader2, Inbox, RefreshCw, Trash2, Mail, Reply } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { contactDisplayName } from "@/types/database";
-import type { InboundEmail } from "@/types/database";
+import type { InboundEmail, EmailTemplate, Contact } from "@/types/database";
+import { SendEmailDialog } from "@/components/emails/SendEmailDialog";
 import Link from "next/link";
 
 export default function InboxPage() {
@@ -24,6 +25,17 @@ export default function InboxPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Reply composer
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyContact, setReplyContact] = useState<Contact | null>(null);
+  const [replyPrefill, setReplyPrefill] = useState<{
+    to?: string;
+    toName?: string;
+    subject?: string;
+    body?: string;
+  } | null>(null);
 
   const fetchEmails = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -41,9 +53,52 @@ export default function InboxPage() {
     }
   }, [activeWorkspace]);
 
+  const fetchTemplates = useCallback(async () => {
+    if (!activeWorkspace) return;
+    try {
+      const res = await fetch(
+        `/api/email-templates?workspaceId=${activeWorkspace.id}`
+      );
+      const data = await res.json();
+      setTemplates(data.templates || []);
+    } catch {
+      /* non-fatal */
+    }
+  }, [activeWorkspace]);
+
   useEffect(() => {
-    if (activeWorkspace) fetchEmails();
-  }, [activeWorkspace, fetchEmails]);
+    if (activeWorkspace) {
+      fetchEmails();
+      fetchTemplates();
+    }
+  }, [activeWorkspace, fetchEmails, fetchTemplates]);
+
+  function handleReply(email: InboundEmail) {
+    const rawSubject = email.subject || "";
+    const subject = /^re:/i.test(rawSubject.trim())
+      ? rawSubject.trim()
+      : `Re: ${rawSubject}`.trim();
+
+    // A light quoted original, so the recipient has context.
+    const quotedDate = formatDateTime(email.received_at) || "";
+    const sender = email.from_name
+      ? `${email.from_name} <${email.from_email}>`
+      : email.from_email;
+    const original =
+      email.body_html ||
+      (email.body_text || "").replace(/\n/g, "<br/>") ||
+      "";
+    const body = `<br/><br/><hr/><p style="color:#666;font-size:13px">On ${quotedDate}, ${sender} wrote:</p><blockquote style="margin:0 0 0 8px;padding-left:12px;border-left:3px solid #ddd;color:#555">${original}</blockquote>`;
+
+    setReplyContact(email.contact || null);
+    setReplyPrefill({
+      to: email.from_email,
+      toName: email.from_name || undefined,
+      subject,
+      body,
+    });
+    setReplyOpen(true);
+  }
 
   async function handleSync() {
     if (!activeWorkspace) return;
@@ -249,14 +304,24 @@ export default function InboxPage() {
                         </Link>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(selected)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReply(selected)}
+                      >
+                        <Reply className="mr-2 h-4 w-4" />
+                        Reply
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(selected)}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -282,6 +347,17 @@ export default function InboxPage() {
             )}
           </Card>
         </div>
+      )}
+
+      {activeWorkspace && (
+        <SendEmailDialog
+          open={replyOpen}
+          onOpenChange={setReplyOpen}
+          workspaceId={activeWorkspace.id}
+          contact={replyContact}
+          templates={templates}
+          prefill={replyPrefill}
+        />
       )}
     </div>
   );

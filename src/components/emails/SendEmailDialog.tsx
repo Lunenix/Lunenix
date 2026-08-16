@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,16 @@ interface SendEmailDialogProps {
   contact?: Contact | null;
   templates: EmailTemplate[];
   onSent?: () => void;
+  /**
+   * Pre-fill the composer (e.g. when replying to an inbound email). When
+   * provided, the recipient field stays editable even if a contact is linked.
+   */
+  prefill?: {
+    to?: string;
+    toName?: string;
+    subject?: string;
+    body?: string;
+  } | null;
 }
 
 export function SendEmailDialog({
@@ -39,6 +49,7 @@ export function SendEmailDialog({
   contact,
   templates,
   onSent,
+  prefill,
 }: SendEmailDialogProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [recipientEmail, setRecipientEmail] = useState(contact?.email || "");
@@ -48,6 +59,20 @@ export function SendEmailDialog({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  // Reset / seed the form each time the dialog opens so it reflects the current
+  // contact or prefill (e.g. a reply) rather than stale state from last time.
+  useEffect(() => {
+    if (!open) return;
+    setSelectedTemplateId("");
+    setRecipientEmail(prefill?.to ?? contact?.email ?? "");
+    setRecipientName(
+      prefill?.toName ?? (contact ? contactDisplayName(contact) : "")
+    );
+    setSubject(prefill?.subject ?? "");
+    setBody(prefill?.body ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplateId(templateId);
@@ -163,7 +188,7 @@ export function SendEmailDialog({
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
                 placeholder="contact@example.com"
-                disabled={!!contact?.email}
+                disabled={!!contact?.email && !prefill}
               />
             </div>
             <div className="space-y-2">
