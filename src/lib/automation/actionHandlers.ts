@@ -74,25 +74,27 @@ export async function handleSendEmailAction(
       recipientEmail = replaceVariables(recipientEmail, context);
     }
     
-    // If template_id is provided, fetch and use the template
-    if (template_id) {
+    // Prefer the snapshot stored in the step's config (config.subject/body).
+    // This is the copy taken when the template was attached, so later edits to
+    // the master template don't retroactively change this placed step. Only
+    // fall back to fetching the live template if no snapshot exists.
+    const hasSnapshot =
+      (typeof subject === "string" && subject.length > 0) ||
+      (typeof body === "string" && body.length > 0);
+
+    if (hasSnapshot) {
+      finalSubject = replaceVariables((subject as string) || "", context);
+      finalBody = replaceVariables((body as string) || "", context);
+    } else if (template_id) {
       const { data: template } = await supabase
         .from("email_templates")
         .select("*")
         .eq("id", template_id)
         .single();
-      
+
       if (template) {
         finalSubject = replaceVariables(template.subject, context);
         finalBody = replaceVariables(template.body, context);
-      }
-    } else {
-      // Replace variables in subject and body
-      if (subject && typeof subject === "string") {
-        finalSubject = replaceVariables(subject, context);
-      }
-      if (body && typeof body === "string") {
-        finalBody = replaceVariables(body, context);
       }
     }
     

@@ -70,10 +70,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "workspace_id is required" }, { status: 400 });
   }
 
-  const provider = body.provider === "smtp" ? "smtp" : "resend";
+  const { data: existing } = await supabase
+    .from("email_settings")
+    .select("*")
+    .eq("workspace_id", workspace_id)
+    .maybeSingle();
 
-  // Validate depending on provider.
-  if (provider === "resend") {
+  // A lightweight save that only updates the signature / scheduler link (used
+  // by the Signature settings card) doesn't carry provider fields — skip the
+  // provider validation for it as long as settings already exist.
+  const isMetaOnlySave =
+    body.provider === undefined &&
+    body.from_email === undefined &&
+    (("signature_html" in body) || ("scheduler_url" in body));
+
+  if (isMetaOnlySave && !existing) {
+    return NextResponse.json(
+      { error: "Configure your sender settings before saving a signature." },
+      { status: 400 }
+    );
+  }
+
+  const provider = body.provider === "smtp" ? "smtp" : existing?.provider || "resend";
+
+  // Validate depending on provider (skipped for meta-only saves).
+  if (!isMetaOnlySave && provider === "resend") {
     if (!body.from_email || !body.from_name) {
       return NextResponse.json(
         { error: "from_email and from_name are required for Resend." },
@@ -82,13 +103,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: existing } = await supabase
-    .from("email_settings")
-    .select("*")
-    .eq("workspace_id", workspace_id)
-    .maybeSingle();
-
-  if (provider === "smtp") {
+  if (!isMetaOnlySave && provider === "smtp") {
     const hasPw = body.smtp_password || existing?.smtp_password_enc;
     if (!body.smtp_host || !body.smtp_port || !body.smtp_username || !hasPw) {
       return NextResponse.json(
@@ -101,28 +116,41 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const payload: Record<string, unknown> = {
-    workspace_id,
-    provider,
-    from_email: body.from_email?.trim() || null,
-    from_name: body.from_name?.trim() || null,
-    reply_to: body.reply_to?.trim() || null,
-    smtp_host: body.smtp_host?.trim() || null,
-    smtp_port: body.smtp_port ? Number(body.smtp_port) : null,
-    smtp_secure: body.smtp_secure ?? true,
-    smtp_username: body.smtp_username?.trim() || null,
-    imap_enabled: !!body.imap_enabled,
-    imap_host: body.imap_host?.trim() || null,
-    imap_port: body.imap_port ? Number(body.imap_port) : null,
-    imap_secure: body.imap_secure ?? true,
-    imap_username: body.imap_username?.trim() || null,
-  };
+  // A meta-only save touches nothing but signature/scheduler so we don't
+  // clobber the provider configuration.
+  const payload: Record<string, unknown> = isMetaOnlySave
+    ? { workspace_id }
+    : {
+        workspace_id,
+        provider,
+        from_email: body.from_email?.trim() || null,
+        from_name: body.from_name?.trim() || null,
+        reply_to: body.reply_to?.trim() || null,
+        smtp_host: body.smtp_host?.trim() || null,
+        smtp_port: body.smtp_port ? Number(body.smtp_port) : null,
+        smtp_secure: body.smtp_secure ?? true,
+        smtp_username: body.smtp_username?.trim() || null,
+        imap_enabled: !!body.imap_enabled,
+        imap_host: body.imap_host?.trim() || null,
+        imap_port: body.imap_port ? Number(body.imap_port) : null,
+        imap_secure: body.imap_secure ?? true,
+        imap_username: body.imap_username?.trim() || null,
+      };
+
+  // Signature + scheduler link are optional and only updated when present in
+  // the request (so an SMTP/IMAP-only save doesn't wipe them).
+  if ("signature_html" in body) {
+    payload.signature_html = body.signature_html?.trim?.() || null;
+  }
+  if ("scheduler_url" in body) {
+    payload.scheduler_url = body.scheduler_url?.trim?.() || null;
+  }
 
   // Only overwrite encrypted passwords when a new plaintext one is provided.
-  if (body.smtp_password) {
+  if (!isMetaOnlySave && body.smtp_password) {
     payload.smtp_password_enc = encryptSecret(body.smtp_password);
   }
-  if (body.imap_password) {
+  if (!isMetaOnlySave && body.imap_password) {
     payload.imap_password_enc = encryptSecret(body.imap_password);
   }
 

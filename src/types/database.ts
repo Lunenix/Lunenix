@@ -362,12 +362,45 @@ export interface TemplateVariable {
 export interface EmailTemplate {
   id: string;
   workspace_id: string;
-  name: string;
-  subject: string;
-  body: string; // HTML content
+  name: string; // internal label / title
+  subject: string; // subject line (may contain smart-field tokens)
+  body: string; // HTML content (may contain smart-field tokens)
   variables: TemplateVariable[];
+  /** Seeded template used by workflow triggers. Editable but NOT deletable. */
+  is_system_default: boolean;
+  /** Stable key for a system trigger template, e.g. "invoice_sent". */
+  template_key: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A queued manual send scheduled for a future time.
+ */
+export type ScheduledEmailStatus = "scheduled" | "sent" | "failed" | "cancelled";
+
+export interface ScheduledEmailAttachment {
+  filename: string;
+  content: string; // base64
+}
+
+export interface ScheduledEmail {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  template_id: string | null;
+  to_email: string;
+  to_name: string | null;
+  subject: string;
+  body_html: string;
+  attachments: ScheduledEmailAttachment[];
+  scheduled_for: string;
+  status: ScheduledEmailStatus;
+  error: string | null;
+  created_by: string | null;
+  created_at: string;
+  sent_at: string | null;
 }
 
 export type EmailStatus = "pending" | "sent" | "failed";
@@ -412,6 +445,10 @@ export interface EmailSettings {
   imap_username: string | null;
   imap_last_synced_at: string | null;
   imap_last_error: string | null;
+  // Default signature (rich text) appended to manual sends.
+  signature_html: string | null;
+  // External booking / scheduling link resolved by {{scheduler.link}}.
+  scheduler_url: string | null;
   // Server-derived flags (passwords themselves are never sent to the client).
   has_smtp_password?: boolean;
   has_imap_password?: boolean;

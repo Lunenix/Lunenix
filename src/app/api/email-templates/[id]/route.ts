@@ -95,6 +95,20 @@ export async function DELETE(
 
   const { id } = await params;
 
+  // System default templates are used by automations and cannot be deleted.
+  const { data: existing } = await supabase
+    .from("email_templates")
+    .select("is_system_default")
+    .eq("id", id)
+    .single();
+
+  if (existing?.is_system_default) {
+    return NextResponse.json(
+      { error: "System default templates cannot be deleted." },
+      { status: 403 }
+    );
+  }
+
   const { error } = await supabase
     .from("email_templates")
     .delete()

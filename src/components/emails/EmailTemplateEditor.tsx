@@ -1,187 +1,135 @@
 "use client";
 
+import { useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { EmailBodyEditor } from "@/components/emails/EmailBodyEditor";
+import { SmartFieldPicker } from "@/components/emails/SmartFieldPicker";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import type { TemplateVariable } from "@/types/database";
+import { Lock } from "lucide-react";
 
 interface EmailTemplateEditorProps {
   name: string;
   subject: string;
   body: string;
-  variables: TemplateVariable[];
   onNameChange: (name: string) => void;
   onSubjectChange: (subject: string) => void;
   onBodyChange: (body: string) => void;
+  /** When true, show a "system default" note (still editable, not deletable). */
+  isSystemDefault?: boolean;
 }
-
-// Pre-defined variables that are always available
-const DEFAULT_VARIABLES: TemplateVariable[] = [
-  {
-    key: "contact.name",
-    label: "Contact Name",
-    description: "Full name of the contact",
-  },
-  {
-    key: "contact.first_name",
-    label: "First Name",
-    description: "Contact's first name",
-  },
-  {
-    key: "contact.last_name",
-    label: "Last Name",
-    description: "Contact's last name",
-  },
-  {
-    key: "contact.email",
-    label: "Email",
-    description: "Contact's email address",
-  },
-  {
-    key: "contact.phone",
-    label: "Phone",
-    description: "Contact's phone number",
-  },
-  {
-    key: "contact.organization",
-    label: "Organization",
-    description: "Contact's organization name",
-  },
-  {
-    key: "workspace.name",
-    label: "Workspace Name",
-    description: "Your workspace name",
-  },
-  {
-    key: "user.name",
-    label: "Your Name",
-    description: "Your full name",
-  },
-];
 
 export function EmailTemplateEditor({
   name,
   subject,
   body,
-  variables,
   onNameChange,
   onSubjectChange,
   onBodyChange,
+  isSystemDefault = false,
 }: EmailTemplateEditorProps) {
-  const insertVariable = (variableKey: string) => {
-    const variableTag = `{{${variableKey}}}`;
-    onBodyChange(body + variableTag);
+  const subjectRef = useRef<HTMLInputElement>(null);
+
+  // Insert a token into the subject input at the caret position.
+  const insertIntoSubject = (token: string) => {
+    const el = subjectRef.current;
+    if (!el) {
+      onSubjectChange(subject + token);
+      return;
+    }
+    const start = el.selectionStart ?? subject.length;
+    const end = el.selectionEnd ?? subject.length;
+    const next = subject.slice(0, start) + token + subject.slice(end);
+    onSubjectChange(next);
+    // restore caret after React updates
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
   };
 
-  const allVariables = [...DEFAULT_VARIABLES, ...variables];
-
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      {/* Main Editor */}
-      <div className="lg:col-span-2 space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="template-name">Template Name</Label>
-          <Input
-            id="template-name"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder="e.g. Welcome Email"
-          />
+    <div className="space-y-6">
+      {isSystemDefault && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>
+            This is a <strong>system default</strong> template used by
+            automations. You can edit it, but it cannot be deleted.
+          </span>
         </div>
+      )}
 
-        <div className="space-y-2">
-          <Label htmlFor="subject">Subject Line</Label>
-          <Input
-            id="subject"
-            value={subject}
-            onChange={(e) => onSubjectChange(e.target.value)}
-            placeholder="e.g. Welcome to {{workspace.name}}, {{contact.first_name}}!"
-          />
+      <div className="space-y-2">
+        <Label htmlFor="template-name">Template title (internal label)</Label>
+        <Input
+          id="template-name"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="e.g. Invoice Sent — friendly reminder"
+        />
+        <p className="text-xs text-muted-foreground">
+          Only you see this. Tip: prefix related templates (e.g.
+          &ldquo;Invoice — …&rdquo;, &ldquo;Onboarding — …&rdquo;) so search
+          groups them together.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="subject">Subject line</Label>
+          <SmartFieldPicker onInsert={(token) => insertIntoSubject(token)} />
         </div>
+        <Input
+          id="subject"
+          ref={subjectRef}
+          value={subject}
+          onChange={(e) => onSubjectChange(e.target.value)}
+          placeholder="e.g. Your invoice {{invoice.number}} from {{workspace.name}}"
+        />
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="body">Email Body</Label>
-          <Textarea
-            id="body"
-            value={body}
-            onChange={(e) => onBodyChange(e.target.value)}
-            placeholder="Write your email content here. Use {{variable}} syntax to insert dynamic content."
-            rows={15}
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground">
-            This template supports HTML. Use variables like{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">
-              {"{{contact.name}}"}
-            </code>{" "}
-            to insert dynamic content.
+      <div className="space-y-2">
+        <Label>Email body</Label>
+        <EmailBodyEditor content={body} onChange={onBodyChange} />
+        <p className="text-xs text-muted-foreground">
+          Use the{" "}
+          <Badge variant="outline" className="font-mono text-[10px]">
+            {"{ }"}
+          </Badge>{" "}
+          smart-field button to insert live data. Action fields (contract,
+          invoice, form, scheduler) insert a clickable button — edit its text
+          right in the token, e.g.{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-[11px]">
+            {"{{contract.link|Review & Sign}}"}
+          </code>
+          .
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">How smart fields resolve</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 text-xs text-muted-foreground">
+          <p>• Tokens are replaced with live data when the email is sent.</p>
+          <p>
+            • If data is missing, that spot shows a visible warning (never a
+            silent blank) so you can catch it before sending.
           </p>
-        </div>
-      </div>
-
-      {/* Variables Sidebar */}
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Available Variables</CardTitle>
-            <CardDescription>
-              Click to insert into your template
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {allVariables.map((variable) => (
-              <button
-                key={variable.key}
-                onClick={() => insertVariable(variable.key)}
-                className="w-full text-left p-2 rounded-md hover:bg-accent transition-colors group"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm group-hover:text-primary">
-                      {variable.label}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {variable.description}
-                    </div>
-                  </div>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="mt-1 text-xs font-mono"
-                >
-                  {"{{" + variable.key + "}}"}
-                </Badge>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="text-base">Preview Tips</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              • Variables are replaced with actual data when sending emails
-            </p>
-            <p>• HTML formatting is supported in the email body</p>
-            <p>
-              • Use <code className="text-xs bg-muted px-1 py-0.5 rounded">{"<p>"}</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">{"<strong>"}</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">{"<a>"}</code> tags for
-              formatting
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          <p>
+            • Action buttons link to the specific project&rsquo;s contract,
+            invoice, form, or your scheduling page.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

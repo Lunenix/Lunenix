@@ -7,7 +7,7 @@ import { EmailTemplateEditor } from "@/components/emails/EmailTemplateEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Save, Trash2 } from "lucide-react";
-import type { EmailTemplate, TemplateVariable } from "@/types/database";
+import type { EmailTemplate } from "@/types/database";
 
 export default function EmailTemplateEditorPage({
   params,
@@ -20,7 +20,7 @@ export default function EmailTemplateEditorPage({
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [variables] = useState<TemplateVariable[]>([]);
+  const [isSystemDefault, setIsSystemDefault] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,6 +43,7 @@ export default function EmailTemplateEditorPage({
       setName(template.name);
       setSubject(template.subject);
       setBody(template.body);
+      setIsSystemDefault(Boolean(template.is_system_default));
     } catch (error) {
       console.error("Error fetching template:", error);
     } finally {
@@ -72,7 +73,6 @@ export default function EmailTemplateEditorPage({
           name,
           subject,
           body,
-          variables,
         }),
       });
 
@@ -134,7 +134,7 @@ export default function EmailTemplateEditorPage({
           </p>
         </div>
         <div className="flex gap-2">
-          {!isNew && (
+          {!isNew && !isSystemDefault && (
             <Button
               variant="destructive"
               onClick={handleDelete}
@@ -175,7 +175,7 @@ export default function EmailTemplateEditorPage({
             name={name}
             subject={subject}
             body={body}
-            variables={variables}
+            isSystemDefault={isSystemDefault}
             onNameChange={setName}
             onSubjectChange={setSubject}
             onBodyChange={setBody}

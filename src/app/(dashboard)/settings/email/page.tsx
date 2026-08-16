@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Mail, Save, Send, Server, Inbox } from "lucide-react";
+import { Loader2, Mail, Save, Send, Server, Inbox, PenLine, CalendarClock } from "lucide-react";
+import { EmailBodyEditor } from "@/components/emails/EmailBodyEditor";
 
 export default function EmailSettingsPage() {
   const { activeWorkspace, isLoading: workspaceLoading } = useWorkspace();
@@ -47,6 +48,13 @@ export default function EmailSettingsPage() {
   const [imapUsername, setImapUsername] = useState("");
   const [imapPassword, setImapPassword] = useState("");
   const [hasImapPassword, setHasImapPassword] = useState(false);
+
+  // Signature + scheduler link
+  const [signatureHtml, setSignatureHtml] = useState("");
+  const [schedulerUrl, setSchedulerUrl] = useState("");
+  const [isSavingSig, setIsSavingSig] = useState(false);
+  const [sigSaved, setSigSaved] = useState(false);
+  const [sigError, setSigError] = useState<string | null>(null);
 
   // Test email
   const [isTesting, setIsTesting] = useState(false);
@@ -85,6 +93,9 @@ export default function EmailSettingsPage() {
           setImapSecure(s.imap_secure ?? true);
           setImapUsername(s.imap_username || "");
           setHasImapPassword(!!s.has_imap_password);
+
+          setSignatureHtml(s.signature_html || "");
+          setSchedulerUrl(s.scheduler_url || "");
         }
       } catch (err) {
         console.error("Error loading email settings:", err);
@@ -184,6 +195,32 @@ export default function EmailSettingsPage() {
       });
     } finally {
       setIsTesting(false);
+    }
+  }
+
+  async function handleSaveSignature() {
+    if (!activeWorkspace) return;
+    setIsSavingSig(true);
+    setSigSaved(false);
+    setSigError(null);
+    try {
+      const res = await fetch("/api/email-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspace_id: activeWorkspace.id,
+          signature_html: signatureHtml || null,
+          scheduler_url: schedulerUrl.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save");
+      setSigSaved(true);
+      setTimeout(() => setSigSaved(false), 3000);
+    } catch (err) {
+      setSigError(err instanceof Error ? err.message : "Failed to save signature");
+    } finally {
+      setIsSavingSig(false);
     }
   }
 
@@ -528,6 +565,59 @@ export default function EmailSettingsPage() {
           </Button>
         </div>
       </form>
+
+      {/* Signature + scheduler link (saved independently) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PenLine className="h-5 w-5" />
+            Email Signature
+          </CardTitle>
+          <CardDescription>
+            Your default signature is automatically appended to emails you send
+            manually. You can turn it off per email in the composer.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <EmailBodyEditor content={signatureHtml} onChange={setSignatureHtml} />
+
+          <div className="space-y-2">
+            <Label htmlFor="scheduler_url" className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4" />
+              Scheduling / booking link
+            </Label>
+            <Input
+              id="scheduler_url"
+              type="url"
+              placeholder="https://calendly.com/your-name"
+              value={schedulerUrl}
+              onChange={(e) => setSchedulerUrl(e.target.value)}
+            />
+            <p className="text-sm text-muted-foreground">
+              The{" "}
+              <code className="rounded bg-muted px-1 py-0.5">{"{{scheduler.link}}"}</code>{" "}
+              smart field links to this URL. If left blank, that button shows a
+              visible warning instead of sending a broken link.
+            </p>
+          </div>
+
+          {sigError && (
+            <p className="text-sm font-medium text-destructive">{sigError}</p>
+          )}
+          {sigSaved && (
+            <p className="text-sm font-medium text-green-600">Signature saved!</p>
+          )}
+
+          <Button type="button" onClick={handleSaveSignature} disabled={isSavingSig}>
+            {isSavingSig ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Save Signature
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -13,7 +13,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Mail, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Mail, Plus, Search } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import type { EmailTemplate } from "@/types/database";
 
@@ -21,12 +23,28 @@ export default function EmailTemplatesPage() {
   const { activeWorkspace, isLoading: workspaceLoading } = useWorkspace();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (activeWorkspace) {
-      fetchTemplates();
+      seedAndFetch();
     }
   }, [activeWorkspace]);
+
+  const seedAndFetch = async () => {
+    if (!activeWorkspace) return;
+    // Ensure the system default templates exist (idempotent).
+    try {
+      await fetch("/api/email-templates/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace_id: activeWorkspace.id }),
+      });
+    } catch {
+      // non-fatal
+    }
+    await fetchTemplates();
+  };
 
   const fetchTemplates = async () => {
     if (!activeWorkspace) return;
@@ -44,6 +62,15 @@ export default function EmailTemplatesPage() {
       setIsLoading(false);
     }
   };
+
+  const filteredTemplates = templates.filter((t) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      t.name.toLowerCase().includes(q) ||
+      t.subject.toLowerCase().includes(q)
+    );
+  });
 
   if (workspaceLoading || isLoading) {
     return (
@@ -100,49 +127,68 @@ export default function EmailTemplatesPage() {
         </Card>
       ) : (
         <Card>
-          <CardHeader>
+          <CardHeader className="gap-4">
             <CardTitle>All Templates</CardTitle>
+            <div className="relative max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by title or subject..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Title</TableHead>
                   <TableHead>Subject</TableHead>
-                  <TableHead>Variables</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {templates.map((template) => (
-                  <TableRow key={template.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/email-templates/${template.id}`}
-                        className="hover:underline"
-                      >
-                        {template.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {template.subject}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {template.variables.length} variable(s)
-                      </span>
-                    </TableCell>
-                    <TableCell>{formatDateTime(template.created_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/email-templates/${template.id}`}>
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </Link>
+                {filteredTemplates.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No templates match &ldquo;{search}&rdquo;.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredTemplates.map((template) => (
+                    <TableRow key={template.id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/email-templates/${template.id}`}
+                          className="hover:underline"
+                        >
+                          {template.name}
+                        </Link>
+                        {template.is_system_default && (
+                          <Badge variant="secondary" className="ml-2 text-[10px]">
+                            System default
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {template.subject}
+                      </TableCell>
+                      <TableCell>{formatDateTime(template.created_at)}</TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/email-templates/${template.id}`}>
+                          <Button variant="ghost" size="sm">
+                            Edit
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

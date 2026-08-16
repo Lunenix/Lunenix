@@ -226,12 +226,23 @@ export function WorkflowBuilder({
                         <Label>Email Template</Label>
                         <Select
                           value={(action.config.template_id as string) || ""}
-                          onValueChange={(value) =>
+                          onValueChange={(value) => {
+                            // Snapshot the template's current content into the
+                            // step so later edits to the master template don't
+                            // retroactively change this placed step.
+                            const tpl = templates.find((t) => t.id === value);
                             updateAction(index, {
                               ...action,
-                              config: { ...action.config, template_id: value },
-                            })
-                          }
+                              config: {
+                                ...action.config,
+                                template_id: value,
+                                template_name: tpl?.name ?? null,
+                                subject: tpl?.subject ?? action.config.subject ?? "",
+                                body: tpl?.body ?? action.config.body ?? "",
+                                snapshot_at: new Date().toISOString(),
+                              },
+                            });
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select a template..." />
@@ -244,6 +255,14 @@ export function WorkflowBuilder({
                             ))}
                           </SelectContent>
                         </Select>
+                        {action.config.snapshot_at ? (
+                          <p className="text-xs text-muted-foreground">
+                            A copy of this template&rsquo;s content is saved with
+                            this step. Editing the master template later
+                            won&rsquo;t change this step. Re-select the template
+                            to refresh the copy.
+                          </p>
+                        ) : null}
                       </div>
                     )}
 

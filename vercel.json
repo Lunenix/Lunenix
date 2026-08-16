@@ -7,6 +7,10 @@
     {
       "path": "/api/emails/inbound/run",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/emails/scheduled/run",
+      "schedule": "0 * * * *"
     }
   ]
 }
