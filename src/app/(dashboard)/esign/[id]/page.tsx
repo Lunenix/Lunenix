@@ -1244,22 +1244,21 @@ function DraggableField({
 
   return (
     <div
-      className={`absolute cursor-move rounded-sm border-2 text-[10px] ${
-        selected
-          ? "border-black bg-black/10"
-          : "border-black/60 bg-black/5"
-      } ${field.assigned_to === "owner" ? "border-dashed" : ""}`}
+      className={`absolute cursor-move rounded-sm border-2 text-[10px] ${field.assigned_to === "owner" ? "border-dashed" : ""}`}
       style={{
         left: `${field.pos_x * 100}%`,
         top: `${field.pos_y * 100}%`,
         width: `${field.width * 100}%`,
         height: `${field.height * 100}%`,
+        borderColor: '#000000',
+        backgroundColor: selected ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+        color: '#000000',
       }}
       onPointerDown={onPointerDown("move")}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div className="pointer-events-none flex h-full w-full items-center justify-center gap-1 overflow-hidden px-1 text-black">
+      <div className="pointer-events-none flex h-full w-full items-center justify-center gap-1 overflow-hidden px-1">
         <Icon className="h-3 w-3 shrink-0" />
         <span className="truncate">
           {field.value || ESIGN_FIELD_LABELS[field.field_type]}
@@ -1626,16 +1625,17 @@ function CountersignFieldBox({
   if (isSig) {
     const showTyped = signature?.type === "typed";
     const showDrawn = signature?.type === "drawn";
+    const buttonStyle = {
+      ...style,
+      borderColor: signature ? 'rgba(34, 197, 94, 0.6)' : '#000000',
+      backgroundColor: signature ? 'rgba(34, 197, 94, 0.05)' : 'rgba(0, 0, 0, 0.1)',
+    };
     return (
       <button
         type="button"
-        style={style}
+        style={buttonStyle}
         onClick={onRequestSignature}
-        className={`flex items-center justify-center overflow-hidden rounded-sm border-2 ${
-          signature
-            ? "border-green-500/60 bg-green-500/5"
-            : "border-black bg-black/10 animate-pulse"
-        }`}
+        className={`flex items-center justify-center overflow-hidden rounded-sm border-2 ${signature ? '' : 'animate-pulse'}`}
       >
         {showDrawn ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -1646,10 +1646,11 @@ function CountersignFieldBox({
           />
         ) : showTyped ? (
           <span
-            className="truncate px-1 text-black"
+            className="truncate px-1"
             style={{
               fontFamily: "'Brush Script MT','Segoe Script',cursive",
               fontSize: "min(2vw,20px)",
+              color: '#000000',
             }}
           >
             {field.field_type === "initials"
@@ -1660,7 +1661,7 @@ function CountersignFieldBox({
               : signature!.data}
           </span>
         ) : (
-          <span className="text-[9px] font-medium text-black">
+          <span className="text-[9px] font-medium" style={{ color: '#000000' }}>
             {field.field_type === "initials" ? "Initial" : "Sign"}
           </span>
         )}
@@ -1669,9 +1670,15 @@ function CountersignFieldBox({
   }
 
   // Owner text / name / date fillable inputs.
+  const inputStyle = {
+    ...style,
+    borderColor: '#000000',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    color: '#000000',
+  };
   return (
     <input
-      style={style}
+      style={inputStyle}
       value={value}
       onChange={(e) => onChangeValue(e.target.value)}
       placeholder={
@@ -1681,7 +1688,8 @@ function CountersignFieldBox({
           ? "Full name (auto)"
           : field.placeholder || "Enter text"
       }
-      className="rounded-sm border-2 border-black/60 bg-black/5 px-1 text-[11px] text-black outline-none focus:border-black focus:bg-white"
+      className="rounded-sm border-2 px-1 text-[11px] outline-none focus:bg-white"
+      onFocus={(e) => e.target.style.borderColor = '#000000'}
     />
   );
 }
