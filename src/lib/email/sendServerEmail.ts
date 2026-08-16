@@ -43,22 +43,43 @@ export async function sendServerEmail(opts: ServerEmailOptions): Promise<{
   let status: "sent" | "failed" = "sent";
   let errorMessage: string | null = null;
 
-  try {
-    await resend.emails.send({
-      from,
-      to: opts.to,
-      subject: opts.subject,
-      html: opts.html,
-      replyTo,
-      attachments: opts.attachments?.map((a) => ({
-        filename: a.filename,
-        content: a.content,
-      })),
-    });
-  } catch (err) {
+  if (!process.env.RESEND_API_KEY) {
     status = "failed";
-    errorMessage = err instanceof Error ? err.message : "Unknown error";
-    console.error("Error sending server email via Resend:", err);
+    errorMessage =
+      "Email is not configured: RESEND_API_KEY is missing. Add it in your environment settings.";
+    console.error(errorMessage);
+  } else {
+    try {
+      const { data, error } = await resend.emails.send({
+        from,
+        to: opts.to,
+        subject: opts.subject,
+        html: opts.html,
+        replyTo,
+        attachments: opts.attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+        })),
+      });
+
+      // The Resend SDK does NOT throw on API errors (e.g. unverified domain,
+      // test-mode recipient restrictions). It returns them in `error`, so we
+      // must inspect the response to know whether the email actually sent.
+      if (error) {
+        status = "failed";
+        errorMessage =
+          (error as { message?: string }).message || "Resend rejected the email.";
+        console.error("Resend returned an error:", error);
+      } else if (!data?.id) {
+        status = "failed";
+        errorMessage = "Resend did not confirm the email was queued.";
+        console.error("Resend returned no id:", data);
+      }
+    } catch (err) {
+      status = "failed";
+      errorMessage = err instanceof Error ? err.message : "Unknown error";
+      console.error("Error sending server email via Resend:", err);
+    }
   }
 
   await admin.from("email_logs").insert({

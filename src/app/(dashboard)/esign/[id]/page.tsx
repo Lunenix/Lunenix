@@ -374,11 +374,15 @@ export default function EsignEditorPage({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send");
       setSendUrl(data.sign_url);
-      setNotice(
-        data.email_sent
-          ? "Sent! The signer has been emailed a signing link."
-          : "Signing link created (email could not be sent — copy the link below)."
-      );
+      if (data.email_sent) {
+        setNotice("Sent! The signer has been emailed a signing link.");
+      } else {
+        setError(
+          `The signing link was created, but the email could NOT be sent${
+            data.email_error ? `: ${data.email_error}` : "."
+          } Copy the link below and share it manually.`
+        );
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send");
