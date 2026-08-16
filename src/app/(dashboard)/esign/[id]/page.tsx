@@ -1246,8 +1246,8 @@ function DraggableField({
     <div
       className={`absolute cursor-move rounded-sm border-2 text-[10px] ${
         selected
-          ? "border-primary bg-primary/15"
-          : "border-primary/50 bg-primary/10"
+          ? "border-black bg-black/10"
+          : "border-black/60 bg-black/5"
       } ${field.assigned_to === "owner" ? "border-dashed" : ""}`}
       style={{
         left: `${field.pos_x * 100}%`,
@@ -1259,7 +1259,7 @@ function DraggableField({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div className="pointer-events-none flex h-full w-full items-center justify-center gap-1 overflow-hidden px-1 text-primary">
+      <div className="pointer-events-none flex h-full w-full items-center justify-center gap-1 overflow-hidden px-1 text-black">
         <Icon className="h-3 w-3 shrink-0" />
         <span className="truncate">
           {field.value || ESIGN_FIELD_LABELS[field.field_type]}
@@ -1634,7 +1634,7 @@ function CountersignFieldBox({
         className={`flex items-center justify-center overflow-hidden rounded-sm border-2 ${
           signature
             ? "border-green-500/60 bg-green-500/5"
-            : "border-primary bg-primary/10 animate-pulse"
+            : "border-black bg-black/10 animate-pulse"
         }`}
       >
         {showDrawn ? (
@@ -1646,7 +1646,7 @@ function CountersignFieldBox({
           />
         ) : showTyped ? (
           <span
-            className="truncate px-1 text-[#12123a]"
+            className="truncate px-1 text-black"
             style={{
               fontFamily: "'Brush Script MT','Segoe Script',cursive",
               fontSize: "min(2vw,20px)",
@@ -1660,7 +1660,7 @@ function CountersignFieldBox({
               : signature!.data}
           </span>
         ) : (
-          <span className="text-[9px] font-medium text-primary">
+          <span className="text-[9px] font-medium text-black">
             {field.field_type === "initials" ? "Initial" : "Sign"}
           </span>
         )}
@@ -1681,7 +1681,7 @@ function CountersignFieldBox({
           ? "Full name (auto)"
           : field.placeholder || "Enter text"
       }
-      className="rounded-sm border-2 border-primary/60 bg-primary/5 px-1 text-[11px] outline-none focus:border-primary focus:bg-white"
+      className="rounded-sm border-2 border-black/60 bg-black/5 px-1 text-[11px] text-black outline-none focus:border-black focus:bg-white"
     />
   );
 }
