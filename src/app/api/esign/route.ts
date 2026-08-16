@@ -1,6 +1,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
+import mammoth from "mammoth";
 
 /**
  * GET /api/esign?workspaceId=...
@@ -39,7 +40,9 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/esign
- * Create a new e-signature document by uploading a PDF (multipart/form-data).
+ * Create a new e-signature document by uploading a PDF or Word document (multipart/form-data).
+ * - PDFs: stored directly, not editable
+ * - .docx: converted to editable HTML content using mammoth
  * Fields: file, name, workspace_id, type?, project_id?, contact_id?,
  * assigned_workflow_id?, signer_name?, signer_email?
  */
@@ -64,8 +67,18 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  if (file.type !== "application/pdf") {
-    return NextResponse.json({ error: "Only PDF files are supported" }, { status: 400 });
+
+  const isPdf = file.type === "application/pdf";
+  const isDocx =
+    file.type ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    file.name.endsWith(".docx");
+
+  if (!isPdf && !isDocx) {
+    return NextResponse.json(
+      { error: "Only PDF and Word (.docx) files are supported" },
+      { status: 400 }
+    );
   }
 
   // Verify workspace membership.
@@ -82,13 +95,36 @@ export async function POST(req: NextRequest) {
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
 
-  // Count pages.
   let pageCount = 1;
-  try {
-    const pdf = await PDFDocument.load(bytes);
-    pageCount = pdf.getPageCount();
-  } catch {
-    return NextResponse.json({ error: "The file is not a valid PDF" }, { status: 400 });
+  let htmlContent: string | null = null;
+  let contentType: "uploaded_pdf" | "editable_document" = "uploaded_pdf";
+
+  if (isPdf) {
+    // PDF: validate and count pages.
+    try {
+      const pdf = await PDFDocument.load(bytes);
+      pageCount = pdf.getPageCount();
+    } catch {
+      return NextResponse.json(
+        { error: "The file is not a valid PDF" },
+        { status: 400 }
+      );
+    }
+  } else {
+    // .docx: convert to editable HTML.
+    contentType = "editable_document";
+    try {
+      const result = await mammoth.convertToHtml({ buffer: Buffer.from(arrayBuffer) });
+      htmlContent = result.value;
+      // Rough page count estimate: 1 page ~= 500 words of HTML.
+      pageCount = Math.max(1, Math.ceil(htmlContent.length / 2500));
+    } catch (e) {
+      console.error("Error converting .docx to HTML:", e);
+      return NextResponse.json(
+        { error: "The file is not a valid Word document" },
+        { status: 400 }
+      );
+    }
   }
 
   const admin = createAdminClient();
@@ -102,6 +138,8 @@ export async function POST(req: NextRequest) {
       type: type === "sub_agreement" ? "sub_agreement" : "contract",
       status: "draft",
       page_count: pageCount,
+      content: htmlContent,
+      content_type: contentType,
       project_id: (form.get("project_id") as string) || null,
       contact_id: (form.get("contact_id") as string) || null,
       assigned_workflow_id: (form.get("assigned_workflow_id") as string) || null,
@@ -120,15 +158,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  const path = `${workspace_id}/${doc.id}/original.pdf`;
-  const { error: uploadError } = await admin.storage
-    .from("contracts")
-    .upload(path, bytes, { contentType: "application/pdf", upsert: true });
+  // Only upload PDF files to storage. For .docx, we'll generate PDF on demand.
+  let path: string | null = null;
+  if (isPdf) {
+    path = `${workspace_id}/${doc.id}/original.pdf`;
+    const { error: uploadError } = await admin.storage
+      .from("contracts")
+      .upload(path, bytes, { contentType: "application/pdf", upsert: true });
 
-  if (uploadError) {
-    console.error("Error uploading PDF:", uploadError);
-    await admin.from("esign_documents").delete().eq("id", doc.id);
-    return NextResponse.json({ error: "Failed to upload PDF" }, { status: 500 });
+    if (uploadError) {
+      console.error("Error uploading PDF:", uploadError);
+      await admin.from("esign_documents").delete().eq("id", doc.id);
+      return NextResponse.json({ error: "Failed to upload PDF" }, { status: 500 });
+    }
   }
 
   // Generate contract number atomically.
@@ -147,11 +189,23 @@ export async function POST(req: NextRequest) {
   await admin.from("esign_events").insert({
     document_id: doc.id,
     event_type: "created",
-    metadata: { by: user.email },
+    metadata: {
+      by: user.email,
+      file_type: isPdf ? "pdf" : "docx",
+      editable: contentType === "editable_document",
+    },
   });
 
   return NextResponse.json(
-    { document: { ...doc, original_file_path: path, contract_number: contractNumber } },
+    {
+      document: {
+        ...doc,
+        original_file_path: path,
+        contract_number: contractNumber,
+        content: htmlContent,
+        content_type: contentType,
+      },
+    },
     { status: 201 }
   );
 }

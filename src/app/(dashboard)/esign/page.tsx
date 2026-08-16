@@ -430,17 +430,20 @@ function NewDocumentDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="pdf">PDF file</Label>
+            <Label htmlFor="pdf">PDF or Word document</Label>
             <Input
               id="pdf"
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(e) => {
                 const f = e.target.files?.[0] || null;
                 setFile(f);
-                if (f && !name) setName(f.name.replace(/\.pdf$/i, ""));
+                if (f && !name) setName(f.name.replace(/\.(pdf|docx)$/i, ""));
               }}
             />
+            <p className="text-xs text-muted-foreground">
+              Word documents (.docx) will be converted to editable format.
+            </p>
           </div>
 
           <div className="space-y-2">

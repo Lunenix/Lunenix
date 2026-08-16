@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PdfPages, type PageSize } from "@/components/esign/PdfPages";
 import { SignaturePad, type SignatureValue } from "@/components/esign/SignaturePad";
+import { RichTextEditor } from "@/components/document/RichTextEditor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,8 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
+  Eye,
+  FileText,
   Loader2,
   MoreVertical,
   Pencil,
@@ -148,6 +151,12 @@ export default function EsignEditorPage({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Editable document state.
+  const [editMode, setEditMode] = useState(false);
+  const [editedContent, setEditedContent] = useState("");
+  const [savingContent, setSavingContent] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -167,6 +176,7 @@ export default function EsignEditorPage({
       setEndDate(d.end_date || "");
       setDescription(d.description || "");
       setTerms(d.terms || "");
+      setEditedContent(d.content || "");
       setFields(
         (d.fields || []).map((f) => ({
           localId: uid(),
@@ -360,6 +370,91 @@ export default function EsignEditorPage({
     }
   };
 
+  const saveContent = async () => {
+    if (!doc || doc.content_type !== "editable_document") return;
+    setSavingContent(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/esign/${id}/content`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editedContent }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save content");
+      }
+      setNotice("Document content saved.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save content");
+    } finally {
+      setSavingContent(false);
+    }
+  };
+
+  const generatePdf = async () => {
+    if (!doc || !editedContent) return;
+    setGeneratingPdf(true);
+    setError(null);
+    try {
+      // First save the content.
+      await saveContent();
+
+      // Import jsPDF dynamically (client-side only).
+      const { default: jsPDF } = await import("jspdf");
+
+      // Create a temporary container for HTML rendering.
+      const container = document.createElement("div");
+      container.style.position = "absolute";
+      container.style.left = "-9999px";
+      container.style.width = "210mm"; // A4 width
+      container.style.padding = "20mm";
+      container.innerHTML = editedContent;
+      document.body.appendChild(container);
+
+      // Generate PDF using jsPDF with html plugin.
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      await pdf.html(container, {
+        callback: async (pdfDoc) => {
+          // Convert to blob and upload.
+          const pdfBlob = pdfDoc.output("blob");
+          const formData = new FormData();
+          formData.append("file", pdfBlob, `${doc.name}.pdf`);
+
+          const res = await fetch(`/api/esign/${id}/replace-file`, {
+            method: "PUT",
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Failed to generate PDF");
+          }
+
+          setNotice("PDF generated successfully. Reloading...");
+          await load();
+          setEditMode(false);
+        },
+        x: 0,
+        y: 0,
+        width: 210, // A4 width in mm
+        windowWidth: 794, // ~210mm at 96dpi
+      });
+
+      // Clean up.
+      document.body.removeChild(container);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -410,7 +505,48 @@ export default function EsignEditorPage({
           </div>
         </div>
         <div className="flex gap-2">
-          {!isLocked && (
+          {doc.content_type === "editable_document" && !isLocked && (
+            <>
+              {editMode ? (
+                <>
+                  <Button variant="outline" onClick={saveContent} disabled={savingContent}>
+                    {savingContent ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Save Content
+                  </Button>
+                  <Button onClick={generatePdf} disabled={generatingPdf}>
+                    {generatingPdf ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="mr-2 h-4 w-4" />
+                    )}
+                    Generate PDF
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditMode(false)}
+                    title="Preview mode"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setEditMode(true)}
+                  title="Edit document content"
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Document
+                </Button>
+              )}
+            </>
+          )}
+          {!isLocked && !editMode && (
             <>
               <Button variant="outline" onClick={() => saveFields(false)} disabled={saving}>
                 {saving ? (
@@ -530,6 +666,25 @@ export default function EsignEditorPage({
             onStartCountersign={() => setCountersigning(true)}
           />
         )
+      ) : editMode && doc.content_type === "editable_document" ? (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Edit Document Content</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RichTextEditor
+                content={editedContent}
+                onChange={setEditedContent}
+                editable={true}
+              />
+              <p className="mt-3 text-xs text-muted-foreground">
+                Edit the document content above, then click <strong>Generate PDF</strong> to
+                create a finalized PDF for signature field placement.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           {/* PDF + fields */}

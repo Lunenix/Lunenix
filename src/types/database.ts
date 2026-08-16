@@ -564,6 +564,8 @@ export interface EsignEvent {
   created_at: string;
 }
 
+export type EsignContentType = "uploaded_pdf" | "editable_document";
+
 export interface EsignDocument {
   id: string;
   workspace_id: string;
@@ -595,6 +597,9 @@ export interface EsignDocument {
   end_date: string | null;
   terms: string | null;
   description: string | null;
+  // Editable content support (migration 0012).
+  content: string | null;
+  content_type: EsignContentType;
   created_by: string | null;
   created_at: string;
   updated_at: string;
