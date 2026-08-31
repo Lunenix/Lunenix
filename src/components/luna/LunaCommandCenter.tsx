@@ -223,9 +223,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       client.on("silent", () =>
         setStatus((prev) => (prev === "speaking" ? "idle" : prev))
       );
+      // STOP/ENDFRAME can fire after a clip without ending the session.
+      // Do not swap back to the still portrait — that flash looked like a
+      // looping cycle with a black line across her face.
       client.on("stop", () => {
-        streamConnectedRef.current = false;
-        setStreamConnected(false);
+        /* keep video up until the user hangs up or an error tears down */
       });
       client.on("error", (detail: string) => {
         toast(`Live avatar error: ${String(detail).slice(0, 120)}`, "error");
