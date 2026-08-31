@@ -279,6 +279,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     return connectPromiseRef.current;
   }, [connectSimli]);
 
+  // Go live as soon as the command center mounts — no start button.
+  useEffect(() => {
+    void ensureLive();
+  }, [ensureLive]);
+
   /* ------- Browser speech-synthesis fallback (when Simli not live) -------- */
   const speakFallback = useCallback(async (text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
