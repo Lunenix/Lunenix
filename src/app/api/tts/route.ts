@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/server";
  * ElevenLabs text-to-speech proxy — server-side only.
  *
  * ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID stay on the server. Accepts
- * `{ text }` from the client and streams the synthesized audio/mpeg buffer
- * back without exposing credentials.
+ * `{ text }` from the client and streams raw PCM16 @ 16 kHz (Simli's native
+ * lip-sync format) so the browser can pipe chunks into sendAudioData live.
  */
 
 export const dynamic = "force-dynamic";
@@ -51,13 +51,13 @@ export async function POST(req: NextRequest) {
   let elevenResponse: Response;
   try {
     elevenResponse = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=pcm_16000`,
       {
         method: "POST",
         headers: {
           "xi-api-key": apiKey,
           "Content-Type": "application/json",
-          Accept: "audio/mpeg",
+          Accept: "application/octet-stream",
         },
         body: JSON.stringify({
           text,
@@ -85,9 +85,8 @@ export async function POST(req: NextRequest) {
 
   return new Response(elevenResponse.body, {
     headers: {
-      "Content-Type": "audio/mpeg",
+      "Content-Type": "application/octet-stream",
       "Cache-Control": "no-store",
-      "Transfer-Encoding": "chunked",
     },
   });
 }

@@ -34,6 +34,44 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
+/** Simli lip-sync frames: PCM16 mono 16 kHz, ~187.5 ms per 6000-byte chunk. */
+const SIMLI_PCM_CHUNK = 6000;
+
+async function pipePcm16ToSimli(
+  body: ReadableStream<Uint8Array>,
+  getClient: () => SimliClient | null
+) {
+  const reader = body.getReader();
+  let pending = new Uint8Array(0);
+  try {
+    while (getClient()) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value?.length) continue;
+      const merged = new Uint8Array(pending.length + value.length);
+      merged.set(pending);
+      merged.set(value, pending.length);
+      let offset = 0;
+      const client = getClient();
+      if (!client) break;
+      while (offset + SIMLI_PCM_CHUNK <= merged.length) {
+        client.sendAudioData(
+          merged.slice(offset, offset + SIMLI_PCM_CHUNK)
+        );
+        offset += SIMLI_PCM_CHUNK;
+      }
+      pending = merged.slice(offset);
+    }
+    const even = pending.length & ~1;
+    const client = getClient();
+    if (even > 0 && client) {
+      client.sendAudioData(pending.slice(0, even));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 
 type Status = "idle" | "listening" | "thinking" | "speaking";
@@ -188,34 +226,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     }
   }, [connecting, teardownSimli]);
 
-  /* ------------------ Decode + resample TTS mp3 to PCM16 ------------------ */
-  const mp3ToPcm16 = async (mp3: ArrayBuffer): Promise<Int16Array> => {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext;
-    const decodeCtx = new AudioCtx();
-    const decoded = await decodeCtx.decodeAudioData(mp3.slice(0));
-    await decodeCtx.close();
-
-    // Resample to 16kHz mono (Simli requirement).
-    const frameCount = Math.ceil(decoded.duration * 16000);
-    const offline = new OfflineAudioContext(1, frameCount, 16000);
-    const src = offline.createBufferSource();
-    src.buffer = decoded;
-    src.connect(offline.destination);
-    src.start();
-    const rendered = await offline.startRendering();
-    const float = rendered.getChannelData(0);
-
-    const pcm = new Int16Array(float.length);
-    for (let i = 0; i < float.length; i++) {
-      const s = Math.max(-1, Math.min(1, float[i]));
-      pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-    }
-    return pcm;
-  };
-
   /* ------- Browser speech-synthesis fallback (when Simli not live) -------- */
   const speakFallback = useCallback(async (text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -269,18 +279,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           return;
         }
         if (!res.ok) throw new Error(await res.text());
+        if (!res.body) throw new Error("TTS returned no audio stream");
 
-        const mp3 = await res.arrayBuffer();
-        const pcm = await mp3ToPcm16(mp3);
-        const bytes = new Uint8Array(pcm.buffer);
-
-        // Feed the ElevenLabs audio into Simli's worklet in ~6000-byte PCM16
-        // frames. Simli lip-syncs the avatar to exactly this audio.
-        const CHUNK = 6000;
-        for (let offset = 0; offset < bytes.length; offset += CHUNK) {
-          if (!simliRef.current) break;
-          simliRef.current.sendAudioData(bytes.subarray(offset, offset + CHUNK));
-        }
+        // Pipe PCM16 @ 16 kHz chunks into Simli as they arrive so the
+        // avatar's mouth tracks the ElevenLabs voice in real time.
+        await pipePcm16ToSimli(res.body, () => simliRef.current);
         // Simli emits "silent" over its data channel to drive the status back
         // to idle once playback finishes.
       } catch (e) {

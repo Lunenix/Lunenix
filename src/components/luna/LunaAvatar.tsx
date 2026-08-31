@@ -5,6 +5,12 @@ import { Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LUNA_AVATAR_URL } from "@/lib/luna";
 
+/**
+ * Offline/fallback portrait only. When a live Simli session is running, the
+ * dashboard shows the WebRTC video instead — lip-sync comes from piping
+ * ElevenLabs PCM into SimliClient.sendAudioData, not from this CSS jaw.
+ */
+
 // Phoneme sequence: 0 = mouth closed, 1 = fully open.
 // Varied values create more natural, non-robotic movement.
 const PHONEMES = [0.25, 0.75, 0.45, 0.9, 0.15, 0.6, 1.0, 0.3, 0.55, 0.1, 0.8, 0.4];
