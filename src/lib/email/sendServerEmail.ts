@@ -12,7 +12,6 @@ import nodemailer from "nodemailer";
 import { createAdminClient } from "@/lib/supabase/server";
 import { decryptSecret } from "@/lib/email/crypto";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 const DEFAULT_FROM_NAME = "Lunenix";
 
@@ -37,13 +36,15 @@ async function sendViaResend(
   replyTo: string | undefined,
   opts: ServerEmailOptions
 ): Promise<SendResult> {
-  if (!process.env.RESEND_API_KEY) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
     return {
       success: false,
       error:
         "Email is not configured: RESEND_API_KEY is missing. Add it in your environment settings.",
     };
   }
+  const resend = new Resend(apiKey);
   try {
     const { data, error } = await resend.emails.send({
       from,

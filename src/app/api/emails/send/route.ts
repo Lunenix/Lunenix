@@ -3,8 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import type { EmailLog } from "@/types/database";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // Default "from" address and name (used when workspace has no email settings)
 const DEFAULT_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 const DEFAULT_FROM_NAME = "Lunenix";
@@ -32,6 +30,15 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { workspace_id, emails } = body;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Email is not configured: RESEND_API_KEY is missing." },
+      { status: 503 }
+    );
+  }
+  const resend = new Resend(apiKey);
 
   if (!workspace_id) {
     return NextResponse.json(

@@ -11,6 +11,7 @@ import type { WorkspaceAISettings } from "@/types/database";
 import { LunaAvatar } from "./LunaAvatar";
 import { LunaSettingsModal } from "./LunaSettingsModal";
 import { Mic, MicOff, Send, Settings, Power, Loader2 } from "lucide-react";
+import type { SimliClient } from "simli-client/dist/client";
 
 /* -------------------------------------------------------------------------- */
 /*  Minimal SpeechRecognition typings (no @types package available)           */
@@ -37,14 +38,6 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 type Status = "idle" | "listening" | "thinking" | "speaking";
 
-/** Minimal surface we use — avoid importing simli-client types (broken ./Client barrel). */
-interface SimliClientLike {
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  sendAudioData: (audioData: Uint8Array) => void;
-  on: (event: string, callback: (...args: string[]) => void) => void;
-}
-
 interface LunaCommandCenterProps {
   workspaceId: string;
 }
@@ -61,7 +54,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const simliRef = useRef<SimliClientLike | null>(null);
+  const simliRef = useRef<SimliClient | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   const agentName = settings?.agent_name || "Luna";
