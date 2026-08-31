@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  GoogleGenAI,
-  Type,
-  createPartFromFunctionResponse,
-  type Content,
-  type FunctionDeclaration,
-} from "@google/genai";
+import type { Content, FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import {
   executeLunaTool,
@@ -23,7 +17,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const GEMINI_MODEL = "gemini-1.5-flash";
+// gemini-1.5-flash was shut down in Sept 2025 and 404s on every request.
+const GEMINI_MODEL = "gemini-2.5-flash";
 const MAX_TOOL_ROUNDS = 4;
 
 const BASE_SYSTEM_PROMPT =
@@ -43,19 +38,19 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
     name: "create_contact",
     description:
       "Create a contact in the current workspace. Do not pass a workspace id.",
-    parameters: {
-      type: Type.OBJECT,
+    parametersJsonSchema: {
+      type: "object",
       properties: {
-        first_name: { type: Type.STRING, description: "Given name" },
-        last_name: { type: Type.STRING, description: "Family name" },
+        first_name: { type: "string", description: "Given name" },
+        last_name: { type: "string", description: "Family name" },
         organization_name: {
-          type: Type.STRING,
+          type: "string",
           description: "Company or organization name",
         },
-        email: { type: Type.STRING, description: "Email address" },
-        phone: { type: Type.STRING, description: "Phone number" },
+        email: { type: "string", description: "Email address" },
+        phone: { type: "string", description: "Phone number" },
         type: {
-          type: Type.STRING,
+          type: "string",
           description: "person, organization, or lead",
         },
       },
@@ -65,16 +60,16 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
     name: "update_project_status",
     description:
       "Update a project's status in the current workspace. Identify the project by id or name.",
-    parameters: {
-      type: Type.OBJECT,
+    parametersJsonSchema: {
+      type: "object",
       properties: {
-        project_id: { type: Type.STRING, description: "Project UUID" },
+        project_id: { type: "string", description: "Project UUID" },
         project_name: {
-          type: Type.STRING,
+          type: "string",
           description: "Project name if id is unknown",
         },
         status: {
-          type: Type.STRING,
+          type: "string",
           description: "planning, active, on_hold, completed, or cancelled",
         },
       },
@@ -85,26 +80,26 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
     name: "create_task",
     description:
       "Create a task in the current workspace. Optionally attach it to a project.",
-    parameters: {
-      type: Type.OBJECT,
+    parametersJsonSchema: {
+      type: "object",
       properties: {
-        title: { type: Type.STRING, description: "Task title" },
-        description: { type: Type.STRING, description: "Optional details" },
-        project_id: { type: Type.STRING, description: "Project UUID" },
+        title: { type: "string", description: "Task title" },
+        description: { type: "string", description: "Optional details" },
+        project_id: { type: "string", description: "Project UUID" },
         project_name: {
-          type: Type.STRING,
+          type: "string",
           description: "Project name if id is unknown",
         },
         status: {
-          type: Type.STRING,
+          type: "string",
           description: "todo, in_progress, or done",
         },
         priority: {
-          type: Type.STRING,
+          type: "string",
           description: "low, medium, high, or urgent",
         },
         due_date: {
-          type: Type.STRING,
+          type: "string",
           description: "Due date as YYYY-MM-DD",
         },
       },
@@ -163,6 +158,9 @@ async function geminiReply(params: {
     formatLunaContextForPrompt(ctx),
   ].join("\n\n");
 
+  const { GoogleGenAI, createPartFromFunctionResponse } = await import(
+    "@google/genai"
+  );
   const ai = new GoogleGenAI({ apiKey });
   const contents: Content[] = [
     { role: "user", parts: [{ text: params.message }] },

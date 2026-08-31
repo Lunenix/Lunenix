@@ -9,6 +9,20 @@ const simliClientJs = path.join(
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // Keep the Node build of the SDK out of webpack so Vercel traces the
+    // real package files (nft often misses @google/genai's conditional exports).
+    serverComponentsExternalPackages: [
+      "@google/genai",
+      "google-auth-library",
+    ],
+    outputFileTracingIncludes: {
+      "/api/luna/chat": [
+        "./node_modules/@google/genai/**/*",
+        "./node_modules/google-auth-library/**/*",
+      ],
+    },
+  },
   webpack: (config, { webpack }) => {
     // simli-client@3.0.2's dist/index.js does `require("./Client")` but the
     // file on disk is `client.js`. That fails on Linux (Vercel). Point every
