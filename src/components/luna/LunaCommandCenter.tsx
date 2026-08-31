@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
-import { ensureVoicesLoaded, pickFemaleVoice } from "@/lib/luna";
+import { ensureVoicesLoaded, pickFemaleVoice, isLunaWakePhrase, stripLunaWakePhrase } from "@/lib/luna";
 import { cn } from "@/lib/utils";
 import type { WorkspaceAISettings } from "@/types/database";
 import { LunaAvatar } from "./LunaAvatar";
@@ -16,11 +16,12 @@ import type { SimliClient } from "simli-client/dist/client";
 /* -------------------------------------------------------------------------- */
 /*  Minimal SpeechRecognition typings (no @types package available)           */
 /* -------------------------------------------------------------------------- */
-interface SpeechRecognitionResultLike {
-  0: { transcript: string };
-}
 interface SpeechRecognitionEventLike {
-  results: { 0: SpeechRecognitionResultLike };
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: { isFinal?: boolean; 0: { transcript: string } };
+  };
 }
 interface SpeechRecognitionLike {
   continuous: boolean;
@@ -94,6 +95,13 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const simliRef = useRef<SimliClient | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const wakeRecRef = useRef<SpeechRecognitionLike | null>(null);
+  const connectPromiseRef = useRef<Promise<boolean> | null>(null);
+  const streamConnectedRef = useRef(false);
+  const commandMicRef = useRef(false);
+  const pauseWakeRef = useRef(false);
+  const wakeWantedRef = useRef(true);
+  const handleSubmitRef = useRef<(text: string) => Promise<void>>(async () => {});
 
   const agentName = settings?.agent_name || "Luna";
 
@@ -140,12 +148,13 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   /* ----------------------- Simli teardown -------------------------- */
   const teardownSimli = useCallback(() => {
     try {
-      // stop() returns a promise; fire-and-forget is fine for teardown.
       void simliRef.current?.stop();
     } catch {
       /* ignore */
     }
     simliRef.current = null;
+    connectPromiseRef.current = null;
+    streamConnectedRef.current = false;
     setStreamConnected(false);
     setStatus("idle");
   }, []);
@@ -155,9 +164,9 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   }, [teardownSimli]);
 
   /* --------------------------- Connect to Simli -------------------------- */
-  const connectSimli = useCallback(async () => {
-    if (simliRef.current || connecting) return;
-    if (!videoRef.current || !audioRef.current) return;
+  const connectSimli = useCallback(async (): Promise<boolean> => {
+    if (simliRef.current && streamConnectedRef.current) return true;
+    if (!videoRef.current || !audioRef.current) return false;
 
     setConnecting(true);
     try {
@@ -165,13 +174,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       const sessionRes = await fetch("/api/simli-session", { method: "POST" });
       if (sessionRes.status === 401) {
         toast("Sign in to start the live avatar.", "error");
-        setConnecting(false);
-        return;
+        return false;
       }
       if (sessionRes.status === 503) {
         toast("Live avatar is not configured on the server.", "error");
-        setConnecting(false);
-        return;
+        return false;
       }
       if (!sessionRes.ok) throw new Error(await sessionRes.text());
       const sessionData = await sessionRes.json();
@@ -200,7 +207,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       client.on("silent", () =>
         setStatus((prev) => (prev === "speaking" ? "idle" : prev))
       );
-      client.on("stop", () => setStreamConnected(false));
+      client.on("stop", () => {
+        streamConnectedRef.current = false;
+        setStreamConnected(false);
+      });
       client.on("error", (detail: string) => {
         toast(`Live avatar error: ${String(detail).slice(0, 120)}`, "error");
       });
@@ -211,8 +221,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
       // 3. Establish the WebRTC connection (resolves once streaming).
       await client.start();
+      streamConnectedRef.current = true;
       setStreamConnected(true);
       setStatus("idle");
+      return true;
     } catch (e) {
       toast(
         e instanceof Error && e.message
@@ -221,10 +233,21 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         "error"
       );
       teardownSimli();
+      return false;
     } finally {
       setConnecting(false);
     }
-  }, [connecting, teardownSimli]);
+  }, [teardownSimli]);
+
+  const ensureLive = useCallback(async () => {
+    if (simliRef.current && streamConnectedRef.current) return true;
+    if (!connectPromiseRef.current) {
+      connectPromiseRef.current = connectSimli().finally(() => {
+        if (!streamConnectedRef.current) connectPromiseRef.current = null;
+      });
+    }
+    return connectPromiseRef.current;
+  }, [connectSimli]);
 
   /* ------- Browser speech-synthesis fallback (when Simli not live) -------- */
   const speakFallback = useCallback(async (text: string) => {
@@ -303,14 +326,25 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   /* ------------------------- Submit an instruction ----------------------- */
   const handleSubmit = useCallback(
     async (text: string) => {
-      if (!text.trim()) return;
+      const raw = text.trim();
+      if (!raw) return;
       setInstruction("");
+      const woke = isLunaWakePhrase(raw);
+      const command = woke ? stripLunaWakePhrase(raw) : raw;
+
       setStatus("thinking");
+      await ensureLive();
+
+      if (woke && !command) {
+        await speakText("I'm here. How can I help?");
+        return;
+      }
+
       try {
         const res = await fetch("/api/luna/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, workspaceId }),
+          body: JSON.stringify({ message: command, workspaceId }),
         });
         if (res.status === 401) {
           toast("Sign in to talk to Luna.", "error");
@@ -325,16 +359,74 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         await speakText("Sorry, I ran into a problem processing that request.");
       }
     },
-    [workspaceId, speakText]
+    [workspaceId, speakText, ensureLive]
   );
+
+  handleSubmitRef.current = handleSubmit;
+
+  /* --------- Always-on wake word: Hey Luna / Hello Luna / Hi Luna -------- */
+  useEffect(() => {
+    wakeWantedRef.current = true;
+    const Ctor =
+      (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor })
+        .SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor })
+        .webkitSpeechRecognition;
+    if (!Ctor) return;
+
+    const rec = new Ctor();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = "en-US";
+    rec.onresult = (e: SpeechRecognitionEventLike) => {
+      if (commandMicRef.current) return;
+      for (let i = e.resultIndex ?? 0; i < e.results.length; i++) {
+        const result = e.results[i];
+        if (result.isFinal === false) continue;
+        const transcript = result[0]?.transcript?.trim() ?? "";
+        if (transcript && isLunaWakePhrase(transcript)) {
+          void handleSubmitRef.current(transcript);
+        }
+      }
+    };
+    rec.onend = () => {
+      if (!wakeWantedRef.current || pauseWakeRef.current) return;
+      try {
+        rec.start();
+      } catch {
+        /* already started */
+      }
+    };
+    rec.onerror = () => {
+      /* Chrome fires no-speech / aborted; onend restarts */
+    };
+    try {
+      rec.start();
+    } catch {
+      /* ignore */
+    }
+    wakeRecRef.current = rec;
+    return () => {
+      wakeWantedRef.current = false;
+      try {
+        rec.stop();
+      } catch {
+        /* ignore */
+      }
+      wakeRecRef.current = null;
+    };
+  }, []);
 
   /* ------------------------------ Mic toggle ----------------------------- */
   const toggleMic = useCallback(() => {
     if (isRecording) {
+      commandMicRef.current = false;
       recognitionRef.current?.stop();
       setIsRecording(false);
       return;
     }
+
+    void ensureLive();
 
     const Ctor =
       (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor })
@@ -352,23 +444,40 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     recognition.interimResults = false;
     recognition.lang = "en-US";
     recognition.onresult = (e: SpeechRecognitionEventLike) => {
-      const transcript = e.results[0][0].transcript;
+      const last = e.results[e.results.length - 1];
+      const transcript = last?.[0]?.transcript ?? "";
       setInstruction(transcript);
       handleSubmit(transcript);
     };
     recognition.onend = () => {
+      commandMicRef.current = false;
+      pauseWakeRef.current = false;
+      try {
+        wakeRecRef.current?.start();
+      } catch {
+        /* ignore */
+      }
       setIsRecording(false);
       setStatus((prev) => (prev === "listening" ? "idle" : prev));
     };
     recognition.onerror = () => {
+      commandMicRef.current = false;
+      pauseWakeRef.current = false;
       setIsRecording(false);
       setStatus((prev) => (prev === "listening" ? "idle" : prev));
     };
+    commandMicRef.current = true;
+    pauseWakeRef.current = true;
+    try {
+      wakeRecRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
     recognition.start();
     recognitionRef.current = recognition;
     setIsRecording(true);
     setStatus("listening");
-  }, [isRecording, handleSubmit]);
+  }, [isRecording, handleSubmit, ensureLive]);
 
   /* -------------------------------- Render ------------------------------- */
   const statusLabel =
@@ -495,7 +604,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSubmit(instruction);
           }}
-          placeholder={`Talk to ${agentName}...`}
+          placeholder={`Hey ${agentName}...`}
           className="flex-1 border-white/10 bg-white/5 text-white placeholder:text-white/40"
         />
 
@@ -509,6 +618,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           <Send className="h-4 w-4" />
         </Button>
       </div>
+      <p className="px-4 pb-3 text-center text-[11px] text-white/40">
+        Say Hey {agentName}, Hello {agentName}, or Hi {agentName} — or type — to
+        start live. Ask for a briefing or the weather anytime.
+      </p>
 
       <LunaSettingsModal
         open={settingsOpen}
