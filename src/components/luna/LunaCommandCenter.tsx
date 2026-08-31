@@ -38,12 +38,25 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 /** Simli lip-sync frames: PCM16 mono 16 kHz, ~187.5 ms per 6000-byte chunk. */
 const SIMLI_PCM_CHUNK = 6000;
 
+function sendPcmToSimli(client: SimliClient, chunk: Uint8Array, kickPlayback: boolean) {
+  if (kickPlayback) {
+    try {
+      client.sendAudioDataImmediate(chunk);
+      return;
+    } catch {
+      /* signaling not ready for PLAY_IMMEDIATE — queue instead */
+    }
+  }
+  client.sendAudioData(chunk);
+}
+
 async function pipePcm16ToSimli(
   body: ReadableStream<Uint8Array>,
   getClient: () => SimliClient | null
 ) {
   const reader = body.getReader();
   let pending = new Uint8Array(0);
+  let first = true;
   try {
     while (getClient()) {
       const { done, value } = await reader.read();
@@ -56,9 +69,12 @@ async function pipePcm16ToSimli(
       const client = getClient();
       if (!client) break;
       while (offset + SIMLI_PCM_CHUNK <= merged.length) {
-        client.sendAudioData(
-          merged.slice(offset, offset + SIMLI_PCM_CHUNK)
+        sendPcmToSimli(
+          client,
+          merged.slice(offset, offset + SIMLI_PCM_CHUNK),
+          first
         );
+        first = false;
         offset += SIMLI_PCM_CHUNK;
       }
       pending = merged.slice(offset);
@@ -66,7 +82,7 @@ async function pipePcm16ToSimli(
     const even = pending.length & ~1;
     const client = getClient();
     if (even > 0 && client) {
-      client.sendAudioData(pending.slice(0, even));
+      sendPcmToSimli(client, pending.slice(0, even), first);
     }
   } finally {
     reader.releaseLock();
@@ -219,11 +235,25 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         teardownSimli();
       });
 
-      // 3. Establish the WebRTC connection (resolves once streaming).
+      // 3. Establish the WebRTC connection (resolves once the first video frame arrives).
       await client.start();
       streamConnectedRef.current = true;
       setStreamConnected(true);
       setStatus("idle");
+
+      const video = videoRef.current;
+      const audio = audioRef.current;
+      if (video) {
+        video.muted = true;
+        void video.play().catch(() => undefined);
+      }
+      if (audio) {
+        audio.muted = false;
+        void audio.play().catch(() => undefined);
+      }
+      // Let the video element attach and React paint before we send TTS PCM.
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+      await new Promise((r) => setTimeout(r, 400));
       return true;
     } catch (e) {
       toast(
@@ -270,16 +300,39 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   }, []);
 
   /* ----------------------------- Speak text ------------------------------ */
+  const pauseWakeListening = useCallback(() => {
+    pauseWakeRef.current = true;
+    try {
+      wakeRecRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const resumeWakeListening = useCallback(() => {
+    pauseWakeRef.current = false;
+    try {
+      wakeRecRef.current?.start();
+    } catch {
+      /* already running */
+    }
+  }, []);
+
   const speakText = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
 
+      pauseWakeListening();
       const client = simliRef.current;
       const simliLive = Boolean(client && streamConnectedRef.current);
 
       // If the live avatar isn't running, use the browser voice so Luna still talks.
       if (!simliLive) {
-        await speakFallback(text);
+        try {
+          await speakFallback(text);
+        } finally {
+          resumeWakeListening();
+        }
         return;
       }
 
@@ -297,18 +350,14 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           return;
         }
         if (res.status === 503) {
-          // Server has no ElevenLabs credentials — fall back to the browser voice.
           await speakFallback(text);
           return;
         }
         if (!res.ok) throw new Error(await res.text());
         if (!res.body) throw new Error("TTS returned no audio stream");
 
-        // Pipe PCM16 @ 16 kHz chunks into Simli as they arrive so the
-        // avatar's mouth tracks the ElevenLabs voice in real time.
+        void audioRef.current?.play().catch(() => undefined);
         await pipePcm16ToSimli(res.body, () => simliRef.current);
-        // Simli emits "silent" over its data channel to drive the status back
-        // to idle once playback finishes.
       } catch (e) {
         toast(
           e instanceof Error
@@ -316,11 +365,12 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
             : "Voice generation failed.",
           "error"
         );
-        // Fall back to the browser voice so the reply is still spoken.
         await speakFallback(text);
+      } finally {
+        resumeWakeListening();
       }
     },
-    [speakFallback]
+    [pauseWakeListening, resumeWakeListening, speakFallback]
   );
 
   /* ------------------------- Submit an instruction ----------------------- */
@@ -333,18 +383,22 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       const command = woke ? stripLunaWakePhrase(raw) : raw;
 
       setStatus("thinking");
-      await ensureLive();
-
-      if (woke && !command) {
-        await speakText("I'm here. How can I help?");
-        return;
+      const live = await ensureLive();
+      if (!live) {
+        toast("Could not start the live avatar. Check Simli settings.", "error");
       }
+
+      const forGemini =
+        command ||
+        (woke
+          ? "The user just said hello and woke you. Greet them briefly as Luna."
+          : raw);
 
       try {
         const res = await fetch("/api/luna/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: command, workspaceId }),
+          body: JSON.stringify({ message: forGemini, workspaceId }),
         });
         if (res.status === 401) {
           toast("Sign in to talk to Luna.", "error");
@@ -530,12 +584,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           autoPlay
           playsInline
           muted
-          className={cn(
-            "h-full w-full object-cover",
-            !streamConnected && "opacity-0"
-          )}
+          className="h-full w-full object-cover"
         />
-        <audio ref={audioRef} autoPlay className="hidden" />
+        {/* Must stay in the layout — display:none often blocks MediaStream audio. */}
+        <audio ref={audioRef} autoPlay playsInline className="sr-only" />
 
         {!streamConnected && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">

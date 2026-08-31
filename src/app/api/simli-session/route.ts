@@ -43,7 +43,7 @@ export async function POST() {
       },
       body: JSON.stringify({
         faceId,
-        handleSilence: true,
+        handleSilence: false,
         maxSessionLength: 3600,
         maxIdleTime: 300,
         model: "fasttalk",
