@@ -1,0 +1,22 @@
+---
+description: Security & Data Privacy Directives for Lunenix
+alwaysApply: true
+---
+
+# Lunenix Security Baseline & Data Isolation
+
+1. **Server-Side Lockdown**:
+   - NEVER expose sensitive API keys (`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SIMLI_API_KEY`, `ELEVENLABS_API_KEY`) to client components.
+   - Execute all third-party API interactions strictly inside server-side API routes (`src/app/api/`).
+
+2. **Tenant & Workspace Isolation**:
+   - Enforce Row-Level Security (RLS) across all Supabase operations.
+   - Ensure every query in database handlers explicitly filters by `workspace_id` and `user_id` to prevent cross-tenant data leakage.
+
+3. **Least-Privilege Context Payload**:
+   - Sanitize all data injected into Luna's context (`src/lib/luna.ts`).
+   - Only pass operational fields required for the prompt (e.g., project titles, task status, contact names). Never send raw authentication tokens, payment details, or password hashes.
+
+4. **Prompt Injection & System Guardrails**:
+   - Maintain strict prompt boundaries in `src/app/api/luna/chat/route.ts`.
+   - Reject prompts attempting to dump internal database schemas or bypass workspace limits.

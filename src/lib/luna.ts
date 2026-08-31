@@ -101,6 +101,29 @@ export function ensureVoicesLoaded(): Promise<SpeechSynthesisVoice[]> {
  * Pick the best available female voice. Prefers an English female voice, then
  * any female voice, then any non-male English voice, and finally any voice.
  */
+const SENSITIVE_FIELD =
+  /^(password|passwd|token|secret|hash|api_?key|service_role|authorization|credit_?card|card_?number|cvv|ssn|access_token|refresh_token)/i;
+
+/**
+ * Strip secrets and non-operational fields before any CRM row is added to
+ * Luna's LLM context. Keeps titles, names, statuses, and similar prompt data.
+ */
+export function sanitizeLunaContext(
+  row: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (SENSITIVE_FIELD.test(key)) continue;
+    if (value == null) continue;
+    if (typeof value === "string") {
+      out[key] = value.length > 400 ? value.slice(0, 400) : value;
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 export function pickFemaleVoice(
   voices: SpeechSynthesisVoice[]
 ): SpeechSynthesisVoice | null {
