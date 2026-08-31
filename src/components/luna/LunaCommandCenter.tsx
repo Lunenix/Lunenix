@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import type { WorkspaceAISettings } from "@/types/database";
 import { LunaAvatar } from "./LunaAvatar";
 import { LunaSettingsModal } from "./LunaSettingsModal";
-import { Mic, MicOff, Send, Settings, Power, Loader2 } from "lucide-react";
+import { Mic, MicOff, Send, Settings, Power } from "lucide-react";
 import type { SimliClient } from "simli-client/dist/client";
 
 /* -------------------------------------------------------------------------- */
@@ -275,7 +275,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       if (!text.trim()) return;
 
       const client = simliRef.current;
-      const simliLive = client && streamConnected;
+      const simliLive = Boolean(client && streamConnectedRef.current);
 
       // If the live avatar isn't running, use the browser voice so Luna still talks.
       if (!simliLive) {
@@ -320,7 +320,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         await speakFallback(text);
       }
     },
-    [streamConnected, speakFallback]
+    [speakFallback]
   );
 
   /* ------------------------- Submit an instruction ----------------------- */
@@ -481,7 +481,9 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
   /* -------------------------------- Render ------------------------------- */
   const statusLabel =
-    status === "idle"
+    connecting && !streamConnected
+      ? "Connecting..."
+      : status === "idle"
       ? "Idle"
       : status === "listening"
       ? "Listening..."
@@ -496,7 +498,8 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         <span
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-            status === "idle" && "bg-white/10 text-white/60",
+            status === "idle" && !connecting && "bg-white/10 text-white/60",
+            connecting && !streamConnected && "animate-pulse bg-indigo-500/30 text-indigo-200",
             status === "listening" && "animate-pulse bg-blue-500/30 text-blue-300",
             status === "thinking" && "animate-pulse bg-amber-500/30 text-amber-300",
             status === "speaking" && "animate-pulse bg-green-500/30 text-green-300"
@@ -534,31 +537,13 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         />
         <audio ref={audioRef} autoPlay className="hidden" />
 
-        {/* Fallback avatar while the live stream isn't connected */}
         {!streamConnected && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <LunaAvatar
               isSpeaking={status === "speaking"}
               isAdmin={isAdmin}
               size={120}
             />
-            <Button
-              onClick={connectSimli}
-              disabled={connecting}
-              className="bg-indigo-600 text-white hover:bg-indigo-500"
-            >
-              {connecting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Power className="mr-2 h-4 w-4" />
-                  Start Live {agentName}
-                </>
-              )}
-            </Button>
           </div>
         )}
 
@@ -600,8 +585,16 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
         <Input
           value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            setInstruction(value);
+            void ensureLive();
+          }}
+          onFocus={() => {
+            void ensureLive();
+          }}
           onKeyDown={(e) => {
+            void ensureLive();
             if (e.key === "Enter") handleSubmit(instruction);
           }}
           placeholder={`Hey ${agentName}...`}
@@ -619,8 +612,8 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         </Button>
       </div>
       <p className="px-4 pb-3 text-center text-[11px] text-white/40">
-        Say Hey {agentName}, Hello {agentName}, or Hi {agentName} — or type — to
-        start live. Ask for a briefing or the weather anytime.
+        Type or say Hey {agentName} to talk. Ask for a briefing or the weather
+        anytime.
       </p>
 
       <LunaSettingsModal
