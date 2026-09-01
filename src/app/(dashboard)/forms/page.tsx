@@ -6,6 +6,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ClipboardList,
   Loader2,
@@ -19,6 +20,7 @@ import {
 import { Form, FORM_STATUS_LABELS } from "@/types/database";
 import { formatDateTime } from "@/lib/format";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 function formStatusClasses(status: string): string {
   const classes: Record<string, string> = {
@@ -35,6 +37,8 @@ export default function FormsPage() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
     if (activeWorkspace?.id) {
@@ -50,6 +54,7 @@ export default function FormsPage() {
       const res = await fetch(`/api/forms?workspaceId=${activeWorkspace.id}`);
       const data = await res.json();
       setForms(data.forms || []);
+      setSelectedIds(new Set());
     } catch (error) {
       console.error("Error fetching forms:", error);
     } finally {
@@ -82,6 +87,25 @@ export default function FormsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const toggleSelected = (formId: string, selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (selected) next.add(formId);
+      else next.delete(formId);
+      return next;
+    });
+  };
+
+  const allSelected = forms.length > 0 && forms.every((f) => selectedIds.has(f.id));
+
+  const toggleSelectAll = (selected: boolean) => {
+    if (selected) {
+      setSelectedIds(new Set(forms.map((f) => f.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
   const handleDelete = async (form: Form) => {
     if (
       !confirm(
@@ -95,12 +119,57 @@ export default function FormsPage() {
       const res = await fetch(`/api/forms/${form.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete form");
       setForms((prev) => prev.filter((f) => f.id !== form.id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(form.id);
+        return next;
+      });
       toast(`Deleted ${form.name}.`, "success");
     } catch (error) {
       console.error("Error deleting form:", error);
       toast("Failed to delete form.", "error");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    const selected = forms.filter((f) => selectedIds.has(f.id));
+    if (!selected.length) return;
+    if (
+      !confirm(
+        `Delete ${selected.length} form${selected.length === 1 ? "" : "s"}? This will also delete all submissions.`
+      )
+    ) {
+      return;
+    }
+    setBulkDeleting(true);
+    const deleted = new Set<string>();
+    const failed: string[] = [];
+    try {
+      await Promise.all(
+        selected.map(async (form) => {
+          const res = await fetch(`/api/forms/${form.id}`, { method: "DELETE" });
+          if (res.ok) deleted.add(form.id);
+          else failed.push(form.name);
+        })
+      );
+      setForms((prev) => prev.filter((f) => !deleted.has(f.id)));
+      setSelectedIds(new Set());
+      if (deleted.size) {
+        toast(
+          `Deleted ${deleted.size} form${deleted.size === 1 ? "" : "s"}.`,
+          "success"
+        );
+      }
+      if (failed.length) {
+        toast(`Could not delete: ${failed.join(", ")}`, "error");
+      }
+    } catch (error) {
+      console.error("Error deleting forms:", error);
+      toast("Failed to delete selected forms.", "error");
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -121,6 +190,37 @@ export default function FormsPage() {
           </Link>
         </Button>
       </div>
+
+      {forms.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card/50 px-4 py-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={allSelected ? true : selectedIds.size > 0 ? "indeterminate" : false}
+              onCheckedChange={(value) => toggleSelectAll(value === true)}
+              aria-label="Select all forms"
+            />
+            <span className="text-muted-foreground">
+              {selectedIds.size > 0
+                ? `${selectedIds.size} selected`
+                : "Select forms"}
+            </span>
+          </label>
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            disabled={selectedIds.size === 0 || bulkDeleting}
+            onClick={() => void handleDeleteSelected()}
+          >
+            {bulkDeleting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 h-4 w-4" />
+            )}
+            Delete selected
+          </Button>
+        </div>
+      )}
 
       {/* Empty State */}
       {forms.length === 0 ? (
@@ -143,18 +243,35 @@ export default function FormsPage() {
         /* Forms Grid */
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {forms.map((form) => (
-            <Card key={form.id} className="h-full transition-shadow hover:shadow-lg">
+            <Card
+              key={form.id}
+              className={cn(
+                "h-full transition-shadow hover:shadow-lg",
+                selectedIds.has(form.id) && "ring-2 ring-primary"
+              )}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="line-clamp-1 text-base">
-                      {form.name}
-                    </CardTitle>
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
+                    <Checkbox
+                      className="mt-1"
+                      checked={selectedIds.has(form.id)}
+                      onCheckedChange={(value) =>
+                        toggleSelected(form.id, value === true)
+                      }
+                      aria-label={`Select ${form.name}`}
+                      disabled={bulkDeleting}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="line-clamp-1 text-base">
+                        {form.name}
+                      </CardTitle>
                     {form.description && (
                       <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
                         {form.description}
                       </p>
                     )}
+                    </div>
                   </div>
                   <Badge className={formStatusClasses(form.status)}>
                     {FORM_STATUS_LABELS[form.status]}
@@ -222,7 +339,7 @@ export default function FormsPage() {
                     size="sm"
                     variant="destructive"
                     className="w-full"
-                    disabled={deletingId === form.id}
+                    disabled={deletingId === form.id || bulkDeleting}
                     onClick={() => handleDelete(form)}
                   >
                     {deletingId === form.id ? (
