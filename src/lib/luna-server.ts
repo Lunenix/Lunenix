@@ -12,10 +12,6 @@ import { sendServerEmail } from "@/lib/email/sendServerEmail";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
-import {
-  normalizePersonalPhone,
-  parseSmsEnabled,
-} from "@/lib/user-settings";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,14 +102,6 @@ function argNumber(args: Record<string, unknown>, key: string): number | null {
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
   }
-  return null;
-}
-
-function argBoolean(args: Record<string, unknown>, key: string): boolean | null {
-  const value = args[key];
-  if (typeof value === "boolean") return value;
-  if (value === "true" || value === "on" || value === 1) return true;
-  if (value === "false" || value === "off" || value === 0) return false;
   return null;
 }
 
@@ -533,7 +521,6 @@ export async function getWorkspaceContext(
     { data: activityLogs },
     { data: knowledgeBase },
     { data: openContracts },
-    { data: userSettings },
   ] = await Promise.all([
     supabase
       .from("workspace_ai_settings")
@@ -583,11 +570,6 @@ export async function getWorkspaceContext(
       .in("status", ["draft", "sent", "active"])
       .order("updated_at", { ascending: false })
       .limit(10),
-    supabase
-      .from("user_settings")
-      .select("sms_enabled, personal_phone_number")
-      .eq("user_id", userId)
-      .maybeSingle(),
   ]);
 
   const rawPayload: WorkspaceContextPayload = {
@@ -597,11 +579,6 @@ export async function getWorkspaceContext(
       timezone: settings?.timezone ?? "UTC",
       custom_instructions: sanitizeCustomInstructions(
         settings?.custom_instructions
-      ),
-      sms_enabled: userSettings?.sms_enabled !== false,
-      phone_on_file: Boolean(
-        typeof userSettings?.personal_phone_number === "string" &&
-          userSettings.personal_phone_number.trim()
       ),
     },
     contacts: (contacts ?? []).map((c: Record<string, unknown>) => {
@@ -2090,91 +2067,6 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `${data.name} is now ${data.is_active ? "on" : "off"}.`
-      );
-    }
-
-    if (name === "get_user_settings") {
-      const { data, error } = await supabase
-        .from("user_settings")
-        .select("sms_enabled, personal_phone_number")
-        .eq("user_id", user_id)
-        .maybeSingle();
-      if (error) {
-        return { error: "Could not load alert settings." };
-      }
-      const smsOn = data?.sms_enabled !== false;
-      const phoneOnFile = Boolean(
-        typeof data?.personal_phone_number === "string" &&
-          data.personal_phone_number.trim()
-      );
-      return {
-        ok: true,
-        sms_enabled: smsOn,
-        phone_on_file: phoneOnFile,
-        summary: `SMS alerts are ${smsOn ? "on" : "off"}. ${
-          phoneOnFile ? "A personal phone is on file." : "No personal phone is on file."
-        }`,
-      };
-    }
-
-    if (name === "update_user_settings") {
-      const phoneRaw = args.personal_phone_number;
-      const phone =
-        phoneRaw === undefined
-          ? null
-          : normalizePersonalPhone(phoneRaw);
-      if (phone && !phone.ok) {
-        return { error: phone.error };
-      }
-
-      const { data: existing } = await supabase
-        .from("user_settings")
-        .select("sms_enabled, personal_phone_number")
-        .eq("user_id", user_id)
-        .maybeSingle();
-
-      const smsEnabled =
-        argBoolean(args, "sms_enabled") ??
-        parseSmsEnabled(existing?.sms_enabled, true);
-      const nextPhone =
-        phoneRaw === undefined
-          ? (typeof existing?.personal_phone_number === "string"
-              ? existing.personal_phone_number
-              : null)
-          : phone && phone.ok
-            ? phone.value
-            : null;
-
-      const { data, error } = await supabase
-        .from("user_settings")
-        .upsert(
-          {
-            user_id,
-            personal_phone_number: nextPhone,
-            sms_enabled: smsEnabled,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        )
-        .select("sms_enabled, personal_phone_number")
-        .maybeSingle();
-
-      if (error || !data) {
-        return { error: "Could not save alert settings." };
-      }
-
-      const phoneOnFile = Boolean(
-        typeof data.personal_phone_number === "string" &&
-          data.personal_phone_number.trim()
-      );
-      return lunaMutationOk(
-        supabase,
-        workspace_id,
-        name,
-        `SMS alerts are ${data.sms_enabled ? "on" : "off"}. ${
-          phoneOnFile ? "A personal phone is on file." : "No personal phone is on file."
-        }`,
-        { sms_enabled: data.sms_enabled, phone_on_file: phoneOnFile }
       );
     }
 

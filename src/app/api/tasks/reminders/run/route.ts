@@ -1,10 +1,8 @@
 import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import { sendSmsAlert, twilioConfigured } from "@/lib/notify/sms";
 import {
   formatTaskReminderMessage,
-  formatTaskReminderSms,
   sendTelegramAlert,
 } from "@/lib/notify/telegram";
 
@@ -30,19 +28,12 @@ type ReminderTask = {
   title: string;
   due_date: string;
   reminder_minutes_before: number;
-  assignee_id: string | null;
   workspaces: { name: string } | { name: string }[] | null;
 };
 
 function workspaceName(row: ReminderTask): string | null {
   const ws = Array.isArray(row.workspaces) ? row.workspaces[0] : row.workspaces;
   return typeof ws?.name === "string" ? ws.name : null;
-}
-
-function telegramConfigured(): boolean {
-  return Boolean(
-    process.env.TELEGRAM_BOT_TOKEN?.trim() && process.env.TELEGRAM_CHAT_ID?.trim()
-  );
 }
 
 /** Due date is date-only; treat as 09:00 UTC that day. */
@@ -60,7 +51,7 @@ function reminderIsDue(
 
 /**
  * GET/POST /api/tasks/reminders/run
- * Telegram and/or SMS for open tasks whose reminder window has opened.
+ * Telegram bot alerts for open tasks whose reminder window has opened.
  * Service role + CRON_SECRET. Does not use cookie RLS.
  */
 async function handle(req: NextRequest) {
@@ -68,17 +59,15 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized cron trigger" }, { status: 401 });
   }
 
-  const canTelegram = telegramConfigured();
-  const canSms = twilioConfigured();
-  if (!canTelegram && !canSms) {
-    return NextResponse.json({ processed: 0, skipped: "alerts_unconfigured" });
+  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
+    return NextResponse.json({ processed: 0, skipped: "telegram_unconfigured" });
   }
 
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("tasks")
     .select(
-      "id, workspace_id, title, due_date, reminder_minutes_before, assignee_id, workspaces(name)"
+      "id, workspace_id, title, due_date, reminder_minutes_before, workspaces(name)"
     )
     .not("reminder_minutes_before", "is", null)
     .is("reminder_sent_at", null)
@@ -105,36 +94,9 @@ async function handle(req: NextRequest) {
       title: todo.title,
       reminderMinutesBefore: todo.reminder_minutes_before,
     });
-    const smsBody = formatTaskReminderSms({
-      workspaceName: workspaceName(todo),
-      title: todo.title,
-      reminderMinutesBefore: todo.reminder_minutes_before,
-    });
 
-    let delivered = false;
-
-    if (canTelegram) {
-      const result = await sendTelegramAlert(messageBody);
-      if (result.ok) delivered = true;
-    }
-
-    if (canSms && todo.assignee_id) {
-      const { data: settings } = await admin
-        .from("user_settings")
-        .select("personal_phone_number, sms_enabled")
-        .eq("user_id", todo.assignee_id)
-        .maybeSingle();
-      const phone =
-        typeof settings?.personal_phone_number === "string"
-          ? settings.personal_phone_number.trim()
-          : "";
-      if (settings?.sms_enabled !== false && phone) {
-        const sms = await sendSmsAlert(phone, smsBody);
-        if (sms.ok) delivered = true;
-      }
-    }
-
-    if (!delivered) {
+    const result = await sendTelegramAlert(messageBody);
+    if (!result.ok) {
       failed++;
       continue;
     }

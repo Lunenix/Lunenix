@@ -204,7 +204,7 @@ export function TaskSheet({
               onChange={(e) => setReminderMinutes(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Telegram (workspace chat) and SMS (assignee) fire in this window.
+              Telegram posts to the workspace bot chat when this window opens.
               Due dates are treated as 9:00 AM UTC that day. Max 10080 (7 days).
             </p>
           </div>

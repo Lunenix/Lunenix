@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Content, FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { isIanaTimeZone, formatContextForGemini } from "@/lib/luna";
-import { sendEmailTool, updateUserSettingsTool, getUserSettingsTool } from "@/lib/luna-tools";
+import { sendEmailTool } from "@/lib/luna-tools";
 import {
   executeLunaTool,
   formatLunaContextForPrompt,
@@ -242,7 +242,7 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
         reminder_minutes_before: {
           type: "number",
           description:
-            "Minutes before due (9:00 UTC that day) to remind via Telegram/SMS. Requires due_date. 1–10080.",
+            "Minutes before due (9:00 UTC that day) to remind via the Telegram bot. Requires due_date. 1–10080.",
         },
       },
       required: ["title"],
@@ -333,8 +333,6 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
     },
   },
   sendEmailTool,
-  getUserSettingsTool,
-  updateUserSettingsTool,
   {
     name: "create_invoice",
     description:
