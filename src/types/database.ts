@@ -15,6 +15,9 @@ export interface Workspace {
   slug: string;
   created_at: string;
   logo_url: string | null;
+  primary_color?: string | null;
+  portal_slug?: string | null;
+  custom_domain?: string | null;
   industry_preset?: string | null;
   max_seats?: number;
   tier?: string;
@@ -353,6 +356,7 @@ export interface Form {
   submit_button_text: string;
   success_message: string;
   allow_multiple_submissions: boolean;
+  slug: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -447,7 +451,7 @@ export interface ScheduledEmail {
 
 export type EmailStatus = "pending" | "sent" | "failed";
 
-export type EmailDraftStatus = "draft" | "sent" | "archived";
+export type EmailDraftStatus = "draft" | "scheduled" | "sent" | "failed" | "archived";
 
 export interface EmailDraft {
   id: string;
@@ -456,6 +460,7 @@ export interface EmailDraft {
   subject: string;
   body_text: string;
   status: EmailDraftStatus;
+  scheduled_at: string | null;
   created_at: string;
 }
 

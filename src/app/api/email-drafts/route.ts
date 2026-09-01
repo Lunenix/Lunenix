@@ -3,7 +3,13 @@ import type { EmailDraft, EmailDraftStatus } from "@/types/database";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
-const DRAFT_STATUSES = new Set<EmailDraftStatus>(["draft", "sent", "archived"]);
+const DRAFT_STATUSES = new Set<EmailDraftStatus>([
+  "draft",
+  "scheduled",
+  "sent",
+  "failed",
+  "archived",
+]);
 
 function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -26,7 +32,7 @@ export async function GET(request: Request) {
   let query = auth.supabase
     .from("email_drafts")
     .select(
-      "id, workspace_id, recipient_email, subject, body_text, status, created_at"
+      "id, workspace_id, recipient_email, subject, body_text, status, scheduled_at, created_at"
     )
     .eq("workspace_id", auth.workspaceId)
     .order("created_at", { ascending: false })
@@ -82,7 +88,7 @@ export async function POST(request: NextRequest) {
       status: "draft",
     })
     .select(
-      "id, workspace_id, recipient_email, subject, body_text, status, created_at"
+      "id, workspace_id, recipient_email, subject, body_text, status, scheduled_at, created_at"
     )
     .maybeSingle();
 
