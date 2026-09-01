@@ -1,35 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/forms
  * List all forms for a workspace.
  */
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
+  const access = await verifyWorkspaceAccess(req);
+  if ("errorResponse" in access) return access.errorResponse;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const workspaceId = searchParams.get("workspaceId");
-
-  if (!workspaceId) {
-    return NextResponse.json(
-      { error: "workspaceId is required" },
-      { status: 400 }
-    );
-  }
-
-  // Fetch forms for the workspace
-  const { data: forms, error } = await supabase
+  const { data: forms, error } = await access.supabase
     .from("forms")
     .select("*")
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", access.workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {

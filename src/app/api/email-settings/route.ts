@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { encryptSecret } from "@/lib/email/crypto";
 import type { EmailSettings } from "@/types/database";
+import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
 
 /**
  * Strip encrypted secrets before returning settings to the client, and add
@@ -19,24 +20,13 @@ function sanitize(row: Record<string, unknown> | null): (EmailSettings & Record<
 
 /** GET /api/email-settings?workspaceId=... */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const access = await verifyWorkspaceAccess(request);
+  if ("errorResponse" in access) return access.errorResponse;
 
-  const { searchParams } = new URL(request.url);
-  const workspaceId = searchParams.get("workspaceId");
-  if (!workspaceId) {
-    return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
-  }
-
-  const { data: settings, error } = await supabase
+  const { data: settings, error } = await access.supabase
     .from("email_settings")
     .select("*")
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", access.workspaceId)
     .maybeSingle();
 
   if (error) {

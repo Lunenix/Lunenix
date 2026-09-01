@@ -54,3 +54,19 @@ export async function requireWorkspaceMember(
 
   return { supabase, user, workspaceId: id };
 }
+
+/**
+ * Auth + membership for GET routes that pass ?workspaceId=...
+ * Returns { errorResponse } or { supabase, user, workspaceId }.
+ */
+export async function verifyWorkspaceAccess(request: Request): Promise<
+  Authed | { errorResponse: NextResponse }
+> {
+  const { searchParams } = new URL(request.url);
+  const workspaceId = searchParams.get("workspaceId");
+  const result = await requireWorkspaceMember(workspaceId);
+  if ("error" in result) {
+    return { errorResponse: result.error };
+  }
+  return result;
+}

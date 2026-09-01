@@ -2,32 +2,22 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import mammoth from "mammoth";
+import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/esign?workspaceId=...
  * List e-signature documents for a workspace.
  */
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const access = await verifyWorkspaceAccess(req);
+  if ("errorResponse" in access) return access.errorResponse;
 
-  const { searchParams } = new URL(req.url);
-  const workspaceId = searchParams.get("workspaceId");
-  if (!workspaceId) {
-    return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
-  }
-
-  const { data, error } = await supabase
+  const { data, error } = await access.supabase
     .from("esign_documents")
     .select(
       `*, contact:contacts(*), project:projects(id, name), assigned_workflow:automation_workflows(id, name)`
     )
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", access.workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {

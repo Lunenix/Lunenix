@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isIanaTimeZone, sanitizeCustomInstructions } from "@/lib/luna";
-import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import {
+  requireWorkspaceMember,
+  verifyWorkspaceAccess,
+} from "@/lib/supabase/workspaceAccess";
 
 const DEFAULT_SETTINGS = {
   agent_name: "Luna",
@@ -17,15 +20,14 @@ const DEFAULT_SETTINGS = {
  * Returns the workspace's Luna AI settings, or sensible defaults if none exist.
  */
 export async function GET(request: NextRequest) {
-  const workspaceId = request.nextUrl.searchParams.get("workspaceId");
-  const authed = await requireWorkspaceMember(workspaceId);
-  if ("error" in authed) return authed.error;
-  const { supabase } = authed;
+  const access = await verifyWorkspaceAccess(request);
+  if ("errorResponse" in access) return access.errorResponse;
+  const { supabase, workspaceId } = access;
 
   const { data, error } = await supabase
     .from("workspace_ai_settings")
     .select("*")
-    .eq("workspace_id", authed.workspaceId)
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
 
   if (error) {
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   const settings = data ?? {
-    workspace_id: authed.workspaceId,
+    workspace_id: workspaceId,
     ...DEFAULT_SETTINGS,
   };
 
