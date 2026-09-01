@@ -16,9 +16,8 @@ import type { WorkspaceAISettings } from "@/types/database";
 import { LunaAvatar } from "./LunaAvatar";
 import { LunaSettingsModal } from "./LunaSettingsModal";
 import { Mic, MicOff, Send, Settings } from "lucide-react";
+import type { SimliClient } from "simli-client/dist/client";
 
-/* -------------------------------------------------------------------------- */
-/*  Minimal SpeechRecognition typings (no @types package available)           */
 /* -------------------------------------------------------------------------- */
 interface SpeechRecognitionEventLike {
   resultIndex: number;
@@ -39,56 +38,33 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
-const PCM_SAMPLE_RATE = 16000;
+const SIMLI_PCM_CHUNK = 6000;
+const PCM_HZ = 16000;
 
-async function playPcm16Stream(
-  body: ReadableStream<Uint8Array>,
-  audioCtx: AudioContext
-) {
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value?.length) chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const total = chunks.reduce((n, c) => n + c.length, 0);
-  const even = total & ~1;
-  if (even < 2) return;
-
-  const merged = new Uint8Array(even);
+function sendPcmChunks(client: SimliClient, bytes: Uint8Array) {
+  const even = bytes.length & ~1;
   let offset = 0;
-  for (const chunk of chunks) {
-    const take = Math.min(chunk.length, even - offset);
-    merged.set(chunk.subarray(0, take), offset);
-    offset += take;
-    if (offset >= even) break;
+  while (offset + SIMLI_PCM_CHUNK <= even) {
+    client.sendAudioData(bytes.subarray(offset, offset + SIMLI_PCM_CHUNK));
+    offset += SIMLI_PCM_CHUNK;
   }
-
-  const samples = merged.length / 2;
-  const buffer = audioCtx.createBuffer(1, samples, PCM_SAMPLE_RATE);
-  const channel = buffer.getChannelData(0);
-  const view = new DataView(merged.buffer, merged.byteOffset, merged.byteLength);
-  for (let i = 0; i < samples; i++) {
-    channel[i] = view.getInt16(i * 2, true) / 32768;
-  }
-
-  await audioCtx.resume();
-  await new Promise<void>((resolve) => {
-    const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
-    src.connect(audioCtx.destination);
-    src.onended = () => resolve();
-    src.start();
-  });
+  if (offset < even) client.sendAudioData(bytes.subarray(offset, even));
 }
 
-/* -------------------------------------------------------------------------- */
+async function playMp3(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    await new Promise<void>((resolve, reject) => {
+      audio.onended = () => resolve();
+      audio.onerror = () => reject(new Error("Audio playback failed"));
+      void audio.play().catch(reject);
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 type Status = "idle" | "listening" | "thinking" | "speaking";
 
@@ -103,7 +79,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [isRecording, setIsRecording] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [live, setLive] = useState(false);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const simliRef = useRef<SimliClient | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const wakeRecRef = useRef<SpeechRecognitionLike | null>(null);
   const commandMicRef = useRef(false);
@@ -112,31 +92,14 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const handleSubmitRef = useRef<(text: string) => Promise<void>>(
     async () => {}
   );
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sessionGenRef = useRef(0);
+  const liveRef = useRef(false);
+  const wantedRef = useRef(true);
+  const connectPromiseRef = useRef<Promise<boolean> | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const agentName = settings?.agent_name || "Luna";
 
-  const getAudioContext = useCallback(() => {
-    if (typeof window === "undefined") return null;
-    const Ctx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!Ctx) return null;
-    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-      audioCtxRef.current = new Ctx();
-    }
-    return audioCtxRef.current;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      void audioCtxRef.current?.close();
-      audioCtxRef.current = null;
-    };
-  }, []);
-
-  /* ----------------------------- Load settings ---------------------------- */
   useEffect(() => {
     if (!workspaceId) return;
     let cancelled = false;
@@ -156,7 +119,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     };
   }, [workspaceId]);
 
-  /* ----------------------------- Admin check ------------------------------ */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -175,6 +137,115 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       cancelled = true;
     };
   }, []);
+
+  const endLive = useCallback(() => {
+    wantedRef.current = false;
+    sessionGenRef.current += 1;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    try {
+      void simliRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    simliRef.current = null;
+    liveRef.current = false;
+    connectPromiseRef.current = null;
+    setLive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => endLive();
+  }, [endLive]);
+
+  const startLive = useCallback(async (): Promise<boolean> => {
+    if (simliRef.current && liveRef.current) return true;
+    if (connectPromiseRef.current) return connectPromiseRef.current;
+    if (!videoRef.current || !audioRef.current) return false;
+    if (!wantedRef.current) return false;
+
+    const run = (async () => {
+      const gen = ++sessionGenRef.current;
+      try {
+        const sessionRes = await fetch("/api/simli-session", { method: "POST" });
+        if (!sessionRes.ok) return false;
+        const sessionData = await sessionRes.json();
+        const sessionToken: string | undefined = sessionData?.sessionToken;
+        if (!sessionToken) return false;
+
+        const iceServers: RTCIceServer[] | null =
+          Array.isArray(sessionData?.iceServers) && sessionData.iceServers.length
+            ? sessionData.iceServers
+            : null;
+
+        const { SimliClient } = await import("simli-client/dist/client.js");
+        const client = new SimliClient(
+          sessionToken,
+          videoRef.current!,
+          audioRef.current!,
+          iceServers
+        );
+        simliRef.current = client;
+
+        const scheduleReconnect = () => {
+          if (!wantedRef.current) return;
+          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = setTimeout(() => {
+            connectPromiseRef.current = null;
+            liveRef.current = false;
+            void startLive();
+          }, 1200);
+        };
+
+        client.on("stop", () => {
+          if (gen !== sessionGenRef.current) return;
+          if (simliRef.current === client) simliRef.current = null;
+          liveRef.current = false;
+          connectPromiseRef.current = null;
+          // Keep showing the last video frame — do not swap to the still photo.
+          scheduleReconnect();
+        });
+        client.on("startup_error", () => {
+          if (gen !== sessionGenRef.current) return;
+          if (simliRef.current === client) simliRef.current = null;
+          liveRef.current = false;
+          connectPromiseRef.current = null;
+          scheduleReconnect();
+        });
+
+        await client.start();
+        if (gen !== sessionGenRef.current || !wantedRef.current) return false;
+        liveRef.current = true;
+        setLive(true);
+        void videoRef.current?.play().catch(() => undefined);
+        if (audioRef.current) {
+          audioRef.current.muted = false;
+          void audioRef.current.play().catch(() => undefined);
+        }
+        await new Promise((r) => setTimeout(r, 400));
+        return gen === sessionGenRef.current && liveRef.current;
+      } catch {
+        if (gen === sessionGenRef.current) {
+          simliRef.current = null;
+          liveRef.current = false;
+        }
+        return false;
+      }
+    })();
+
+    connectPromiseRef.current = run.finally(() => {
+      if (!liveRef.current) connectPromiseRef.current = null;
+    });
+    return connectPromiseRef.current;
+  }, []);
+
+  // Stay on Simli for the whole dashboard visit. Idle uses no Gemini/ElevenLabs.
+  useEffect(() => {
+    wantedRef.current = true;
+    void startLive();
+  }, [startLive]);
 
   const speakFallback = useCallback(async (text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -203,6 +274,22 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     });
   }, []);
 
+  const speakMp3 = useCallback(async (text: string) => {
+    setStatus("speaking");
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, format: "mp3" }),
+    });
+    if (res.status === 503) {
+      await speakFallback(text);
+      return;
+    }
+    if (!res.ok) throw new Error(await res.text());
+    await playMp3(await res.blob());
+    setStatus("idle");
+  }, [speakFallback]);
+
   const pauseWakeListening = useCallback(() => {
     pauseWakeRef.current = true;
     try {
@@ -224,47 +311,55 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const speakText = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
-
       pauseWakeListening();
       setStatus("speaking");
       try {
-        const res = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-        if (res.status === 401) {
-          toast("Sign in to use Luna's voice.", "error");
+        const simliOk = await startLive();
+        const client = simliRef.current;
+
+        if (simliOk && client && liveRef.current) {
+          const res = await fetch("/api/tts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, format: "pcm" }),
+          });
+          if (res.status === 503) {
+            await speakFallback(text);
+            return;
+          }
+          if (!res.ok || !res.body) throw new Error("TTS failed");
+          const buf = new Uint8Array(await res.arrayBuffer());
+          sendPcmChunks(client, buf);
+          const durationMs = Math.max(800, (buf.length / 2 / PCM_HZ) * 1000 + 400);
+          await new Promise((r) => setTimeout(r, durationMs));
           setStatus("idle");
           return;
         }
-        if (res.status === 503) {
-          await speakFallback(text);
-          return;
-        }
-        if (!res.ok) throw new Error(await res.text());
-        if (!res.body) throw new Error("TTS returned no audio stream");
 
-        const ctx = getAudioContext();
-        if (!ctx) {
-          await speakFallback(text);
-          return;
-        }
-        await playPcm16Stream(res.body, ctx);
-        setStatus("idle");
+        await speakMp3(text);
       } catch (e) {
-        toast(
-          e instanceof Error
-            ? `Voice error: ${e.message.slice(0, 120)}`
-            : "Voice generation failed.",
-          "error"
-        );
-        await speakFallback(text);
+        try {
+          await speakMp3(text);
+        } catch {
+          toast(
+            e instanceof Error
+              ? `Voice error: ${e.message.slice(0, 120)}`
+              : "Voice generation failed.",
+            "error"
+          );
+          await speakFallback(text);
+        }
       } finally {
         resumeWakeListening();
       }
     },
-    [getAudioContext, pauseWakeListening, resumeWakeListening, speakFallback]
+    [
+      pauseWakeListening,
+      resumeWakeListening,
+      speakFallback,
+      speakMp3,
+      startLive,
+    ]
   );
 
   const handleSubmit = useCallback(
@@ -276,8 +371,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       const command = woke ? stripLunaWakePhrase(raw) : raw;
 
       setStatus("thinking");
-      // Unlock audio on the same user gesture as Send / Enter.
-      void getAudioContext()?.resume();
 
       const forGemini =
         command ||
@@ -308,12 +401,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         await speakText("Sorry, I ran into a problem processing that request.");
       }
     },
-    [getAudioContext, speakText, workspaceId]
+    [speakText, workspaceId]
   );
 
   handleSubmitRef.current = handleSubmit;
 
-  /* --------- Always-on wake word: Hey Luna / Hello Luna / Hi Luna -------- */
   useEffect(() => {
     wakeWantedRef.current = true;
     const Ctor =
@@ -374,8 +466,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       return;
     }
 
-    void getAudioContext()?.resume();
-
     const Ctor =
       (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor })
         .SpeechRecognition ||
@@ -425,7 +515,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     recognitionRef.current = recognition;
     setIsRecording(true);
     setStatus("listening");
-  }, [getAudioContext, handleSubmit, isRecording]);
+  }, [handleSubmit, isRecording]);
 
   const statusLabel =
     status === "idle"
@@ -466,11 +556,23 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       </div>
 
       <div className="relative mx-auto w-full max-w-[320px] aspect-square overflow-hidden rounded-xl bg-gradient-to-b from-indigo-950 to-black">
-        <LunaAvatar
-          fill
-          isSpeaking={status === "speaking"}
-          isAdmin={isAdmin}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 h-full w-full object-cover"
         />
+        <audio ref={audioRef} autoPlay playsInline className="sr-only" />
+        {!live && (
+          <div className="absolute inset-0">
+            <LunaAvatar
+              fill
+              isSpeaking={status === "speaking"}
+              isAdmin={isAdmin}
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2 bg-black/40 p-4">
@@ -513,8 +615,8 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         </Button>
       </div>
       <p className="px-4 pb-3 text-center text-[11px] text-white/40">
-        Type or say Hey {agentName} to talk. She stays still until you send a
-        message — no live session while idle.
+        Type or say Hey {agentName} to talk. She stays on the live avatar;
+        idle uses no Gemini or ElevenLabs until you wake her.
       </p>
 
       <LunaSettingsModal

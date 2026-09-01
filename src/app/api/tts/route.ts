@@ -4,9 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * ElevenLabs text-to-speech proxy — server-side only.
  *
- * ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID stay on the server. Accepts
- * `{ text }` from the client and streams raw PCM16 @ 16 kHz (Simli's native
- * lip-sync format) so the browser can pipe chunks into sendAudioData live.
+ * ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID stay on the server.
+ * `{ text, format: "pcm" | "mp3" }` — PCM16 @ 16 kHz for Simli lip-sync,
+ * MP3 for browser playback when the live avatar is not running.
  */
 
 export const dynamic = "force-dynamic";
@@ -31,9 +31,11 @@ export async function POST(req: NextRequest) {
   }
 
   let text = "";
+  let format: "pcm" | "mp3" = "pcm";
   try {
     const body = await req.json();
     text = typeof body?.text === "string" ? body.text : "";
+    if (body?.format === "mp3") format = "mp3";
   } catch {
     /* handled below */
   }
@@ -48,16 +50,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const outputFormat =
+    format === "mp3" ? "mp3_44100_128" : "pcm_16000";
+
   let elevenResponse: Response;
   try {
     elevenResponse = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=pcm_16000`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=${outputFormat}`,
       {
         method: "POST",
         headers: {
           "xi-api-key": apiKey,
           "Content-Type": "application/json",
-          Accept: "application/octet-stream",
+          Accept: format === "mp3" ? "audio/mpeg" : "application/octet-stream",
         },
         body: JSON.stringify({
           text,
@@ -85,7 +90,8 @@ export async function POST(req: NextRequest) {
 
   return new Response(elevenResponse.body, {
     headers: {
-      "Content-Type": "application/octet-stream",
+      "Content-Type":
+        format === "mp3" ? "audio/mpeg" : "application/octet-stream",
       "Cache-Control": "no-store",
     },
   });
