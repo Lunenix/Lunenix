@@ -1,26 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/tasks?workspaceId=...&projectId=...
  * Lists tasks. Always scoped to a workspace the caller belongs to.
+ * Project detail may pass only projectId; membership is taken from that project.
  */
-export async function GET(request: NextRequest) {
-  const requestedWorkspaceId = request.nextUrl.searchParams.get("workspaceId");
-  const projectId = request.nextUrl.searchParams.get("projectId");
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const projectId = searchParams.get("projectId");
 
-  let workspaceId = requestedWorkspaceId;
+  let supabase;
+  let workspaceId: string;
 
-  if (!workspaceId && projectId) {
-    const supabase = createClient();
+  if (!searchParams.get("workspaceId") && projectId) {
+    const client = createClient();
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await client.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const { data: project } = await supabase
+    const { data: project } = await client
       .from("projects")
       .select("id, workspace_id")
       .eq("id", projectId)
@@ -28,26 +31,31 @@ export async function GET(request: NextRequest) {
     if (!project?.workspace_id) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    workspaceId = project.workspace_id;
+    const member = await requireWorkspaceMember(project.workspace_id);
+    if ("error" in member) return member.error;
+    supabase = member.supabase;
+    workspaceId = member.workspaceId;
+  } else {
+    const auth = await verifyWorkspaceAccess(request);
+    if (auth.errorResponse) return auth.errorResponse;
+    supabase = auth.supabase;
+    workspaceId = auth.workspaceId;
   }
 
-  const auth = await requireWorkspaceMember(workspaceId);
-  if ("error" in auth) return auth.error;
-
-  let query = auth.supabase
+  let query = supabase
     .from("tasks")
     .select("*, project:projects(id, name)")
-    .eq("workspace_id", auth.workspaceId)
+    .eq("workspace_id", workspaceId)
     .order("position", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (projectId) query = query.eq("project_id", projectId);
 
-  const { data, error } = await query;
+  const { data: tasks, error } = await query;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ tasks: data });
+  return NextResponse.json({ tasks: tasks ?? [] });
 }
 
 /**
