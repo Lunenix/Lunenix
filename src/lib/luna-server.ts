@@ -518,6 +518,7 @@ export async function getWorkspaceContext(
     { data: projects },
     { data: activityLogs },
     { data: knowledgeBase },
+    { data: openContracts },
   ] = await Promise.all([
     supabase
       .from("workspace_ai_settings")
@@ -556,10 +557,17 @@ export async function getWorkspaceContext(
       .limit(12),
     supabase
       .from("knowledge_base")
-      .select("title, category, content")
+      .select("id, title, category, content")
       .eq("workspace_id", workspace_id)
       .order("created_at", { ascending: false })
-      .limit(8),
+      .limit(10),
+    supabase
+      .from("contracts")
+      .select("id, name, value, status")
+      .eq("workspace_id", workspace_id)
+      .in("status", ["draft", "sent", "active"])
+      .order("updated_at", { ascending: false })
+      .limit(10),
   ]);
 
   const rawPayload: WorkspaceContextPayload = {
@@ -630,6 +638,18 @@ export async function getWorkspaceContext(
             ? row.category.trim().slice(0, 40)
             : "general",
         content: String(row.content).slice(0, 600),
+      })),
+    openContracts: (openContracts ?? [])
+      .filter((row: Record<string, unknown>) => typeof row.name === "string")
+      .map((row: Record<string, unknown>) => ({
+        name: String(row.name).slice(0, 120),
+        value:
+          typeof row.value === "number"
+            ? row.value
+            : row.value != null && Number.isFinite(Number(row.value))
+              ? Number(row.value)
+              : null,
+        status: typeof row.status === "string" ? row.status : "draft",
       })),
     summary: {
       totalContacts: (contacts ?? []).length,

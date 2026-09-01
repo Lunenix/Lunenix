@@ -170,6 +170,12 @@ export interface SanitizedKnowledge {
   content: string;
 }
 
+export interface SanitizedOpenContract {
+  name: string;
+  value: number | null;
+  status: string;
+}
+
 export interface WorkspaceContextPayload {
   workspaceId: string;
   settings: LunaContextSettings;
@@ -179,6 +185,7 @@ export interface WorkspaceContextPayload {
   projects: SanitizedProject[];
   recentActivity: SanitizedActivity[];
   knowledgeBase: SanitizedKnowledge[];
+  openContracts: SanitizedOpenContract[];
   summary: {
     totalContacts: number;
     openTasksCount: number;
@@ -257,6 +264,9 @@ ${context.recentActivity.map((a) => `- (${a.actor_type}) ${a.description}`).join
 
 [KNOWLEDGE BASE]
 ${context.knowledgeBase.map((k) => `- ${k.title} (${k.category}): ${k.content}`).join("\n") || "None"}
+
+[OPEN CONTRACTS]
+${context.openContracts.map((c) => `- ${c.name} (${c.status}${c.value != null ? `, $${c.value}` : ""})`).join("\n") || "None"}
 `.trim();
 }
 
