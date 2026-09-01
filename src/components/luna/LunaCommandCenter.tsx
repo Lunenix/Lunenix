@@ -20,6 +20,7 @@ import {
 } from "@/lib/luna";
 import type { WorkspaceAISettings } from "@/types/database";
 import { LunaSettingsModal } from "./LunaSettingsModal";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { Loader2, Mic, MicOff, Play, Send, Settings, Video, VideoOff } from "lucide-react";
 import type { SimliClient } from "simli-client/dist/client";
 
@@ -88,7 +89,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const [instruction, setInstruction] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [status, setStatus] = useState<Status>("disconnected");
-  const [isRecording, setIsRecording] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [live, setLive] = useState(false);
   const [chatLog, setChatLog] = useState<
@@ -98,7 +98,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const simliRef = useRef<SimliClient | null>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const wakeRecRef = useRef<SpeechRecognitionLike | null>(null);
   const commandMicRef = useRef(false);
   const pauseWakeRef = useRef(false);
@@ -480,6 +479,45 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
   handleSubmitRef.current = handleSubmit;
 
+  const {
+    isListening,
+    transcript: liveTranscript,
+    startListening,
+    stopListening,
+    isSupported: speechSupported,
+  } = useSpeechToText({
+    onFinalTranscript: (text) => {
+      if (!text) return;
+      setInstruction(text);
+      void handleSubmitRef.current(text);
+    },
+  });
+
+  const wasListeningRef = useRef(false);
+  useEffect(() => {
+    commandMicRef.current = isListening;
+    if (isListening && !wasListeningRef.current) {
+      pauseWakeRef.current = true;
+      wantedRef.current = true;
+      void startLiveRef.current();
+      try {
+        wakeRecRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      setStatus("listening");
+    } else if (!isListening && wasListeningRef.current) {
+      pauseWakeRef.current = false;
+      try {
+        wakeRecRef.current?.start();
+      } catch {
+        /* ignore */
+      }
+      setStatus((prev) => (prev === "listening" ? "idle" : prev));
+    }
+    wasListeningRef.current = isListening;
+  }, [isListening]);
+
   useEffect(() => {
     wakeWantedRef.current = true;
     const Ctor =
@@ -533,65 +571,16 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   }, []);
 
   const toggleMic = useCallback(() => {
-    if (isRecording) {
-      commandMicRef.current = false;
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
-    const Ctor =
-      (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor })
-        .SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor })
-        .webkitSpeechRecognition;
-
-    if (!Ctor) {
+    if (!speechSupported) {
       toast("Voice input isn't supported in this browser.", "error");
       return;
     }
-
-    const recognition = new Ctor();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognition.onresult = (e: SpeechRecognitionEventLike) => {
-      const last = e.results[e.results.length - 1];
-      const transcript = last?.[0]?.transcript ?? "";
-      setInstruction(transcript);
-      handleSubmit(transcript);
-    };
-    recognition.onend = () => {
-      commandMicRef.current = false;
-      pauseWakeRef.current = false;
-      try {
-        wakeRecRef.current?.start();
-      } catch {
-        /* ignore */
-      }
-      setIsRecording(false);
-      setStatus((prev) => (prev === "listening" ? "idle" : prev));
-    };
-    recognition.onerror = () => {
-      commandMicRef.current = false;
-      pauseWakeRef.current = false;
-      setIsRecording(false);
-      setStatus((prev) => (prev === "listening" ? "idle" : prev));
-    };
-    commandMicRef.current = true;
-    pauseWakeRef.current = true;
-    wantedRef.current = true;
-    void startLive();
-    try {
-      wakeRecRef.current?.stop();
-    } catch {
-      /* ignore */
+    if (isListening) {
+      stopListening();
+      return;
     }
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsRecording(true);
-    setStatus("listening");
-  }, [handleSubmit, isRecording, startLive]);
+    startListening();
+  }, [isListening, speechSupported, startListening, stopListening]);
 
   const statusLabel =
     status === "disconnected"
@@ -723,12 +712,12 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         <div className="flex items-center space-x-2">
           <Button
             type="button"
-            variant={isRecording ? "destructive" : "outline"}
+            variant={isListening ? "destructive" : "outline"}
             size="icon"
             onClick={toggleMic}
-            aria-label={isRecording ? "Stop listening" : "Start voice input"}
+            aria-label={isListening ? "Stop listening" : "Start voice input"}
           >
-            {isRecording ? (
+            {isListening ? (
               <MicOff className="h-4 w-4" />
             ) : (
               <Mic className="h-4 w-4" />
@@ -741,7 +730,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
                 ? "Type a message to wake Luna..."
                 : `Type or speak to ${agentName}...`
             }
-            value={instruction}
+            value={isListening ? liveTranscript : instruction}
             onChange={(e) => setInstruction(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !busy) void handleSubmit(instruction);
