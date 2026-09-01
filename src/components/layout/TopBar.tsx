@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Menu } from "lucide-react";
+import { ThemeToggleMenuItem } from "@/components/theme-toggle";
 
 interface TopBarProps {
   userEmail?: string | null;
@@ -86,6 +87,7 @@ export function TopBar({
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <ThemeToggleMenuItem />
           <DropdownMenuItem
             onClick={handleSignOut}
             className="cursor-pointer text-destructive focus:text-destructive"

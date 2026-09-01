@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
+import { ThemeToggleMenuItem } from "@/components/theme-toggle";
 import {
   Building2,
   CalendarDays,
@@ -296,6 +297,7 @@ export function Sidebar({
                 {userEmail}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <ThemeToggleMenuItem />
               <DropdownMenuItem
                 onClick={handleSignOut}
                 className="cursor-pointer text-destructive focus:text-destructive"
