@@ -438,6 +438,18 @@ export interface ScheduledEmail {
 
 export type EmailStatus = "pending" | "sent" | "failed";
 
+export type EmailDraftStatus = "draft" | "sent" | "archived";
+
+export interface EmailDraft {
+  id: string;
+  workspace_id: string;
+  recipient_email: string;
+  subject: string;
+  body_text: string;
+  status: EmailDraftStatus;
+  created_at: string;
+}
+
 export interface EmailLog {
   id: string;
   workspace_id: string;
