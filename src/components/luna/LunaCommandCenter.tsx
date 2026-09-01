@@ -493,6 +493,12 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     },
   });
 
+  useEffect(() => {
+    if (isListening && liveTranscript) {
+      setInstruction(liveTranscript);
+    }
+  }, [isListening, liveTranscript]);
+
   const wasListeningRef = useRef(false);
   useEffect(() => {
     commandMicRef.current = isListening;
@@ -570,17 +576,29 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     };
   }, []);
 
-  const toggleMic = useCallback(() => {
+  const toggleMic = useCallback(async () => {
     if (!speechSupported) {
       toast("Voice input isn't supported in this browser.", "error");
       return;
     }
     if (isListening) {
       stopListening();
+      if (status === "listening") setStatus("idle");
       return;
     }
+    if (status === "disconnected") {
+      await startAvatarSession();
+    }
+    setStatus("listening");
     startListening();
-  }, [isListening, speechSupported, startListening, stopListening]);
+  }, [
+    isListening,
+    speechSupported,
+    startAvatarSession,
+    startListening,
+    status,
+    stopListening,
+  ]);
 
   const statusLabel =
     status === "disconnected"
@@ -714,11 +732,13 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
             type="button"
             variant={isListening ? "destructive" : "outline"}
             size="icon"
-            onClick={toggleMic}
+            onClick={() => void toggleMic()}
+            disabled={!speechSupported || busy}
+            title={isListening ? "Stop listening" : "Start voice input"}
             aria-label={isListening ? "Stop listening" : "Start voice input"}
           >
             {isListening ? (
-              <MicOff className="h-4 w-4" />
+              <MicOff className="h-4 w-4 animate-pulse" />
             ) : (
               <Mic className="h-4 w-4" />
             )}
@@ -726,11 +746,13 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
           <Input
             placeholder={
-              status === "disconnected"
-                ? "Type a message to wake Luna..."
-                : `Type or speak to ${agentName}...`
+              isListening
+                ? "Listening..."
+                : status === "disconnected"
+                  ? "Type a message to wake Luna..."
+                  : `Type or speak to ${agentName}...`
             }
-            value={isListening ? liveTranscript : instruction}
+            value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !busy) void handleSubmit(instruction);
@@ -749,7 +771,9 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground">
-          On-demand WebRTC. Click Disconnect anytime to stop Simli credit use.
+          {isListening
+            ? "Speak now. Your query will automatically send when you finish speaking."
+            : "Click the mic or type to send queries. Disconnect anytime to stop Simli credit use."}
         </p>
       </CardContent>
 
