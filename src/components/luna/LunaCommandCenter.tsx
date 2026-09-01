@@ -665,7 +665,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="relative mx-auto flex aspect-square w-full max-w-[180px] items-center justify-center overflow-hidden rounded-2xl border border-border/30 bg-black/90 shadow-md">
+        <div className="relative mx-auto flex aspect-square w-full max-w-[240px] items-center justify-center overflow-hidden rounded-2xl border border-border/30 bg-black/90 shadow-md">
           <video
             ref={videoRef}
             autoPlay
