@@ -108,7 +108,35 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const { error } = await supabase.from("forms").delete().eq("id", id);
+  const { data: existing, error: loadError } = await supabase
+    .from("forms")
+    .select("id, workspace_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !existing) {
+    return NextResponse.json({ error: "Form not found" }, { status: 404 });
+  }
+
+  const { data: membership } = await supabase
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", existing.workspace_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!membership) {
+    return NextResponse.json(
+      { error: "You are not a member of this workspace" },
+      { status: 403 }
+    );
+  }
+
+  const { error } = await supabase
+    .from("forms")
+    .delete()
+    .eq("id", id)
+    .eq("workspace_id", existing.workspace_id);
 
   if (error) {
     console.error("Error deleting form:", error);

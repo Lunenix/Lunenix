@@ -14,9 +14,11 @@ import {
   FileText,
   Link as LinkIcon,
   Check,
+  Trash2,
 } from "lucide-react";
 import { Form, FORM_STATUS_LABELS } from "@/types/database";
 import { formatDateTime } from "@/lib/format";
+import { toast } from "@/lib/toast";
 
 function formStatusClasses(status: string): string {
   const classes: Record<string, string> = {
@@ -32,6 +34,7 @@ export default function FormsPage() {
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeWorkspace?.id) {
@@ -77,6 +80,28 @@ export default function FormsPage() {
     navigator.clipboard.writeText(url);
     setCopiedId(formId);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleDelete = async (form: Form) => {
+    if (
+      !confirm(
+        `Delete form "${form.name}"? This will also delete all submissions.`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(form.id);
+    try {
+      const res = await fetch(`/api/forms/${form.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete form");
+      setForms((prev) => prev.filter((f) => f.id !== form.id));
+      toast(`Deleted ${form.name}.`, "success");
+    } catch (error) {
+      console.error("Error deleting form:", error);
+      toast("Failed to delete form.", "error");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -192,6 +217,21 @@ export default function FormsPage() {
                       </Link>
                     </Button>
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    className="w-full"
+                    disabled={deletingId === form.id}
+                    onClick={() => handleDelete(form)}
+                  >
+                    {deletingId === form.id ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    {deletingId === form.id ? "Deleting..." : "Delete"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
