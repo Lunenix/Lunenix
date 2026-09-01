@@ -4,6 +4,9 @@
 
 const TELEGRAM_API = "https://api.telegram.org";
 
+export const TELEGRAM_PIPELINE_TEST_TEXT =
+  "🔔 *Lunenix Notification Test*: Telegram push pipeline operational!";
+
 function escapeTelegramMarkdown(value: string): string {
   return value.replace(/([_*`\[])/g, "\\$&");
 }

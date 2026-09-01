@@ -21,6 +21,7 @@ const PUBLIC_PATHS = [
   "/api/emails/inbound/run",
   "/api/email-drafts/run",
   "/api/tasks/reminders/run",
+  "/api/telegram/test",
 ];
 
 function isPublicPath(pathname: string): boolean {
