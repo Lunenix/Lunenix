@@ -1,33 +1,49 @@
-"use client";
-
-import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { ContactsTable } from "@/components/contacts/ContactsTable";
-import { Loader2 } from "lucide-react";
+import { ContactsPageClient } from "./ContactsPageClient";
 
-export default function ContactsPage() {
-  const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams: { workspaceId?: string };
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (wsLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (!user) {
+    redirect("/login");
   }
 
-  if (!activeWorkspace) {
+  const requested =
+    typeof searchParams.workspaceId === "string"
+      ? searchParams.workspaceId.trim()
+      : "";
+
+  if (requested) {
+    const { data: member } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("workspace_id", requested)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!member?.workspace_id) {
+      redirect("/dashboard");
+    }
+
     return (
-      <div className="flex h-64 flex-col items-center justify-center text-center">
-        <p className="text-muted-foreground">
-          Create or select a workspace to manage contacts.
-        </p>
+      <div className="space-y-6">
+        <ContactsTable workspaceId={member.workspace_id} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <ContactsTable workspaceId={activeWorkspace.id} />
+      <ContactsPageClient />
     </div>
   );
 }
