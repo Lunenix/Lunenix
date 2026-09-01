@@ -1,32 +1,16 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/invoices
  * List all invoices for a workspace, with optional contact/contract/project joins.
  */
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
+  const workspaceId = req.nextUrl.searchParams.get("workspaceId");
+  const auth = await requireWorkspaceMember(workspaceId);
+  if ("error" in auth) return auth.error;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const workspaceId = searchParams.get("workspaceId");
-
-  if (!workspaceId) {
-    return NextResponse.json(
-      { error: "workspaceId is required" },
-      { status: 400 }
-    );
-  }
-
-  // Fetch invoices with optional contact, contract, and project joins
-  const { data: invoices, error } = await supabase
+  const { data: invoices, error } = await auth.supabase
     .from("invoices")
     .select(
       `
@@ -36,7 +20,7 @@ export async function GET(req: NextRequest) {
       project:projects(id, name)
     `
     )
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", auth.workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -55,18 +39,8 @@ export async function GET(req: NextRequest) {
  * Create a new invoice.
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await req.json();
   const {
-    workspace_id,
     contact_id,
     contract_id,
     project_id,
@@ -81,14 +55,19 @@ export async function POST(req: NextRequest) {
     payment_terms,
   } = body;
 
-  if (!workspace_id || !contact_id || !invoice_number || !issue_date || !due_date) {
+  const auth = await requireWorkspaceMember(body.workspace_id);
+  if ("error" in auth) return auth.error;
+
+  if (!contact_id || !invoice_number || !issue_date || !due_date) {
     return NextResponse.json(
-      { error: "workspace_id, contact_id, invoice_number, issue_date, and due_date are required" },
+      {
+        error:
+          "contact_id, invoice_number, issue_date, and due_date are required",
+      },
       { status: 400 }
     );
   }
 
-  // Calculate totals from line items
   const items = line_items || [];
   const subtotal = items.reduce(
     (sum: number, item: { amount: number }) => sum + (item.amount || 0),
@@ -98,10 +77,10 @@ export async function POST(req: NextRequest) {
   const taxAmount = (subtotal * taxRate) / 100;
   const total = subtotal + taxAmount;
 
-  const { data: invoice, error } = await supabase
+  const { data: invoice, error } = await auth.supabase
     .from("invoices")
     .insert({
-      workspace_id,
+      workspace_id: auth.workspaceId,
       contact_id,
       contract_id: contract_id || null,
       project_id: project_id || null,

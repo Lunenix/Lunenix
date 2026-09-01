@@ -1,34 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import type { EmailLog } from "@/types/database";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/emails/logs?workspaceId=...&contactId=...&status=...
  * Fetch email logs for a workspace with optional filters
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const workspaceId = request.nextUrl.searchParams.get("workspaceId");
+  const contactId = request.nextUrl.searchParams.get("contactId");
+  const status = request.nextUrl.searchParams.get("status");
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireWorkspaceMember(workspaceId);
+  if ("error" in auth) return auth.error;
 
-  const { searchParams } = new URL(request.url);
-  const workspaceId = searchParams.get("workspaceId");
-  const contactId = searchParams.get("contactId");
-  const status = searchParams.get("status");
-
-  if (!workspaceId) {
-    return NextResponse.json(
-      { error: "workspaceId is required" },
-      { status: 400 }
-    );
-  }
-
-  let query = supabase
+  let query = auth.supabase
     .from("email_logs")
     .select(
       `
@@ -37,9 +23,8 @@ export async function GET(request: NextRequest) {
       template:email_templates(id, name)
     `
     )
-    .eq("workspace_id", workspaceId);
+    .eq("workspace_id", auth.workspaceId);
 
-  // Apply optional filters
   if (contactId) {
     query = query.eq("contact_id", contactId);
   }
@@ -49,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   query = query.order("sent_at", { ascending: false });
 
-  const { data: logs, error } = await supabase.auth.getUser().then(() => query);
+  const { data: logs, error } = await query;
 
   if (error) {
     console.error("Error fetching email logs:", error);

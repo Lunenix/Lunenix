@@ -1,32 +1,16 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/contracts
  * List all contracts for a workspace, with optional contact/project joins.
  */
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
+  const workspaceId = req.nextUrl.searchParams.get("workspaceId");
+  const auth = await requireWorkspaceMember(workspaceId);
+  if ("error" in auth) return auth.error;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const workspaceId = searchParams.get("workspaceId");
-
-  if (!workspaceId) {
-    return NextResponse.json(
-      { error: "workspaceId is required" },
-      { status: 400 }
-    );
-  }
-
-  // Fetch contracts with optional contact and project joins
-  const { data: contracts, error } = await supabase
+  const { data: contracts, error } = await auth.supabase
     .from("contracts")
     .select(
       `
@@ -35,7 +19,7 @@ export async function GET(req: NextRequest) {
       project:projects(id, name)
     `
     )
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", auth.workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -54,18 +38,8 @@ export async function GET(req: NextRequest) {
  * Create a new contract.
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await req.json();
   const {
-    workspace_id,
     contact_id,
     project_id,
     contract_number,
@@ -79,17 +53,20 @@ export async function POST(req: NextRequest) {
     terms,
   } = body;
 
-  if (!workspace_id || !contract_number || !name) {
+  const auth = await requireWorkspaceMember(body.workspace_id);
+  if ("error" in auth) return auth.error;
+
+  if (!contract_number || !name) {
     return NextResponse.json(
-      { error: "workspace_id, contract_number, and name are required" },
+      { error: "contract_number and name are required" },
       { status: 400 }
     );
   }
 
-  const { data: contract, error } = await supabase
+  const { data: contract, error } = await auth.supabase
     .from("contracts")
     .insert({
-      workspace_id,
+      workspace_id: auth.workspaceId,
       contact_id: contact_id || null,
       project_id: project_id || null,
       contract_number,

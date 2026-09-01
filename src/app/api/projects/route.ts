@@ -1,41 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/projects?workspaceId=...
  * Lists projects for the workspace, including linked contact and task counts.
  */
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const workspaceId = request.nextUrl.searchParams.get("workspaceId");
-  if (!workspaceId) {
-    return NextResponse.json({ error: "workspaceId is required" }, { status: 400 });
-  }
+  const auth = await requireWorkspaceMember(workspaceId);
+  if ("error" in auth) return auth.error;
 
-  const { data: projects, error } = await supabase
+  const { data: projects, error } = await auth.supabase
     .from("projects")
     .select("*, contact:contacts(*)")
-    .eq("workspace_id", workspaceId)
+    .eq("workspace_id", auth.workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Attach task counts per project.
   const ids = (projects ?? []).map((p) => p.id);
   const counts: Record<string, { total: number; open: number }> = {};
   if (ids.length > 0) {
-    const { data: tasks } = await supabase
+    const { data: tasks } = await auth.supabase
       .from("tasks")
       .select("project_id, status")
+      .eq("workspace_id", auth.workspaceId)
       .in("project_id", ids);
     for (const t of tasks ?? []) {
       if (!t.project_id) continue;
@@ -59,25 +50,17 @@ export async function GET(request: NextRequest) {
  * Creates a project in the given workspace.
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await request.json();
-  const { workspace_id, name } = body;
-  if (!workspace_id || !name) {
-    return NextResponse.json(
-      { error: "workspace_id and name are required" },
-      { status: 400 }
-    );
+  const { name } = body;
+  const auth = await requireWorkspaceMember(body.workspace_id);
+  if ("error" in auth) return auth.error;
+
+  if (!name) {
+    return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
 
   const payload = {
-    workspace_id,
+    workspace_id: auth.workspaceId,
     name,
     description: body.description ?? null,
     status: body.status ?? "planning",
@@ -89,7 +72,7 @@ export async function POST(request: NextRequest) {
     currency: body.currency ?? "USD",
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from("projects")
     .insert(payload)
     .select("*, contact:contacts(*)")
