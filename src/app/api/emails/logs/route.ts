@@ -1,18 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import type { EmailLog } from "@/types/database";
-import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/emails/logs?workspaceId=...&contactId=...&status=...
  * Fetch email logs for a workspace with optional filters
  */
-export async function GET(request: NextRequest) {
-  const workspaceId = request.nextUrl.searchParams.get("workspaceId");
-  const contactId = request.nextUrl.searchParams.get("contactId");
-  const status = request.nextUrl.searchParams.get("status");
+export async function GET(request: Request) {
+  const auth = await verifyWorkspaceAccess(request);
+  if (auth.errorResponse) return auth.errorResponse;
 
-  const auth = await requireWorkspaceMember(workspaceId);
-  if ("error" in auth) return auth.error;
+  const { searchParams } = new URL(request.url);
+  const contactId = searchParams.get("contactId");
+  const status = searchParams.get("status");
 
   let query = auth.supabase
     .from("email_logs")
@@ -41,5 +41,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ logs: logs as EmailLog[] });
+  return NextResponse.json({ logs: (logs as EmailLog[]) ?? [] });
 }

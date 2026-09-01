@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { NextResponse } from "next/server";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/submissions
  * List all form submissions for a workspace or specific form.
  */
-export async function GET(req: NextRequest) {
-  const workspaceId = req.nextUrl.searchParams.get("workspaceId");
-  const formId = req.nextUrl.searchParams.get("formId");
-  const auth = await requireWorkspaceMember(workspaceId);
-  if ("error" in auth) return auth.error;
+export async function GET(request: Request) {
+  const auth = await verifyWorkspaceAccess(request);
+  if (auth.errorResponse) return auth.errorResponse;
+
+  const formId = new URL(request.url).searchParams.get("formId");
 
   let query = auth.supabase
     .from("form_submissions")
@@ -37,5 +37,5 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ submissions: submissions || [] });
+  return NextResponse.json({ submissions: submissions ?? [] });
 }

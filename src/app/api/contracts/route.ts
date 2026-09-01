@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/contracts
  * List all contracts for a workspace, with optional contact/project joins.
  */
-export async function GET(req: NextRequest) {
-  const workspaceId = req.nextUrl.searchParams.get("workspaceId");
-  const auth = await requireWorkspaceMember(workspaceId);
-  if ("error" in auth) return auth.error;
+export async function GET(request: Request) {
+  const auth = await verifyWorkspaceAccess(request);
+  if (auth.errorResponse) return auth.errorResponse;
 
   const { data: contracts, error } = await auth.supabase
     .from("contracts")
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ contracts: contracts || [] });
+  return NextResponse.json({ contracts: contracts ?? [] });
 }
 
 /**
