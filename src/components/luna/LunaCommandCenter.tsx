@@ -21,7 +21,7 @@ import {
 } from "@/lib/luna";
 import type { WorkspaceAISettings } from "@/types/database";
 import { LunaSettingsModal } from "./LunaSettingsModal";
-import { Loader2, Mic, MicOff, Send, Settings, Video } from "lucide-react";
+import { Loader2, Mic, MicOff, Play, Send, Settings, Video, VideoOff } from "lucide-react";
 import type { SimliClient } from "simli-client/dist/client";
 
 /* -------------------------------------------------------------------------- */
@@ -72,7 +72,13 @@ async function playMp3(blob: Blob) {
   }
 }
 
-type Status = "idle" | "connecting" | "listening" | "thinking" | "speaking";
+type Status =
+  | "disconnected"
+  | "idle"
+  | "connecting"
+  | "listening"
+  | "thinking"
+  | "speaking";
 
 interface LunaCommandCenterProps {
   workspaceId: string;
@@ -82,7 +88,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const [settings, setSettings] = useState<WorkspaceAISettings | null>(null);
   const [instruction, setInstruction] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] = useState<Status>("disconnected");
   const [isRecording, setIsRecording] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [live, setLive] = useState(false);
@@ -103,7 +109,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   );
   const sessionGenRef = useRef(0);
   const liveRef = useRef(false);
-  const wantedRef = useRef(true);
+  const wantedRef = useRef(false);
   const connectPromiseRef = useRef<Promise<boolean> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startLiveRef = useRef<() => Promise<boolean>>(async () => false);
@@ -165,7 +171,9 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     if (!wantedRef.current) return false;
 
     const run = (async () => {
-      setStatus((prev) => (prev === "idle" ? "connecting" : prev));
+      setStatus((prev) =>
+        prev === "disconnected" || prev === "idle" ? "connecting" : prev
+      );
       // Video must exist and stay unoccluded — Simli only emits "start"
       // after requestVideoFrameCallback, which never fires under an overlay.
       for (let i = 0; i < 20 && (!videoRef.current || !audioRef.current); i++) {
@@ -256,10 +264,32 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
   startLiveRef.current = startLive;
 
-  // Stay on Simli for the whole dashboard visit.
-  useEffect(() => {
+  const stopAvatarSession = useCallback(() => {
+    wantedRef.current = false;
+    sessionGenRef.current += 1;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    connectPromiseRef.current = null;
+    try {
+      void simliRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    simliRef.current = null;
+    liveRef.current = false;
+    setLive(false);
+    setStatus("disconnected");
+  }, []);
+
+  const startAvatarSession = useCallback(async (): Promise<boolean> => {
     wantedRef.current = true;
-    void startLive();
+    return startLive();
+  }, [startLive]);
+
+  // Do not mint a Simli session until the user starts one. Always tear down on leave.
+  useEffect(() => {
     return () => {
       wantedRef.current = false;
       sessionGenRef.current += 1;
@@ -276,7 +306,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       liveRef.current = false;
       connectPromiseRef.current = null;
     };
-  }, [startLive]);
+  }, []);
 
   const speakFallback = useCallback(async (text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -345,6 +375,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       pauseWakeListening();
       setStatus("speaking");
       try {
+        wantedRef.current = true;
         const simliOk = await startLive();
         const client = simliRef.current;
 
@@ -406,6 +437,8 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       const command = woke ? stripLunaWakePhrase(raw) : raw;
 
       setChatLog((prev) => [...prev, { role: "user", text: raw }]);
+      wantedRef.current = true;
+      void startLive();
       setStatus("thinking");
 
       const forGemini =
@@ -548,6 +581,8 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     };
     commandMicRef.current = true;
     pauseWakeRef.current = true;
+    wantedRef.current = true;
+    void startLive();
     try {
       wakeRecRef.current?.stop();
     } catch {
@@ -557,27 +592,32 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     recognitionRef.current = recognition;
     setIsRecording(true);
     setStatus("listening");
-  }, [handleSubmit, isRecording]);
+  }, [handleSubmit, isRecording, startLive]);
 
   const statusLabel =
-    status === "idle"
-      ? "Idle"
-      : status === "connecting"
-        ? "Connecting"
-        : status === "listening"
-          ? "Listening"
-          : status === "thinking"
-            ? "Thinking"
-            : "Speaking";
+    status === "disconnected"
+      ? "Disconnected"
+      : status === "idle"
+        ? "Idle"
+        : status === "connecting"
+          ? "Connecting"
+          : status === "listening"
+            ? "Listening"
+            : status === "thinking"
+              ? "Thinking"
+              : "Speaking";
 
   const statusBadgeVariant =
-    status === "speaking" || status === "listening"
-      ? "default"
-      : status === "thinking" || status === "connecting"
-        ? "secondary"
-        : "outline";
+    status === "disconnected"
+      ? "destructive"
+      : status === "speaking" || status === "listening"
+        ? "default"
+        : status === "thinking" || status === "connecting"
+          ? "secondary"
+          : "outline";
 
   const busy = status === "thinking";
+  const sessionOn = status !== "disconnected";
 
   return (
     <Card className="border-border/40 bg-background/95 backdrop-blur">
@@ -591,18 +631,41 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
             {statusLabel}
           </Badge>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Customize assistant"
-        >
-          <Settings className="h-4 w-4 text-muted-foreground" />
-        </Button>
+        <div className="flex items-center space-x-1">
+          {sessionOn ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={stopAvatarSession}
+              className="h-8 font-mono text-xs text-muted-foreground hover:text-destructive"
+            >
+              <VideoOff className="mr-1.5 h-3.5 w-3.5" />
+              Disconnect
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => void startAvatarSession()}
+              className="h-8 font-mono text-xs"
+            >
+              <Play className="mr-1.5 h-3.5 w-3.5" />
+              Start Session
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Customize assistant"
+          >
+            <Settings className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-border/20 bg-black/90">
+        <div className="relative mx-auto flex aspect-square w-full max-w-[180px] items-center justify-center overflow-hidden rounded-2xl border border-border/30 bg-black/90 shadow-md">
           <video
             ref={videoRef}
             autoPlay
@@ -613,17 +676,36 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           />
           <audio ref={audioRef} autoPlay playsInline className="sr-only" />
 
-          {(status === "connecting" || !live) && (
-            <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1.5 font-mono text-[10px] text-white/80">
-              <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
-              Establishing Simli WebRTC session...
+          {status === "disconnected" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center space-y-1.5 bg-background/95 p-2 text-center">
+              <div className="rounded-full bg-muted p-2">
+                <VideoOff className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-[10px] font-semibold text-muted-foreground">
+                Avatar Offline
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void startAvatarSession()}
+                className="h-6 px-2 text-[10px]"
+              >
+                Connect
+              </Button>
             </div>
           )}
 
-          {live && (
-            <div className="absolute right-3 top-3 flex items-center space-x-1.5 rounded bg-black/60 px-2 py-1 font-mono text-[10px] text-white/80">
-              <Video className="h-3 w-3 text-emerald-400" />
-              <span>Simli Avatar Live</span>
+          {status === "connecting" && (
+            <div className="pointer-events-none absolute bottom-1.5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 font-mono text-[9px] text-white/90">
+              <Loader2 className="mr-1 inline h-2.5 w-2.5 animate-spin" />
+              WebRTC...
+            </div>
+          )}
+
+          {live && status !== "disconnected" && status !== "connecting" && (
+            <div className="absolute right-1.5 top-1.5 flex items-center space-x-1 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] text-white/90">
+              <Video className="h-2.5 w-2.5 text-emerald-400" />
+              <span>Live</span>
             </div>
           )}
         </div>
@@ -657,7 +739,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           </Button>
 
           <Input
-            placeholder={`Type or speak to ${agentName}...`}
+            placeholder={
+              status === "disconnected"
+                ? "Type a message to wake Luna..."
+                : `Type or speak to ${agentName}...`
+            }
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             onKeyDown={(e) => {
@@ -677,8 +763,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground">
-          Type or speak to Luna. Real-time avatar streaming connects
-          automatically upon interaction.
+          On-demand WebRTC. Click Disconnect anytime to stop Simli credit use.
         </p>
       </CardContent>
 
