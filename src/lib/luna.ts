@@ -162,3 +162,47 @@ export function pickFemaleVoice(
   const nonMale = voices.find((v) => !isMale(v.name.toLowerCase()));
   return nonMale ?? voices[0];
 }
+
+/** Common IANA zones for Luna's home city / local clock. */
+export const LUNA_TIMEZONES = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Phoenix",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  "America/Toronto",
+  "America/Mexico_City",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "UTC",
+] as const;
+
+export function isIanaTimeZone(value: string): boolean {
+  if (!/^[A-Za-z0-9_]+(?:\/[A-Za-z0-9_+\-]+)+$|^UTC$/.test(value)) return false;
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: value }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function formatTimeInZone(timeZone: string): string | null {
+  if (!isIanaTimeZone(timeZone)) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(new Date());
+  } catch {
+    return null;
+  }
+}

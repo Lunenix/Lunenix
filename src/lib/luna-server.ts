@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sanitizeLunaContext } from "@/lib/luna";
+import { sanitizeLunaContext, formatTimeInZone, isIanaTimeZone } from "@/lib/luna";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
@@ -53,6 +53,9 @@ export type LunaWorkspaceContext = {
   invoices: Record<string, unknown>[];
   forms: Record<string, unknown>[];
   workflows: Record<string, unknown>[];
+  homeCity: string | null;
+  timezone: string | null;
+  localTime: string | null;
 };
 
 function pickKeys(
@@ -153,7 +156,8 @@ async function findProjectId(
 export async function getLunaWorkspaceContext(
   supabase: LunaSupabaseClient,
   workspaceId: string,
-  userId: string
+  userId: string,
+  timezoneOverride?: string | null
 ): Promise<LunaWorkspaceContext> {
   const empty: LunaWorkspaceContext = {
     contacts: [],
@@ -164,6 +168,9 @@ export async function getLunaWorkspaceContext(
     invoices: [],
     forms: [],
     workflows: [],
+    homeCity: null,
+    timezone: null,
+    localTime: null,
   };
   const member = await assertLunaWorkspaceMember(supabase, workspaceId, userId);
   if (!member) return empty;
@@ -178,6 +185,7 @@ export async function getLunaWorkspaceContext(
     { data: invoices },
     { data: forms },
     { data: workflows },
+    { data: aiSettings },
   ] = await Promise.all([
     supabase
       .from("contacts")
@@ -230,7 +238,25 @@ export async function getLunaWorkspaceContext(
       .eq("workspace_id", workspace_id)
       .order("updated_at", { ascending: false })
       .limit(15),
+    supabase
+      .from("workspace_ai_settings")
+      .select("home_city, timezone")
+      .eq("workspace_id", workspace_id)
+      .maybeSingle(),
   ]);
+
+  const homeCity =
+    typeof aiSettings?.home_city === "string" && aiSettings.home_city.trim()
+      ? aiSettings.home_city.trim().slice(0, 80)
+      : null;
+  const timezone =
+    (typeof aiSettings?.timezone === "string" &&
+    isIanaTimeZone(aiSettings.timezone)
+      ? aiSettings.timezone
+      : null) ||
+    (timezoneOverride && isIanaTimeZone(timezoneOverride)
+      ? timezoneOverride
+      : null);
 
   return {
     contacts: (contacts ?? []).map((row: Record<string, unknown>) =>
@@ -257,6 +283,9 @@ export async function getLunaWorkspaceContext(
     workflows: (workflows ?? []).map((row: Record<string, unknown>) =>
       pickKeys(row, ["id", "name", "is_active", "trigger_type"])
     ),
+    homeCity,
+    timezone,
+    localTime: timezone ? formatTimeInZone(timezone) : null,
   };
 }
 
@@ -308,6 +337,15 @@ export function formatLunaContextForPrompt(ctx: LunaWorkspaceContext): string {
 
   return [
     "Current workspace snapshot (this workspace only):",
+    ctx.homeCity || ctx.timezone || ctx.localTime
+      ? `Locale: ${[
+          ctx.homeCity ? `home city ${ctx.homeCity}` : "",
+          ctx.timezone ? `timezone ${ctx.timezone}` : "",
+          ctx.localTime ? `local time ${ctx.localTime}` : "",
+        ]
+          .filter(Boolean)
+          .join("; ")}.`
+      : "",
     `Contacts:\n${line(contacts, "none")}`,
     `Projects:\n${line(projects, "none")}`,
     `Open tasks:\n${line(openTasks, "none")}`,
@@ -315,7 +353,9 @@ export function formatLunaContextForPrompt(ctx: LunaWorkspaceContext): string {
     `Unpaid invoices:\n${line(invoices, "none")}`,
     `Forms:\n${line(forms, "none")}`,
     `Workflows:\n${line(workflows, "none")}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 const WMO: Record<number, string> = {
@@ -369,6 +409,76 @@ export async function fetchWeather(location: string): Promise<Record<string, unk
 }
 
 export type LunaToolResult = Record<string, unknown>;
+
+export type LunaForcedTool = {
+  name: string;
+  args: Record<string, unknown>;
+};
+
+/** Run weather/forms even if Gemini skips tools or errors out. */
+export function inferLunaForcedTools(
+  message: string,
+  defaults?: { homeCity?: string | null }
+): LunaForcedTool[] {
+  const m = message.trim();
+  const tools: LunaForcedTool[] = [];
+
+  if (/\b(weather|forecast|temperature)\b/i.test(m)) {
+    const loc =
+      m.match(/\b(?:in|for|at)\s+([A-Za-z][A-Za-z .'-]{1,48}?)(?:[?.!]|$)/i)?.[1] ??
+      m.match(/\b(?:weather|forecast|temperature)\s+(?:in\s+|for\s+|at\s+)?(.+)/i)?.[1];
+    let location = (loc ?? "")
+      .replace(/[?.!]+$/g, "")
+      .replace(/\b(today|right now|currently|please)\b/gi, "")
+      .trim();
+    if (!location || /^(here|there|outside|home)$/i.test(location)) {
+      location = (defaults?.homeCity ?? "").trim();
+    }
+    tools.push({
+      name: "get_weather",
+      args: { location: location.slice(0, 80) },
+    });
+  }
+
+  if (
+    /\b(create|make|build|new|draft|add)\b.{0,60}\bforms?\b/i.test(m) ||
+    /\bforms?\b.{0,40}\b(create|make|build|new|draft)\b/i.test(m) ||
+    /\b(contact|intake|lead|sign[- ]?up|client|feedback|survey)\s+form\b/i.test(m)
+  ) {
+    const named = m.match(
+      /\bform\s+(?:called|named|titled|for)\s+["']?([^"'?.!]+)["']?/i
+    );
+    const kind = m.match(
+      /\b(contact|intake|lead|sign[- ]?up|client|feedback|survey)\s+form\b/i
+    );
+    const name = (
+      named?.[1]?.trim() ||
+      (kind ? `${kind[1].replace(/-/g, " ")} form` : "Intake form")
+    ).slice(0, 80);
+    const fieldsHint = m.match(/\bfields?\s*[:\-]\s*(.+)$/i)?.[1];
+    const fields =
+      fieldsHint?.trim() ||
+      (kind && /contact/i.test(kind[1])
+        ? "Name, Email, Phone"
+        : "Name, Email, Phone, Message");
+    tools.push({
+      name: "create_form",
+      args: { name, fields: fields.slice(0, 200) },
+    });
+  }
+
+  return tools;
+}
+
+export function spokenToolResult(result: LunaToolResult): string {
+  if (typeof result.summary === "string" && result.summary.trim()) {
+    return result.summary.trim();
+  }
+  if (typeof result.error === "string" && result.error.trim()) {
+    return result.error.trim();
+  }
+  return "";
+}
 
 export async function executeLunaTool(
   supabase: LunaSupabaseClient,

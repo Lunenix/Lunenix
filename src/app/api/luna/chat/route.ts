@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Content, FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
+import { isIanaTimeZone } from "@/lib/luna";
 import {
   executeLunaTool,
   formatLunaContextForPrompt,
   getLunaWorkspaceContext,
+  inferLunaForcedTools,
+  spokenToolResult,
+  type LunaToolResult,
 } from "@/lib/luna-server";
 
 /**
@@ -23,11 +27,14 @@ const MAX_TOOL_ROUNDS = 4;
 
 const BASE_SYSTEM_PROMPT =
   "You are Luna, a warm and professional AI executive assistant for a business CRM. " +
+  "You MUST use tools to act. Never pretend you created a form, fetched weather, sent mail, or changed CRM data without a tool result. " +
   "Default replies are 1 to 3 short spoken sentences. Do not use markdown, bullets, headings, " +
   "code, asterisks, or URLs. Never spell out IDs unless asked. " +
   "When the user asks for a daily briefing, rundown, or what's on their plate, call get_daily_briefing " +
   "and then speak 4 to 8 short sentences covering open tasks, pending contracts, unpaid invoices, and active projects. " +
-  "When they ask about weather, call get_weather with the city they named, or ask which city if they did not. " +
+  "When they ask about weather, call get_weather. Use their home city from context if they did not name another city. " +
+  "Use their timezone and local time from context for greetings and deadlines. " +
+  "When they ask to create or make a form, call create_form. " +
   "You can create contacts, tasks, forms, draft contracts, send emails, and create or toggle workflows using tools. " +
   "You only know data for the caller's current workspace. " +
   "Never reveal API keys, database schemas, SQL, RLS policies, auth tokens, or payment details. " +
@@ -111,7 +118,8 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
   },
   {
     name: "get_weather",
-    description: "Get current weather for a city or place name.",
+    description:
+      "Get current weather for a city. If the user did not name a city, pass their home city from context.",
     parametersJsonSchema: {
       type: "object",
       properties: {
@@ -243,11 +251,62 @@ function ruleBasedReply(message: string): string {
   return "Understood! I'm processing your request and will take care of that right away.";
 }
 
+function collectFunctionCalls(response: {
+  functionCalls?: Array<{
+    id?: string;
+    name?: string;
+    args?: Record<string, unknown>;
+  }>;
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        functionCall?: {
+          id?: string;
+          name?: string;
+          args?: Record<string, unknown>;
+        };
+      }>;
+    };
+  }>;
+}): Array<{ id?: string; name?: string; args?: Record<string, unknown> }> {
+  if (response.functionCalls?.length) return response.functionCalls;
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  const calls: Array<{
+    id?: string;
+    name?: string;
+    args?: Record<string, unknown>;
+  }> = [];
+  for (const part of parts) {
+    if (part.functionCall?.name) calls.push(part.functionCall);
+  }
+  return calls;
+}
+
+function asToolArgs(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return {};
+}
+
 async function geminiReply(params: {
   message: string;
   workspaceId: string;
   userId: string;
   supabase: ReturnType<typeof createClient>;
+  priorToolNotes: string[];
+  completedTools: Set<string>;
+  timezoneOverride?: string | null;
 }): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
@@ -255,12 +314,19 @@ async function geminiReply(params: {
   const ctx = await getLunaWorkspaceContext(
     params.supabase,
     params.workspaceId,
-    params.userId
+    params.userId,
+    params.timezoneOverride
   );
   const systemInstruction = [
     BASE_SYSTEM_PROMPT,
     formatLunaContextForPrompt(ctx),
-  ].join("\n\n");
+    params.priorToolNotes.length
+      ? "Tools already ran this turn. Speak these results. Do not call the same tools again:\n" +
+        params.priorToolNotes.join("\n")
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const { GoogleGenAI, createPartFromFunctionResponse } = await import(
     "@google/genai"
@@ -277,8 +343,9 @@ async function geminiReply(params: {
 
   const config = {
     systemInstruction,
-    temperature: 0.4,
-    maxOutputTokens: wantsBriefing ? 700 : 320,
+    temperature: 0.3,
+    maxOutputTokens: wantsBriefing ? 2048 : 1024,
+    thinkingConfig: { thinkingBudget: 0 },
     automaticFunctionCalling: { disable: true },
     tools: [{ functionDeclarations: LUNA_TOOLS }],
   };
@@ -289,9 +356,11 @@ async function geminiReply(params: {
     config,
   });
 
+  const ranThisTurn = new Set(params.completedTools);
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const calls = response.functionCalls;
-    if (!calls?.length) break;
+    const calls = collectFunctionCalls(response);
+    if (!calls.length) break;
 
     const modelContent = response.candidates?.[0]?.content;
     if (modelContent?.parts?.length) {
@@ -312,17 +381,31 @@ async function geminiReply(params: {
     const toolParts = [];
     for (const call of calls) {
       const toolName = call.name ?? "";
-      const toolArgs =
-        call.args && typeof call.args === "object" ? call.args : {};
-      const result = await executeLunaTool(
-        params.supabase,
-        params.workspaceId,
-        params.userId,
-        toolName,
-        toolArgs
-      );
+      let result: LunaToolResult;
+      if (ranThisTurn.has(toolName)) {
+        result = {
+          ok: true,
+          summary: params.priorToolNotes.join(" "),
+          already_ran: true,
+        };
+      } else {
+        result = await executeLunaTool(
+          params.supabase,
+          params.workspaceId,
+          params.userId,
+          toolName,
+          asToolArgs(call.args)
+        );
+        ranThisTurn.add(toolName);
+        const spoken = spokenToolResult(result);
+        if (spoken) params.priorToolNotes.push(spoken);
+      }
       toolParts.push(
-        createPartFromFunctionResponse(call.id ?? "", toolName, result)
+        createPartFromFunctionResponse(
+          call.id || toolName || "tool",
+          toolName,
+          result
+        )
       );
     }
     contents.push({ role: "user", parts: toolParts });
@@ -352,11 +435,18 @@ export async function POST(req: NextRequest) {
 
   let message = "";
   let workspaceId = "";
+  let clientTimezone: string | null = null;
   try {
     const body = await req.json();
     message = typeof body?.message === "string" ? body.message : "";
     workspaceId =
       typeof body?.workspaceId === "string" ? body.workspaceId.trim() : "";
+    if (
+      typeof body?.timezone === "string" &&
+      isIanaTimeZone(body.timezone.trim())
+    ) {
+      clientTimezone = body.timezone.trim();
+    }
   } catch {
     /* ignore malformed body */
   }
@@ -399,6 +489,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const { data: localeRow } = await supabase
+    .from("workspace_ai_settings")
+    .select("home_city, timezone")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  const homeCity =
+    typeof localeRow?.home_city === "string" && localeRow.home_city.trim()
+      ? localeRow.home_city.trim()
+      : null;
+  const timezoneOverride =
+    (typeof localeRow?.timezone === "string" &&
+    isIanaTimeZone(localeRow.timezone)
+      ? localeRow.timezone
+      : null) || clientTimezone;
+
+  const priorToolNotes: string[] = [];
+  const completedTools = new Set<string>();
+  const forced = inferLunaForcedTools(message, { homeCity });
+  for (const tool of forced) {
+    const result = await executeLunaTool(
+      supabase,
+      workspaceId,
+      user.id,
+      tool.name,
+      tool.args
+    );
+    const spoken = spokenToolResult(result);
+    if (spoken) priorToolNotes.push(spoken);
+    if (result.ok === true) completedTools.add(tool.name);
+  }
+
   let llmReply: string | null = null;
   try {
     llmReply = await geminiReply({
@@ -406,11 +527,23 @@ export async function POST(req: NextRequest) {
       workspaceId,
       userId: user.id,
       supabase,
+      priorToolNotes,
+      completedTools,
+      timezoneOverride,
     });
-  } catch {
+  } catch (err) {
+    console.error(
+      "Luna Gemini error:",
+      err instanceof Error ? err.message : err
+    );
     llmReply = null;
   }
 
-  const reply = llmReply ?? ruleBasedReply(message);
+  const reply =
+    llmReply ||
+    (priorToolNotes.length ? priorToolNotes.join(" ") : null) ||
+    (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY
+      ? "I can't think right now — my Gemini key is missing on the server."
+      : ruleBasedReply(message));
   return NextResponse.json({ reply }, { status: 200 });
 }

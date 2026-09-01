@@ -20,10 +20,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/lib/toast";
-import { VOICE_OPTIONS, ensureVoicesLoaded, pickFemaleVoice } from "@/lib/luna";
+import {
+  VOICE_OPTIONS,
+  LUNA_TIMEZONES,
+  ensureVoicesLoaded,
+  pickFemaleVoice,
+} from "@/lib/luna";
 import type { WorkspaceAISettings } from "@/types/database";
 import { LunaAvatar } from "./LunaAvatar";
-import { Loader2, Volume2 } from "lucide-react";
+import { Loader2, Volume2, MapPin } from "lucide-react";
 
 interface LunaSettingsModalProps {
   open: boolean;
@@ -45,6 +50,9 @@ export function LunaSettingsModal({
 }: LunaSettingsModalProps) {
   const [agentName, setAgentName] = useState("Luna");
   const [voiceId, setVoiceId] = useState("ava");
+  const [homeCity, setHomeCity] = useState("");
+  const [timezone, setTimezone] = useState("");
+  const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
@@ -53,6 +61,13 @@ export function LunaSettingsModal({
     if (open && settings) {
       setAgentName(settings.agent_name || "Luna");
       setVoiceId(settings.voice_id || "ava");
+      setHomeCity(settings.home_city || "");
+      setTimezone(
+        settings.timezone ||
+          (typeof Intl !== "undefined"
+            ? Intl.DateTimeFormat().resolvedOptions().timeZone
+            : "")
+      );
     }
   }, [open, settings]);
 
@@ -75,6 +90,50 @@ export function LunaSettingsModal({
     synth.speak(utterance);
   };
 
+  const detectFromDevice = () => {
+    const tz =
+      typeof Intl !== "undefined"
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : "";
+    if (tz) setTimezone(tz);
+    if (!navigator.geolocation) {
+      toast("Location isn't available in this browser. Time zone was filled.", "info");
+      return;
+    }
+    setDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(
+            `/api/geo/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Lookup failed");
+          if (typeof data.city === "string") setHomeCity(data.city);
+          if (typeof data.timezone === "string" && data.timezone) {
+            setTimezone(data.timezone);
+          }
+          toast("City and time zone filled from this device.", "success");
+        } catch (e) {
+          toast(
+            e instanceof Error ? e.message : "Could not detect city.",
+            "error"
+          );
+        } finally {
+          setDetecting(false);
+        }
+      },
+      () => {
+        setDetecting(false);
+        toast(
+          "Location permission denied. Time zone was still filled from this device.",
+          "info"
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
+  };
+
   const handleSave = async () => {
     if (!agentName.trim()) {
       toast("Agent name is required", "error");
@@ -90,6 +149,8 @@ export function LunaSettingsModal({
           agent_name: agentName.trim(),
           avatar_id: "luna",
           voice_id: voiceId,
+          home_city: homeCity.trim(),
+          timezone: timezone.trim(),
         }),
       });
       if (!res.ok) {
@@ -116,7 +177,8 @@ export function LunaSettingsModal({
         <DialogHeader>
           <DialogTitle>Customize Your Executive Assistant</DialogTitle>
           <DialogDescription>
-            Personalize your AI assistant&apos;s name, avatar, and voice.
+            Personalize your AI assistant&apos;s name, voice, home city, and time
+            zone.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,6 +251,56 @@ export function LunaSettingsModal({
               Click the speaker icon to preview the selected voice.
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="home-city">Home city</Label>
+            <Input
+              id="home-city"
+              value={homeCity}
+              onChange={(e) => setHomeCity(e.target.value)}
+              placeholder="Austin, Texas"
+            />
+            <p className="text-xs text-muted-foreground">
+              Luna uses this for weather and &quot;here&quot; unless you name
+              another city.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="timezone">Time zone</Label>
+            <Select value={timezone || undefined} onValueChange={setTimezone}>
+              <SelectTrigger id="timezone">
+                <SelectValue placeholder="Select a time zone" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from(
+                  new Set([
+                    timezone,
+                    ...LUNA_TIMEZONES,
+                  ].filter(Boolean))
+                ).map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz.replace(/_/g, " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={detectFromDevice}
+            disabled={detecting}
+          >
+            {detecting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <MapPin className="mr-2 h-4 w-4" />
+            )}
+            Use my current location
+          </Button>
         </div>
 
         <DialogFooter>

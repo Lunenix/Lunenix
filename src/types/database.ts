@@ -30,6 +30,8 @@ export interface WorkspaceAISettings {
   avatar_id: string;
   avatar_url: string | null;
   voice_id: string;
+  home_city: string | null;
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isIanaTimeZone } from "@/lib/luna";
 
-const DEFAULT_SETTINGS = {
+  const DEFAULT_SETTINGS = {
   agent_name: "Luna",
   avatar_id: "avatar_1",
   avatar_url: null as string | null,
   voice_id: "ava",
+  home_city: null as string | null,
+  timezone: null as string | null,
 };
 
 /**
@@ -68,6 +71,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const homeCityRaw =
+    typeof body.home_city === "string" ? body.home_city.trim().slice(0, 80) : "";
+  const tzRaw =
+    typeof body.timezone === "string" ? body.timezone.trim() : "";
+
   const payload = {
     workspace_id: workspaceId,
     agent_name: (body.agent_name ?? DEFAULT_SETTINGS.agent_name).trim() ||
@@ -75,6 +83,8 @@ export async function POST(request: NextRequest) {
     avatar_id: body.avatar_id ?? DEFAULT_SETTINGS.avatar_id,
     voice_id: body.voice_id ?? DEFAULT_SETTINGS.voice_id,
     avatar_url: body.avatar_url ?? null,
+    home_city: homeCityRaw || null,
+    timezone: tzRaw && isIanaTimeZone(tzRaw) ? tzRaw : null,
     updated_at: new Date().toISOString(),
   };
 

@@ -118,6 +118,9 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const pauseWakeRef = useRef(false);
   const wakeWantedRef = useRef(true);
   const handleSubmitRef = useRef<(text: string) => Promise<void>>(async () => {});
+  const liveWantedRef = useRef(true);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectSimliRef = useRef<() => Promise<boolean>>(async () => false);
 
   const agentName = settings?.agent_name || "Luna";
 
@@ -163,6 +166,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
   /* ----------------------- Simli teardown -------------------------- */
   const teardownSimli = useCallback(() => {
+    liveWantedRef.current = false;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     try {
       void simliRef.current?.stop();
     } catch {
@@ -223,11 +231,18 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       client.on("silent", () =>
         setStatus((prev) => (prev === "speaking" ? "idle" : prev))
       );
-      // STOP/ENDFRAME can fire after a clip without ending the session.
-      // Do not swap back to the still portrait — that flash looked like a
-      // looping cycle with a black line across her face.
       client.on("stop", () => {
-        /* keep video up until the user hangs up or an error tears down */
+        streamConnectedRef.current = false;
+        setStreamConnected(false);
+        simliRef.current = null;
+        connectPromiseRef.current = null;
+        if (!liveWantedRef.current) return;
+        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = setTimeout(() => {
+          if (liveWantedRef.current && !streamConnectedRef.current) {
+            void connectSimliRef.current();
+          }
+        }, 800);
       });
       client.on("error", (detail: string) => {
         toast(`Live avatar error: ${String(detail).slice(0, 120)}`, "error");
@@ -264,7 +279,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           : "Could not start live avatar.",
         "error"
       );
-      teardownSimli();
+      simliRef.current = null;
+      connectPromiseRef.current = null;
+      streamConnectedRef.current = false;
+      setStreamConnected(false);
       return false;
     } finally {
       setConnecting(false);
@@ -272,6 +290,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   }, [teardownSimli]);
 
   const ensureLive = useCallback(async () => {
+    liveWantedRef.current = true;
     if (simliRef.current && streamConnectedRef.current) return true;
     if (!connectPromiseRef.current) {
       connectPromiseRef.current = connectSimli().finally(() => {
@@ -281,8 +300,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     return connectPromiseRef.current;
   }, [connectSimli]);
 
+  connectSimliRef.current = connectSimli;
+
   // Go live as soon as the command center mounts — no start button.
   useEffect(() => {
+    liveWantedRef.current = true;
     void ensureLive();
   }, [ensureLive]);
 
@@ -405,7 +427,11 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         const res = await fetch("/api/luna/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: forGemini, workspaceId }),
+          body: JSON.stringify({
+            message: forGemini,
+            workspaceId,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
         });
         if (res.status === 401) {
           toast("Sign in to talk to Luna.", "error");
