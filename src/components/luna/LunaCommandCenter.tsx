@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -12,10 +19,9 @@ import {
   stripLunaWakePhrase,
   LUNA_AVATAR_URL,
 } from "@/lib/luna";
-import { cn } from "@/lib/utils";
 import type { WorkspaceAISettings } from "@/types/database";
 import { LunaSettingsModal } from "./LunaSettingsModal";
-import { Mic, MicOff, Send, Settings } from "lucide-react";
+import { Loader2, Mic, MicOff, Send, Settings, Video } from "lucide-react";
 import type { SimliClient } from "simli-client/dist/client";
 
 /* -------------------------------------------------------------------------- */
@@ -66,7 +72,7 @@ async function playMp3(blob: Blob) {
   }
 }
 
-type Status = "idle" | "listening" | "thinking" | "speaking";
+type Status = "idle" | "connecting" | "listening" | "thinking" | "speaking";
 
 interface LunaCommandCenterProps {
   workspaceId: string;
@@ -80,6 +86,9 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [live, setLive] = useState(false);
+  const [chatLog, setChatLog] = useState<
+    { role: "user" | "luna"; text: string }[]
+  >([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -156,6 +165,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     if (!wantedRef.current) return false;
 
     const run = (async () => {
+      setStatus((prev) => (prev === "idle" ? "connecting" : prev));
       // Video must exist and stay unoccluded — Simli only emits "start"
       // after requestVideoFrameCallback, which never fires under an overlay.
       for (let i = 0; i < 20 && (!videoRef.current || !audioRef.current); i++) {
@@ -219,6 +229,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         started = true;
         liveRef.current = true;
         setLive(true);
+        setStatus((prev) => (prev === "connecting" ? "idle" : prev));
         bumpPlay();
         return true;
       } catch {
@@ -394,6 +405,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       const woke = isLunaWakePhrase(raw);
       const command = woke ? stripLunaWakePhrase(raw) : raw;
 
+      setChatLog((prev) => [...prev, { role: "user", text: raw }]);
       setStatus("thinking");
 
       const forGemini =
@@ -422,7 +434,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         pendingActionRef.current =
           typeof data?.pendingAction === "string" ? data.pendingAction : null;
         const reply: string =
-          data?.reply || "Understood! I'll take care of that right away.";
+          (typeof data?.text === "string" && data.text.trim()) ||
+          (typeof data?.reply === "string" && data.reply.trim()) ||
+          "Understood! I'll take care of that right away.";
+        setChatLog((prev) => [...prev, { role: "luna", text: reply }]);
         await speakText(reply);
       } catch {
         await speakText("Sorry, I ran into a problem processing that request.");
@@ -547,101 +562,125 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const statusLabel =
     status === "idle"
       ? "Idle"
-      : status === "listening"
-        ? "Listening..."
-        : status === "thinking"
-          ? "Thinking..."
-          : "Speaking...";
+      : status === "connecting"
+        ? "Connecting"
+        : status === "listening"
+          ? "Listening"
+          : status === "thinking"
+            ? "Thinking"
+            : "Speaking";
+
+  const statusBadgeVariant =
+    status === "speaking" || status === "listening"
+      ? "default"
+      : status === "thinking" || status === "connecting"
+        ? "secondary"
+        : "outline";
+
+  const busy = status === "thinking";
 
   return (
-    <div className="relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/60 shadow-2xl backdrop-blur-xl">
-      <div className="absolute left-4 top-4 z-20">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-            status === "idle" && "bg-white/10 text-white/60",
-            status === "listening" && "animate-pulse bg-blue-500/30 text-blue-300",
-            status === "thinking" && "animate-pulse bg-amber-500/30 text-amber-300",
-            status === "speaking" && "animate-pulse bg-green-500/30 text-green-300"
-          )}
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {statusLabel}
-        </span>
-      </div>
-
-      <div className="absolute right-3 top-3 z-20">
+    <Card className="border-border/40 bg-background/95 backdrop-blur">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <div className="flex items-center space-x-3">
+          <CardTitle className="text-xl font-bold">Luna Command Center</CardTitle>
+          <Badge variant={statusBadgeVariant} className="font-mono text-xs">
+            {status === "connecting" && (
+              <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+            )}
+            {statusLabel}
+          </Badge>
+        </div>
         <Button
           variant="ghost"
           size="icon"
-          className="text-white/60 hover:bg-white/10 hover:text-white"
+          className="h-8 w-8"
           onClick={() => setSettingsOpen(true)}
           aria-label="Customize assistant"
         >
-          <Settings className="h-5 w-5" />
+          <Settings className="h-4 w-4 text-muted-foreground" />
         </Button>
-      </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-border/20 bg-black/90">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            poster={LUNA_AVATAR_URL}
+            className="h-full w-full object-cover"
+          />
+          <audio ref={audioRef} autoPlay playsInline className="sr-only" />
 
-      <div className="relative mx-auto w-full max-w-[320px] aspect-square overflow-hidden rounded-xl bg-gradient-to-b from-indigo-950 to-black">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          poster={LUNA_AVATAR_URL}
-          className="absolute inset-0 z-10 h-full w-full object-cover"
-        />
-        <audio ref={audioRef} autoPlay playsInline className="sr-only" />
-        {!live && (
-          <span className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-white/70">
-            Connecting…
-          </span>
+          {(status === "connecting" || !live) && (
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1.5 font-mono text-[10px] text-white/80">
+              <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+              Establishing Simli WebRTC session...
+            </div>
+          )}
+
+          {live && (
+            <div className="absolute right-3 top-3 flex items-center space-x-1.5 rounded bg-black/60 px-2 py-1 font-mono text-[10px] text-white/80">
+              <Video className="h-3 w-3 text-emerald-400" />
+              <span>Simli Avatar Live</span>
+            </div>
+          )}
+        </div>
+
+        {chatLog.length > 0 && (
+          <div className="max-h-32 space-y-2 overflow-y-auto rounded-md bg-muted/40 p-3 text-xs">
+            {chatLog.slice(-3).map((entry, idx) => (
+              <div key={`${entry.role}-${idx}`} className="flex space-x-2">
+                <span className="font-semibold capitalize text-muted-foreground">
+                  {entry.role}:
+                </span>
+                <span className="text-foreground">{entry.text}</span>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
 
-      <div className="flex items-center gap-2 bg-black/40 p-4">
-        <Button
-          type="button"
-          size="icon"
-          onClick={toggleMic}
-          aria-label={isRecording ? "Stop listening" : "Start voice input"}
-          className={cn(
-            isRecording
-              ? "bg-red-600 text-white hover:bg-red-500"
-              : "bg-white/10 text-white hover:bg-white/20"
-          )}
-        >
-          {isRecording ? (
-            <MicOff className="h-4 w-4" />
-          ) : (
-            <Mic className="h-4 w-4" />
-          )}
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            type="button"
+            variant={isRecording ? "destructive" : "outline"}
+            size="icon"
+            onClick={toggleMic}
+            aria-label={isRecording ? "Stop listening" : "Start voice input"}
+          >
+            {isRecording ? (
+              <MicOff className="h-4 w-4" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+          </Button>
 
-        <Input
-          value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSubmit(instruction);
-          }}
-          placeholder={`Hey ${agentName}...`}
-          className="flex-1 border-white/10 bg-white/5 text-white placeholder:text-white/40"
-        />
+          <Input
+            placeholder={`Type or speak to ${agentName}...`}
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !busy) void handleSubmit(instruction);
+            }}
+            disabled={busy}
+          />
 
-        <Button
-          type="button"
-          size="icon"
-          onClick={() => handleSubmit(instruction)}
-          aria-label="Send"
-          className="bg-indigo-600 text-white hover:bg-indigo-500"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      </div>
-      <p className="px-4 pb-3 text-center text-[11px] text-white/40">
-        Type or speak to Luna. Real-time avatar streaming connects automatically
-        upon interaction.
-      </p>
+          <Button
+            type="button"
+            onClick={() => void handleSubmit(instruction)}
+            disabled={busy}
+            aria-label="Send"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <p className="text-center text-[11px] text-muted-foreground">
+          Type or speak to Luna. Real-time avatar streaming connects
+          automatically upon interaction.
+        </p>
+      </CardContent>
 
       <LunaSettingsModal
         open={settingsOpen}
@@ -651,6 +690,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         isAdmin={isAdmin}
         onSaved={(s) => setSettings(s)}
       />
-    </div>
+    </Card>
   );
 }
