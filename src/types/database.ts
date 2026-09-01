@@ -66,6 +66,15 @@ export interface ActivityLog {
   created_at: string;
 }
 
+export interface KnowledgeBaseEntry {
+  id: string;
+  workspace_id: string;
+  title: string;
+  content: string;
+  category: string;
+  created_at: string;
+}
+
 /**
  * A workspace joined with the current user's membership row. Useful for the
  * workspace switcher, which needs both the workspace details and the role.

@@ -459,6 +459,7 @@ export async function getWorkspaceContext(
     { data: invoices },
     { data: projects },
     { data: activityLogs },
+    { data: knowledgeBase },
   ] = await Promise.all([
     supabase
       .from("workspace_ai_settings")
@@ -495,6 +496,12 @@ export async function getWorkspaceContext(
       .eq("workspace_id", workspace_id)
       .order("created_at", { ascending: false })
       .limit(12),
+    supabase
+      .from("knowledge_base")
+      .select("title, category, content")
+      .eq("workspace_id", workspace_id)
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   const rawPayload: WorkspaceContextPayload = {
@@ -552,6 +559,19 @@ export async function getWorkspaceContext(
         description: String(row.description).slice(0, 240),
         created_at:
           typeof row.created_at === "string" ? row.created_at : "",
+      })),
+    knowledgeBase: (knowledgeBase ?? [])
+      .filter(
+        (row: Record<string, unknown>) =>
+          typeof row.title === "string" && typeof row.content === "string"
+      )
+      .map((row: Record<string, unknown>) => ({
+        title: String(row.title).slice(0, 120),
+        category:
+          typeof row.category === "string" && row.category.trim()
+            ? row.category.trim().slice(0, 40)
+            : "general",
+        content: String(row.content).slice(0, 600),
       })),
     summary: {
       totalContacts: (contacts ?? []).length,
