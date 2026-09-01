@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Content, FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
-import { isIanaTimeZone } from "@/lib/luna";
+import { isIanaTimeZone, formatContextForGemini } from "@/lib/luna";
 import {
   executeLunaTool,
   formatLunaContextForPrompt,
   getLunaWorkspaceContext,
+  getWorkspaceContext,
   ASK_FORM_NAME_REPLY,
   ASK_CONTACT_NAME_REPLY,
   ASK_PROJECT_NAME_REPLY,
@@ -437,12 +438,24 @@ async function geminiReply(params: {
     params.userId,
     params.timezoneOverride
   );
+  let metricsBlock = "";
+  try {
+    const snapshot = await getWorkspaceContext(
+      params.supabase,
+      params.workspaceId,
+      params.userId
+    );
+    metricsBlock = formatContextForGemini(snapshot);
+  } catch {
+    /* membership already enforced above; skip compact snapshot on failure */
+  }
   const needsFormName =
     isFormCreateRequest(params.message) &&
     !extractFormNameFromMessage(params.message);
 
   const systemInstruction = [
     BASE_SYSTEM_PROMPT,
+    metricsBlock,
     formatLunaContextForPrompt(ctx),
     needsFormName
       ? "The user asked to create a form but did not give a name. Do not call create_form. Ask what they want to name it, then wait."

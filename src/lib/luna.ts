@@ -121,6 +121,112 @@ export function sanitizeLunaContext(
   return out;
 }
 
+export interface LunaContextSettings {
+  home_city: string | null;
+  timezone: string | null;
+  custom_instructions: string | null;
+}
+
+export interface SanitizedContact {
+  id: string;
+  name: string;
+  email: string | null;
+  company: string | null;
+  status: string | null;
+}
+
+export interface SanitizedTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string | null;
+  due_date: string | null;
+}
+
+export interface SanitizedInvoice {
+  id: string;
+  invoice_number: string;
+  amount: number;
+  status: string;
+  due_date: string | null;
+}
+
+export interface SanitizedProject {
+  id: string;
+  name: string;
+  status: string;
+}
+
+export interface WorkspaceContextPayload {
+  workspaceId: string;
+  settings: LunaContextSettings;
+  contacts: SanitizedContact[];
+  tasks: SanitizedTask[];
+  invoices: SanitizedInvoice[];
+  projects: SanitizedProject[];
+  summary: {
+    totalContacts: number;
+    openTasksCount: number;
+    activeProjectsCount: number;
+    outstandingInvoicesCount: number;
+  };
+}
+
+/**
+ * Recursively strips sensitive properties (tokens, keys, hashes, secrets)
+ * so they never land in Luna's Gemini context payload.
+ */
+export function sanitizePayload<T>(obj: T): T {
+  if (obj === null || typeof obj !== "object") return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizePayload(item)) as unknown as T;
+  }
+
+  const sensitiveKeysPattern =
+    /(token|key|secret|password|hash|card|stripe|ssn|auth|jwt)/i;
+  const sanitized = { ...obj } as Record<string, unknown>;
+
+  for (const key of Object.keys(sanitized)) {
+    if (sensitiveKeysPattern.test(key)) {
+      delete sanitized[key];
+    } else if (typeof sanitized[key] === "object" && sanitized[key] !== null) {
+      sanitized[key] = sanitizePayload(sanitized[key]);
+    }
+  }
+
+  return sanitized as T;
+}
+
+/**
+ * Formats the sanitized workspace snapshot for Gemini. Operational fields only.
+ */
+export function formatContextForGemini(context: WorkspaceContextPayload): string {
+  return `
+[WORKSPACE CONTEXT]
+Location/TZ: ${context.settings.home_city ?? "Not specified"} (${context.settings.timezone ?? "UTC"})
+${context.settings.custom_instructions ? `Instructions: ${context.settings.custom_instructions}` : ""}
+
+[METRICS]
+Open Tasks: ${context.summary.openTasksCount}
+Active Projects: ${context.summary.activeProjectsCount}
+Outstanding Invoices: ${context.summary.outstandingInvoicesCount}
+Recent Contacts Loaded: ${context.summary.totalContacts}
+
+[ACTIVE PROJECTS]
+${context.projects.map((p) => `- ${p.name} (Status: ${p.status})`).join("\n") || "None"}
+
+[PENDING TASKS]
+${context.tasks.map((t) => `- [${t.priority ?? "Normal"}] ${t.title} (Status: ${t.status}, Due: ${t.due_date ?? "N/A"})`).join("\n") || "None"}
+
+[OUTSTANDING INVOICES]
+${context.invoices.map((i) => `- Invoice #${i.invoice_number}: $${i.amount} (${i.status}, Due: ${i.due_date ?? "N/A"})`).join("\n") || "None"}
+
+[RECENT CONTACTS]
+${context.contacts.map((c) => `- ${c.name} (${c.company ?? "No company"}, Email: ${c.email ?? "N/A"})`).join("\n") || "None"}
+`.trim();
+}
+
 export const LUNA_WAKE_RE = /^(hey|hello|hi)\s+luna\b/i;
 
 export function isLunaWakePhrase(text: string): boolean {

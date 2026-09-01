@@ -1,6 +1,12 @@
 import "server-only";
 
-import { sanitizeLunaContext, formatTimeInZone, isIanaTimeZone } from "@/lib/luna";
+import {
+  sanitizeLunaContext,
+  sanitizePayload,
+  formatTimeInZone,
+  isIanaTimeZone,
+  type WorkspaceContextPayload,
+} from "@/lib/luna";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
@@ -403,6 +409,110 @@ export async function getLunaWorkspaceContext(
     timezone,
     localTime: timezone ? formatTimeInZone(timezone) : null,
   };
+}
+
+/**
+ * Compact, sanitized CRM snapshot for Gemini. Membership is required.
+ * Uses real table columns (contacts have first/last name, invoices use total).
+ */
+export async function getWorkspaceContext(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  userId: string
+): Promise<WorkspaceContextPayload> {
+  const member = await assertLunaWorkspaceMember(supabase, workspaceId, userId);
+  if (!member) {
+    throw new Error("Unauthorized: not a member of this workspace");
+  }
+  const { workspace_id } = member;
+
+  const [
+    { data: settings },
+    { data: contacts },
+    { data: tasks },
+    { data: invoices },
+    { data: projects },
+  ] = await Promise.all([
+    supabase
+      .from("workspace_ai_settings")
+      .select("home_city, timezone")
+      .eq("workspace_id", workspace_id)
+      .maybeSingle(),
+    supabase
+      .from("contacts")
+      .select("id, first_name, last_name, organization_name, email, type")
+      .eq("workspace_id", workspace_id)
+      .order("updated_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("tasks")
+      .select("id, title, status, priority, due_date")
+      .eq("workspace_id", workspace_id)
+      .neq("status", "done")
+      .limit(20),
+    supabase
+      .from("invoices")
+      .select("id, invoice_number, total, status, due_date")
+      .eq("workspace_id", workspace_id)
+      .in("status", ["sent", "overdue"])
+      .limit(20),
+    supabase
+      .from("projects")
+      .select("id, name, status")
+      .eq("workspace_id", workspace_id)
+      .eq("status", "active")
+      .limit(20),
+  ]);
+
+  const rawPayload: WorkspaceContextPayload = {
+    workspaceId: workspace_id,
+    settings: {
+      home_city: settings?.home_city ?? "Not specified",
+      timezone: settings?.timezone ?? "UTC",
+      custom_instructions: null,
+    },
+    contacts: (contacts ?? []).map((c: Record<string, unknown>) => {
+      const name =
+        [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
+        (typeof c.organization_name === "string" ? c.organization_name : "") ||
+        (typeof c.email === "string" ? c.email : "Unnamed contact");
+      return {
+        id: String(c.id),
+        name,
+        email: typeof c.email === "string" ? c.email : null,
+        company:
+          typeof c.organization_name === "string" ? c.organization_name : null,
+        status: typeof c.type === "string" ? c.type : null,
+      };
+    }),
+    tasks: (tasks ?? []).map((t: Record<string, unknown>) => ({
+      id: String(t.id),
+      title: String(t.title ?? ""),
+      status: String(t.status ?? "todo"),
+      priority: typeof t.priority === "string" ? t.priority : null,
+      due_date: typeof t.due_date === "string" ? t.due_date : null,
+    })),
+    invoices: (invoices ?? []).map((i: Record<string, unknown>) => ({
+      id: String(i.id),
+      invoice_number: String(i.invoice_number ?? ""),
+      amount: Number(i.total ?? 0),
+      status: String(i.status ?? ""),
+      due_date: typeof i.due_date === "string" ? i.due_date : null,
+    })),
+    projects: (projects ?? []).map((p: Record<string, unknown>) => ({
+      id: String(p.id),
+      name: String(p.name ?? ""),
+      status: String(p.status ?? ""),
+    })),
+    summary: {
+      totalContacts: (contacts ?? []).length,
+      openTasksCount: (tasks ?? []).length,
+      activeProjectsCount: (projects ?? []).length,
+      outstandingInvoicesCount: (invoices ?? []).length,
+    },
+  };
+
+  return sanitizePayload(rawPayload);
 }
 
 export function formatLunaContextForPrompt(ctx: LunaWorkspaceContext): string {
