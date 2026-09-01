@@ -4,9 +4,28 @@ import { createEditableInvoicePDF } from "@/lib/export/invoicePdf";
 import {
   contactDisplayName,
   type Contact,
-  type Invoice,
   type InvoiceLineItem,
 } from "@/types/database";
+
+type InvoicePdfRow = {
+  invoice_number: string;
+  total: number | string | null;
+  due_date: string;
+  notes: string | null;
+  payment_terms: string | null;
+  currency: string | null;
+  line_items: InvoiceLineItem[] | null;
+  contact:
+    | Pick<
+        Contact,
+        "type" | "first_name" | "last_name" | "organization_name" | "email"
+      >
+    | Pick<
+        Contact,
+        "type" | "first_name" | "last_name" | "organization_name" | "email"
+      >[]
+    | null;
+};
 
 function safeFilename(invoiceNumber: string): string {
   const base = invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 40);
@@ -56,21 +75,9 @@ export async function GET(
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 
-  const row = invoice as Pick<
-    Invoice,
-    | "invoice_number"
-    | "total"
-    | "due_date"
-    | "notes"
-    | "payment_terms"
-    | "currency"
-    | "line_items"
-  > & { contact: Contact | Contact[] | null };
-
+  const row = invoice as unknown as InvoicePdfRow;
   const contact = Array.isArray(row.contact) ? row.contact[0] : row.contact;
-  const clientName = contact
-    ? contactDisplayName(contact)
-    : "Client";
+  const clientName = contact ? contactDisplayName(contact) : "Client";
 
   const fileBuffer = await createEditableInvoicePDF({
     invoice_number: row.invoice_number,
@@ -80,7 +87,7 @@ export async function GET(
     notes: row.notes,
     payment_terms: row.payment_terms,
     currency: row.currency || "USD",
-    line_items: (row.line_items as InvoiceLineItem[] | null) ?? [],
+    line_items: row.line_items ?? [],
   });
 
   return new NextResponse(new Uint8Array(fileBuffer), {
