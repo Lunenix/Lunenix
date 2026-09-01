@@ -1703,10 +1703,23 @@ export async function executeLunaTool(
     }
 
     if (name === "send_email") {
-      let to = argString(args, "to_email");
+      let to = argStringAny(args, ["to", "to_email", "contact_email"]);
+      let contactId: string | null = null;
+      if (to && !looksLikeEmail(to)) {
+        contactId = await findContactId(supabase, workspace_id, to);
+        to = null;
+        if (contactId) {
+          const { data: namedContact } = await supabase
+            .from("contacts")
+            .select("id, email")
+            .eq("id", contactId)
+            .eq("workspace_id", workspace_id)
+            .maybeSingle();
+          to = typeof namedContact?.email === "string" ? namedContact.email : null;
+        }
+      }
       const contactRef =
         argString(args, "contact_name") ?? argString(args, "contact_email");
-      let contactId: string | null = null;
       if (!to && contactRef) {
         contactId = await findContactId(supabase, workspace_id, contactRef);
         if (contactId) {
@@ -1724,12 +1737,19 @@ export async function executeLunaTool(
       if (!to || !subject || !body) {
         return { error: "Need a recipient email or contact, plus subject and body." };
       }
+      if (!looksLikeEmail(to)) {
+        return { error: "That contact has no email on file in this workspace." };
+      }
+      const safeBody = body
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
       const result = await sendServerEmail({
         workspaceId: workspace_id,
         to,
         toName: argString(args, "to_name"),
-        subject,
-        html: `<p>${body.replace(/</g, "&lt;").replace(/\n/g, "<br/>")}</p>`,
+        subject: subject.slice(0, 500),
+        html: `<p>${safeBody.replace(/\n/g, "<br/>")}</p>`,
         contactId,
       });
       if (!result.success) {
@@ -1739,7 +1759,7 @@ export async function executeLunaTool(
         supabase,
         workspace_id,
         name,
-        `Sent email to ${to} about ${subject}.`
+        `Sent email to ${to.slice(0, 120)} about ${subject.slice(0, 80)}.`
       );
     }
 

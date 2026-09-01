@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Content, FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { isIanaTimeZone, formatContextForGemini } from "@/lib/luna";
+import { sendEmailTool } from "@/lib/luna-tools";
 import {
   executeLunaTool,
   formatLunaContextForPrompt,
@@ -326,22 +327,7 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
       required: ["name"],
     },
   },
-  {
-    name: "send_email",
-    description: "Send an email from this workspace to a contact or address.",
-    parametersJsonSchema: {
-      type: "object",
-      properties: {
-        to_email: { type: "string" },
-        to_name: { type: "string" },
-        contact_name: { type: "string" },
-        contact_email: { type: "string" },
-        subject: { type: "string" },
-        body: { type: "string", description: "Plain spoken email body" },
-      },
-      required: ["subject", "body"],
-    },
-  },
+  sendEmailTool,
   {
     name: "create_invoice",
     description:
