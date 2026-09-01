@@ -57,6 +57,8 @@ const BASE_SYSTEM_PROMPT =
   "When they ask to change, update, or edit a contact, call update_contact and identify them by name or email. " +
   "When they ask to add or create a project, call create_project. " +
   "When they ask to change a project (name, status, budget, dates, client, or description), call update_project. " +
+  "When they ask to create an invoice, call create_invoice. Identify the client by contact name or email. Use total for the amount. " +
+  "When they ask to draft an email without sending, call send_email_draft. Only call send_email when they clearly want it sent now. " +
   "Never invent a contact or project without a tool result. " +
   "You only know data for the caller's current workspace. " +
   "Never reveal API keys, database schemas, SQL, RLS policies, auth tokens, or payment details. " +
@@ -329,6 +331,56 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "create_invoice",
+    description:
+      "Create a draft invoice in this workspace for an existing contact. Do not pass a workspace id. Amount maps to total.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        invoice_number: {
+          type: "string",
+          description: "Unique invoice identifier (e.g. INV-1002)",
+        },
+        invoiceNumber: {
+          type: "string",
+          description: "Same as invoice_number",
+        },
+        amount: { type: "number", description: "Total billing amount" },
+        total: { type: "number", description: "Same as amount" },
+        due_date: { type: "string", description: "Due date YYYY-MM-DD" },
+        dueDate: { type: "string", description: "Same as due_date" },
+        contact_name: {
+          type: "string",
+          description: "Client or contact to bill",
+        },
+        contact_email: { type: "string" },
+        contact_id: { type: "string" },
+        currency: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "send_email_draft",
+    description:
+      "Save an outbound email as a draft for approval. Does not send. Use send_email to actually send.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        recipient_email: { type: "string", description: "Recipient address" },
+        recipientEmail: { type: "string", description: "Same as recipient_email" },
+        to_email: { type: "string" },
+        contact_name: { type: "string" },
+        contact_email: { type: "string" },
+        subject: { type: "string" },
+        body_text: { type: "string", description: "Plain email body" },
+        bodyText: { type: "string", description: "Same as body_text" },
+        body: { type: "string" },
+      },
+      required: ["subject"],
+    },
+  },
+  {
     name: "create_workflow",
     description:
       "Create an inactive automation workflow that creates a follow-up task on a trigger.",
@@ -416,7 +468,7 @@ function ruleBasedReply(message: string): string {
     return "I've noted that request. I'll schedule that and send calendar invites to all parties right away.";
   }
   if (m.includes("email") || m.includes("send") || m.includes("draft")) {
-    return "On it! I'll draft and send that email for you immediately.";
+    return "I'll prepare that email as a draft so you can review it before it goes out.";
   }
   if (m.includes("remind") || m.includes("reminder")) {
     return "Reminder set! I'll make sure to notify you at the right time.";

@@ -237,6 +237,20 @@ function asIsoDate(value: string | null): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 }
 
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function plusDaysIsoDate(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 async function requireOneContact(
   supabase: LunaSupabaseClient,
   workspaceId: string,
@@ -1542,6 +1556,119 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Sent email to ${to} about ${subject}.`
+      );
+    }
+
+    if (name === "create_invoice") {
+      const amount =
+        argNumber(args, "amount") ?? argNumber(args, "total");
+      if (amount === null || amount <= 0) {
+        return { error: "Need a billing amount greater than zero." };
+      }
+      const contactRef =
+        argString(args, "contact_name") ||
+        argString(args, "contact_email") ||
+        argString(args, "contact_id");
+      const found = await requireOneContact(supabase, workspace_id, contactRef);
+      if ("error" in found) {
+        return {
+          error:
+            found.error === "I could not find that contact in this workspace."
+              ? "Need an existing contact to bill. Name the client or their email."
+              : found.error,
+        };
+      }
+      const invoiceNumber =
+        argStringAny(args, ["invoice_number", "invoiceNumber"]) ||
+        `INV-${Date.now().toString(36).toUpperCase()}`;
+      const dueDate =
+        asIsoDate(argStringAny(args, ["due_date", "dueDate"])) ||
+        plusDaysIsoDate(14);
+      const issueDate = todayIsoDate();
+      const currency = argString(args, "currency") || "USD";
+      const lineItems = [
+        {
+          description: "Services",
+          quantity: 1,
+          unit_price: amount,
+          amount,
+        },
+      ];
+      const { data, error } = await supabase
+        .from("invoices")
+        .insert({
+          workspace_id,
+          contact_id: found.id,
+          invoice_number: invoiceNumber.slice(0, 40),
+          status: "draft",
+          issue_date: issueDate,
+          due_date: dueDate,
+          line_items: lineItems,
+          subtotal: amount,
+          tax_rate: 0,
+          tax_amount: 0,
+          total: amount,
+          currency,
+          notes: argString(args, "notes"),
+        })
+        .select("id, invoice_number, total, due_date")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not create invoice." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created draft invoice ${data.invoice_number} for ${found.label} totaling ${currency} ${Number(data.total).toFixed(2)}, due ${data.due_date}.`
+      );
+    }
+
+    if (name === "send_email_draft") {
+      let to =
+        argStringAny(args, ["recipient_email", "recipientEmail", "to_email"]) ||
+        null;
+      const contactRef =
+        argString(args, "contact_name") ?? argString(args, "contact_email");
+      if (!to && contactRef) {
+        const found = await requireOneContact(supabase, workspace_id, contactRef);
+        if ("error" in found) return found;
+        const { data: contact } = await supabase
+          .from("contacts")
+          .select("email")
+          .eq("id", found.id)
+          .eq("workspace_id", workspace_id)
+          .maybeSingle();
+        to = typeof contact?.email === "string" ? contact.email : null;
+      }
+      const subject = argString(args, "subject");
+      const bodyText =
+        argStringAny(args, ["body_text", "bodyText", "body"]) ?? "";
+      if (!to || !looksLikeEmail(to) || !subject || !bodyText) {
+        return {
+          error:
+            "Need a recipient email or contact with an email, plus subject and body.",
+        };
+      }
+      const { data, error } = await supabase
+        .from("email_drafts")
+        .insert({
+          workspace_id,
+          recipient_email: to,
+          subject: subject.slice(0, 500),
+          body_text: bodyText.slice(0, 20000),
+          status: "draft",
+        })
+        .select("id, recipient_email, subject")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not save that email draft." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Saved a draft email to ${data.recipient_email} about ${data.subject}. It has not been sent.`
       );
     }
 
