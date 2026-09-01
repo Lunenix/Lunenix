@@ -30,6 +30,16 @@ const nextConfig = {
         destination: "/dashboard/calendar",
         permanent: false,
       },
+      {
+        source: "/email-templates",
+        destination: "/emails/templates",
+        permanent: false,
+      },
+      {
+        source: "/email-templates/:id",
+        destination: "/emails/templates/:id",
+        permanent: false,
+      },
     ];
   },
   webpack: (config, { webpack }) => {

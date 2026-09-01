@@ -80,7 +80,7 @@ export default function EmailTemplateEditorPage({
         throw new Error("Failed to save template");
       }
 
-      router.push("/email-templates");
+      router.push("/emails/templates");
     } catch (error) {
       console.error("Error saving template:", error);
       alert("Failed to save template. Please try again.");
@@ -105,7 +105,7 @@ export default function EmailTemplateEditorPage({
         throw new Error("Failed to delete template");
       }
 
-      router.push("/email-templates");
+      router.push("/emails/templates");
     } catch (error) {
       console.error("Error deleting template:", error);
       alert("Failed to delete template. Please try again.");
@@ -123,14 +123,14 @@ export default function EmailTemplateEditorPage({
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">
-            {isNew ? "New Email Template" : "Edit Template"}
-          </h1>
-          <p className="text-muted-foreground">
-            Create reusable email templates with dynamic variables
+          <h2 className="text-xl font-semibold">
+            {isNew ? "New template" : "Edit template"}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Reusable email with dynamic variables
           </p>
         </div>
         <div className="flex gap-2">

@@ -54,7 +54,6 @@ const navItems = [
   { href: "/forms", label: "Forms", icon: ClipboardList },
   { href: "/emails", label: "Emails", icon: Mail },
   { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/email-templates", label: "Email Templates", icon: Mail },
   { href: "/automation", label: "Automation", icon: Zap },
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/settings/email", label: "Settings", icon: Settings },

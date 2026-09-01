@@ -21,7 +21,7 @@ import type { EmailLog } from "@/types/database";
 import { SendEmailDialog } from "@/components/emails/SendEmailDialog";
 import type { EmailTemplate } from "@/types/database";
 
-export default function EmailsPage() {
+export default function EmailsHistoryPage() {
   const { activeWorkspace, isLoading: workspaceLoading } = useWorkspace();
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -87,14 +87,8 @@ export default function EmailsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Email History</h1>
-          <p className="text-muted-foreground">
-            View all sent emails and their delivery status
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-end">
         <Button onClick={() => setSendDialogOpen(true)}>
           <Send className="mr-2 h-4 w-4" />
           Send Email

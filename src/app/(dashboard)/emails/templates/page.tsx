@@ -33,7 +33,6 @@ export default function EmailTemplatesPage() {
 
   const seedAndFetch = async () => {
     if (!activeWorkspace) return;
-    // Ensure the system default templates exist (idempotent).
     try {
       await fetch("/api/email-templates/seed", {
         method: "POST",
@@ -67,8 +66,7 @@ export default function EmailTemplatesPage() {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
-      t.name.toLowerCase().includes(q) ||
-      t.subject.toLowerCase().includes(q)
+      t.name.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q)
     );
   });
 
@@ -93,15 +91,9 @@ export default function EmailTemplatesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Email Templates</h1>
-          <p className="text-muted-foreground">
-            Create reusable templates for your emails
-          </p>
-        </div>
-        <Link href="/email-templates/new">
+    <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <Link href="/emails/templates/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             New Template
@@ -117,7 +109,7 @@ export default function EmailTemplatesPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Create your first email template to get started
             </p>
-            <Link href="/email-templates/new">
+            <Link href="/emails/templates/new">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 Create Template
@@ -164,7 +156,7 @@ export default function EmailTemplatesPage() {
                     <TableRow key={template.id}>
                       <TableCell className="font-medium">
                         <Link
-                          href={`/email-templates/${template.id}`}
+                          href={`/emails/templates/${template.id}`}
                           className="hover:underline"
                         >
                           {template.name}
@@ -180,7 +172,7 @@ export default function EmailTemplatesPage() {
                       </TableCell>
                       <TableCell>{formatDateTime(template.created_at)}</TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/email-templates/${template.id}`}>
+                        <Link href={`/emails/templates/${template.id}`}>
                           <Button variant="ghost" size="sm">
                             Edit
                           </Button>
