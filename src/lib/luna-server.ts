@@ -442,9 +442,11 @@ function cleanExtractedFormName(raw: string | undefined): string | null {
     /\s+(?:with|that has|that includes|and then|and add|and include|fields?:)\b[\s\S]*$/i,
     ""
   );
+  s = s.replace(/^(and|an|n)\s+/i, "");
   s = s.replace(/\s+/g, " ").trim();
   if (s.length < 1 || s.length > 80) return null;
   if (isPlaceholderFormName(s)) return null;
+  if (/^(it|this|that|the|a|an|my|your|form|forms)$/i.test(s)) return null;
   return s;
 }
 
@@ -452,21 +454,65 @@ function cleanExtractedFormName(raw: string | undefined): string | null {
 export function extractFormNameFromMessage(message: string): string | null {
   const m = message.trim();
   const patterns: RegExp[] = [
+    /\b(?:and|an|n)\s+name\s+it\s+(?:as\s+|to\s+)?["']?([^"'?\n]+)/i,
     /\bname\s+(?:the\s+form|this(?:\s+form)?|it|that(?:\s+form)?)\s+(?:as\s+|to\s+)?["']?([^"'?\n]+)/i,
     /\b(?:give\s+it|with|under)\s+(?:the\s+)?name\s+["']?([^"'?\n]+)/i,
+    /\b(?:its|it's|it is)\s+(?:name\s+is\s+|called\s+|named\s+)?["']?([A-Za-z][^"'?\n]{0,60})/i,
+    /\bname(?:'?s)?\s+is\s+["']?([^"'?\n]+)/i,
     /\b(?:call|title)\s+(?:it|this|that|the\s+form)\s+(?:as\s+)?["']?([^"'?\n]+)/i,
     /\b(?:named|called|titled|labelled|labeled)\s+(?:it\s+)?["']?([^"'?\n]+)/i,
     /\bforms?\s+(?:called|named|titled|labelled|labeled)\s+["']?([^"'?\n]+)/i,
+    /\bform(?:'s)?\s+name(?:\s+is|\s+as|:)?\s+["']?([^"'?\n]+)/i,
     /\bforms?\s*[,:]\s*["']?([A-Za-z][^"'?\n]{0,60})/i,
   ];
   for (const re of patterns) {
     const name = cleanExtractedFormName(m.match(re)?.[1]);
     if (name) return name;
   }
-  const quoted = [...m.matchAll(/["']([^"']{1,80})["']/g)]
-    .map((x) => cleanExtractedFormName(x[1]))
-    .filter((x): x is string => Boolean(x));
+  const quoted: string[] = [];
+  const quoteRe = /["']([^"']{1,80})["']/g;
+  let quoteHit: RegExpExecArray | null = quoteRe.exec(m);
+  while (quoteHit) {
+    const name = cleanExtractedFormName(quoteHit[1]);
+    if (name) quoted.push(name);
+    quoteHit = quoteRe.exec(m);
+  }
   if (quoted.length === 1) return quoted[0];
+  return null;
+}
+
+/**
+ * Only accept a form title that the user actually said.
+ * Gemini's "Intake form" default is ignored unless those words are in the message.
+ */
+export function resolveFormCreateName(
+  message: string,
+  proposed?: string | null
+): string | null {
+  const extracted = extractFormNameFromMessage(message);
+  if (extracted) return extracted;
+  const guess = (proposed ?? "").trim();
+  if (!guess || isPlaceholderFormName(guess)) return null;
+  const escaped = guess.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, "i").test(message)) {
+    return guess.slice(0, 80);
+  }
+  return null;
+}
+
+const OTHER_INTENT_RE =
+  /\b(weather|forecast|briefing|email|invoice|contract|task|contact|project|cancel|never mind|nevermind|stop)\b/i;
+
+/** After Luna asked for a form name, treat a short reply like "Shay" as the title. */
+export function interpretPendingFormName(message: string): string | null {
+  const trimmed = message.trim();
+  if (!trimmed) return null;
+  if (OTHER_INTENT_RE.test(trimmed) && !/\bform\b/i.test(trimmed)) return null;
+  const explicit = extractFormNameFromMessage(trimmed);
+  if (explicit) return explicit;
+  if (isFormCreateRequest(trimmed)) return extractFormNameFromMessage(trimmed);
+  const words = trimmed.replace(/[?.!]/g, "").trim();
+  if (words.split(/\s+/).length <= 6) return cleanExtractedFormName(words);
   return null;
 }
 
@@ -506,8 +552,7 @@ export function inferLunaForcedTools(
   }
 
   if (isFormCreateRequest(m)) {
-    const name = extractFormNameFromMessage(m);
-    // No guessed titles like "Intake form" — if they did not name it, ask first.
+    const name = resolveFormCreateName(m);
     if (name) {
       tools.push({
         name: "create_form",

@@ -9,8 +9,9 @@ import {
   ASK_FORM_NAME_REPLY,
   extractFormNameFromMessage,
   inferLunaForcedTools,
+  interpretPendingFormName,
   isFormCreateRequest,
-  isPlaceholderFormName,
+  resolveFormCreateName,
   spokenToolResult,
   type LunaToolResult,
 } from "@/lib/luna-server";
@@ -412,13 +413,13 @@ async function geminiReply(params: {
       } else {
         let args = asToolArgs(call.args);
         if (toolName === "create_form") {
-          const fromUser = extractFormNameFromMessage(params.message);
+          const fromUser = resolveFormCreateName(
+            params.message,
+            typeof args.name === "string" ? args.name : null
+          );
           if (fromUser) {
             args = { ...args, name: fromUser };
-          } else if (
-            isFormCreateRequest(params.message) ||
-            isPlaceholderFormName(String(args.name ?? ""))
-          ) {
+          } else {
             result = {
               error:
                 "Do not create the form yet. Ask the user what to name it.",
@@ -480,6 +481,7 @@ export async function POST(req: NextRequest) {
   let message = "";
   let workspaceId = "";
   let clientTimezone: string | null = null;
+  let pendingAction: string | null = null;
   try {
     const body = await req.json();
     message = typeof body?.message === "string" ? body.message : "";
@@ -491,6 +493,7 @@ export async function POST(req: NextRequest) {
     ) {
       clientTimezone = body.timezone.trim();
     }
+    if (body?.pendingAction === "create_form") pendingAction = "create_form";
   } catch {
     /* ignore malformed body */
   }
@@ -548,6 +551,23 @@ export async function POST(req: NextRequest) {
       ? localeRow.timezone
       : null) || clientTimezone;
 
+  if (pendingAction === "create_form") {
+    const pendingName = interpretPendingFormName(message);
+    if (pendingName) {
+      message = `Create a form named ${pendingName}`;
+      pendingAction = null;
+    } else if (!isFormCreateRequest(message)) {
+      pendingAction = null;
+    }
+  }
+
+  if (isFormCreateRequest(message) && !resolveFormCreateName(message)) {
+    return NextResponse.json(
+      { reply: ASK_FORM_NAME_REPLY, pendingAction: "create_form" },
+      { status: 200 }
+    );
+  }
+
   const priorToolNotes: string[] = [];
   const completedTools = new Set<string>();
   const forced = inferLunaForcedTools(message, { homeCity });
@@ -586,11 +606,19 @@ export async function POST(req: NextRequest) {
   const reply =
     llmReply ||
     (priorToolNotes.length ? priorToolNotes.join(" ") : null) ||
-    (isFormCreateRequest(message) && !extractFormNameFromMessage(message)
+    (isFormCreateRequest(message) && !resolveFormCreateName(message)
       ? ASK_FORM_NAME_REPLY
       : null) ||
     (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY
       ? "I can't think right now — my Gemini key is missing on the server."
       : ruleBasedReply(message));
-  return NextResponse.json({ reply }, { status: 200 });
+  const stillNeedsFormName =
+    isFormCreateRequest(message) && !resolveFormCreateName(message);
+  return NextResponse.json(
+    {
+      reply,
+      pendingAction: stillNeedsFormName ? "create_form" : null,
+    },
+    { status: 200 }
+  );
 }

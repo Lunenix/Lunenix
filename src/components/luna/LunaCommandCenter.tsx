@@ -98,6 +98,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const connectPromiseRef = useRef<Promise<boolean> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startLiveRef = useRef<() => Promise<boolean>>(async () => false);
+  const pendingActionRef = useRef<string | null>(null);
 
   const agentName = settings?.agent_name || "Luna";
 
@@ -405,6 +406,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
             message: forGemini,
             workspaceId,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            pendingAction: pendingActionRef.current,
           }),
         });
         if (res.status === 401) {
@@ -413,6 +415,8 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           return;
         }
         const data = await res.json();
+        pendingActionRef.current =
+          typeof data?.pendingAction === "string" ? data.pendingAction : null;
         const reply: string =
           data?.reply || "Understood! I'll take care of that right away.";
         await speakText(reply);
