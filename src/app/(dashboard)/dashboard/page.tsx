@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DashboardWelcome } from "@/components/layout/DashboardWelcome";
 import { CreateWorkspaceForm } from "@/components/workspace/CreateWorkspaceForm";
 import { LunaCommandCenter } from "@/components/luna/LunaCommandCenter";
+import { WorkspaceActivityFeed } from "@/components/workspace/WorkspaceActivityFeed";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   Card,
@@ -145,6 +146,8 @@ export default function DashboardPage() {
 
       <LunaCommandCenter workspaceId={activeWorkspace.id} />
 
+      <WorkspaceActivityFeed workspaceId={activeWorkspace.id} />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
@@ -165,17 +168,6 @@ export default function DashboardPage() {
           );
         })}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Getting started</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          This is the foundation of your Lunenix workspace. Contacts, projects,
-          the calendar, and invoicing will appear here as they are built out in
-          the next phases.
-        </CardContent>
-      </Card>
     </div>
   );
 }
