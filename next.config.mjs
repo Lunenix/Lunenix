@@ -23,6 +23,15 @@ const nextConfig = {
       ],
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/calendar",
+        destination: "/dashboard/calendar",
+        permanent: false,
+      },
+    ];
+  },
   webpack: (config, { webpack }) => {
     // simli-client@3.0.2's dist/index.js does `require("./Client")` but the
     // file on disk is `client.js`. That fails on Linux (Vercel). Point every

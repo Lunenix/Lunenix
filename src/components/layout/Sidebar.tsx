@@ -55,7 +55,7 @@ const navItems = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/email-templates", label: "Email Templates", icon: Mail },
   { href: "/automation", label: "Automation", icon: Zap },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/settings/email", label: "Settings", icon: Settings },
   { href: "/settings/workspaces", label: "Workspaces", icon: Building2 },
 ];
