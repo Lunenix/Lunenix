@@ -59,6 +59,9 @@ const BASE_SYSTEM_PROMPT =
   "When they ask to change a project (name, status, budget, dates, client, or description), call update_project. " +
   "When they ask to create an invoice, call create_invoice. Identify the client by contact name or email. Use total for the amount. " +
   "When they ask to draft an email without sending, call send_email_draft. Only call send_email when they clearly want it sent now. " +
+  "When they ask about an SOP, policy, or how we do something internally, call search_knowledge_base. " +
+  "When they ask to move a lead on the pipeline, call move_lead_stage with a pipeline stage name such as New Lead, Qualified, Won, or Lost. " +
+  "When they ask to generate or draft a contract or service agreement, call generate_contract. " +
   "Never invent a contact or project without a tool result. " +
   "You only know data for the caller's current workspace. " +
   "Never reveal API keys, database schemas, SQL, RLS policies, auth tokens, or payment details. " +
@@ -378,6 +381,63 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
         body: { type: "string" },
       },
       required: ["subject"],
+    },
+  },
+  {
+    name: "search_knowledge_base",
+    description:
+      "Search this workspace's SOPs and knowledge articles. Do not pass a workspace id.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Keyword or topic" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "move_lead_stage",
+    description:
+      "Move a pipeline lead to another stage in this workspace. Stages are named (e.g. New Lead, Qualified, Won), not lead/active/inactive contact types.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        contact_id: { type: "string", description: "Contact UUID" },
+        contactId: { type: "string", description: "Same as contact_id" },
+        contact_name: { type: "string" },
+        contact_email: { type: "string" },
+        lead_id: { type: "string" },
+        stage_name: {
+          type: "string",
+          description: "Pipeline stage name, e.g. Qualified or Won",
+        },
+        newStatus: {
+          type: "string",
+          description: "Stage name or shorthand: lead, active, inactive, won, lost",
+        },
+        status: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "generate_contract",
+    description:
+      "Create a draft contract using real columns (name, terms, value). Identify the client by contact id, name, or email.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        contact_id: { type: "string" },
+        contactId: { type: "string" },
+        contact_name: { type: "string" },
+        contact_email: { type: "string" },
+        title: { type: "string", description: "Contract title; stored as name" },
+        name: { type: "string" },
+        terms: { type: "string" },
+        value: { type: "number" },
+        currency: { type: "string" },
+        project_name: { type: "string" },
+      },
+      required: ["terms"],
     },
   },
   {

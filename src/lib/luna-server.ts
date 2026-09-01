@@ -9,6 +9,7 @@ import {
   type WorkspaceContextPayload,
 } from "@/lib/luna";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,6 +132,49 @@ async function findContactId(
   return matches.length === 1 ? matches[0].id : matches[0]?.id ?? null;
 }
 
+async function findPipelineStage(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  statusOrName: string | null
+): Promise<{ id: string; name: string } | null> {
+  if (!statusOrName?.trim()) return null;
+  const { data: stages } = await supabase
+    .from("pipeline_stages")
+    .select("id, name, position")
+    .eq("workspace_id", workspaceId)
+    .order("position", { ascending: true });
+  const list = (stages ?? []) as Array<{ id: string; name: string }>;
+  if (!list.length) return null;
+  const terms = stageSearchTerms(statusOrName);
+  for (const term of terms) {
+    const hit = list.find((s) => s.name.toLowerCase().includes(term));
+    if (hit) return { id: hit.id, name: hit.name };
+  }
+  return null;
+}
+
+async function resolveWorkspaceContactId(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  args: Record<string, unknown>
+): Promise<string | null> {
+  const explicit = argStringAny(args, ["contact_id", "contactId"]);
+  if (explicit) {
+    const { data } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("id", explicit)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    return typeof data?.id === "string" ? data.id : null;
+  }
+  return findContactId(
+    supabase,
+    workspaceId,
+    argString(args, "contact_name") ?? argString(args, "contact_email")
+  );
+}
+
 async function findContactMatches(
   supabase: LunaSupabaseClient,
   workspaceId: string,
@@ -249,6 +293,20 @@ function plusDaysIsoDate(days: number): string {
 
 function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function sanitizeIlikeQuery(raw: string): string {
+  return raw.replace(/[%_*,()]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function stageSearchTerms(statusOrName: string): string[] {
+  const s = statusOrName.trim().toLowerCase();
+  if (s === "lead" || s === "new") return ["new lead", "new"];
+  if (s === "active") return ["qualified", "contacted", "proposal"];
+  if (s === "inactive") return ["lost"];
+  if (s === "won") return ["won"];
+  if (s === "lost") return ["lost"];
+  return [s];
 }
 
 async function requireOneContact(
@@ -1495,20 +1553,20 @@ export async function executeLunaTool(
       );
     }
 
-    if (name === "create_contract") {
-      const contractName = argString(args, "name");
-      if (!contractName) return { error: "A contract name is required." };
-      const contactId = await findContactId(
+    if (name === "create_contract" || name === "generate_contract") {
+      const contractName = argStringAny(args, ["name", "title"]);
+      if (!contractName) return { error: "A contract name or title is required." };
+      const contactId = await resolveWorkspaceContactId(
         supabase,
         workspace_id,
-        argString(args, "contact_name") ?? argString(args, "contact_email")
+        args
       );
       const projectId = await findProjectId(
         supabase,
         workspace_id,
         argString(args, "project_name")
       );
-      const value = argNumber(args, "value");
+      const value = argNumber(args, "value") ?? 0;
       const number = `LUNA-${Date.now().toString(36).toUpperCase()}`;
       const { data, error } = await supabase
         .from("contracts")
@@ -1690,6 +1748,121 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Drafted email to ${data.recipient_email}: "${data.subject}"`
+      );
+    }
+
+    if (name === "search_knowledge_base") {
+      const q = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      if (!q) return { error: "Need a search term." };
+      const pattern = `%${q}%`;
+      const { data, error } = await supabase
+        .from("knowledge_base")
+        .select("title, category, content")
+        .eq("workspace_id", workspace_id)
+        .or(`title.ilike.${pattern},content.ilike.${pattern}`)
+        .limit(6);
+      if (error) {
+        return { error: error.message ?? "Could not search the knowledge base." };
+      }
+      const results = (data ?? []).map((row: Record<string, unknown>) => ({
+        title: String(row.title ?? ""),
+        category: typeof row.category === "string" ? row.category : "general",
+        excerpt: String(row.content ?? "").slice(0, 280),
+      }));
+      if (!results.length) {
+        return {
+          ok: true,
+          summary: `No knowledge articles matched ${q}.`,
+          results: [],
+        };
+      }
+      const titles = results.map((r: { title: string }) => r.title).join(", ");
+      return {
+        ok: true,
+        summary: `Found ${results.length} articles: ${titles}.`,
+        results,
+      };
+    }
+
+    if (name === "move_lead_stage") {
+      const stageHint = argStringAny(args, ["stage_name", "newStatus", "status"]);
+      const stage = await findPipelineStage(supabase, workspace_id, stageHint);
+      if (!stage) {
+        return {
+          error:
+            "Need a pipeline stage such as New Lead, Contacted, Qualified, Proposal Sent, Won, or Lost.",
+        };
+      }
+      let leadId = argString(args, "lead_id");
+      let fromStageId: string | null = null;
+      let leadTitle = "lead";
+      let contactIdForLead: string | null = null;
+      if (!leadId) {
+        const contactId = await resolveWorkspaceContactId(
+          supabase,
+          workspace_id,
+          args
+        );
+        if (!contactId) {
+          return { error: "Need a contact that is already on the pipeline." };
+        }
+        const { data: lead } = await supabase
+          .from("leads")
+          .select("id, stage_id, title, contact_id")
+          .eq("workspace_id", workspace_id)
+          .eq("contact_id", contactId)
+          .limit(1)
+          .maybeSingle();
+        if (!lead?.id) {
+          return { error: "That contact does not have a pipeline lead yet." };
+        }
+        leadId = String(lead.id);
+        fromStageId = typeof lead.stage_id === "string" ? lead.stage_id : null;
+        leadTitle = typeof lead.title === "string" ? lead.title : "lead";
+        contactIdForLead =
+          typeof lead.contact_id === "string" ? lead.contact_id : contactId;
+      } else {
+        const { data: lead } = await supabase
+          .from("leads")
+          .select("id, stage_id, title, contact_id")
+          .eq("id", leadId)
+          .eq("workspace_id", workspace_id)
+          .maybeSingle();
+        if (!lead?.id) {
+          return { error: "Lead not found in this workspace." };
+        }
+        fromStageId = typeof lead.stage_id === "string" ? lead.stage_id : null;
+        leadTitle = typeof lead.title === "string" ? lead.title : "lead";
+        contactIdForLead =
+          typeof lead.contact_id === "string" ? lead.contact_id : null;
+      }
+      const { data, error } = await supabase
+        .from("leads")
+        .update({ stage_id: stage.id })
+        .eq("id", leadId)
+        .eq("workspace_id", workspace_id)
+        .select("id, title, stage_id")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not move that lead." };
+      }
+      void executeWorkflowsForTrigger(
+        "lead_stage_change",
+        {
+          lead_id: data.id,
+          lead: data,
+          from_stage_id: fromStageId,
+          to_stage_id: stage.id,
+          contact_id: contactIdForLead,
+          user_id,
+        },
+        workspace_id
+      ).catch(() => undefined);
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Moved ${leadTitle} to ${stage.name}.`
       );
     }
 
