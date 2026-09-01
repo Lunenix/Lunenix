@@ -11,6 +11,7 @@ import {
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
+import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import {
   normalizePersonalPhone,
   parseSmsEnabled,
@@ -1593,6 +1594,13 @@ export async function executeLunaTool(
         argStringAny(args, ["due_date", "dueDate"]) ??
           argString(args, "due_date")
       );
+      const reminderArg = parseReminderMinutes(
+        args.reminder_minutes_before ?? args.reminderMinutesBefore
+      );
+      if (!reminderArg.ok) return { error: reminderArg.error };
+      if (reminderArg.value && !dueDate) {
+        return { error: "A due date is required to set a reminder." };
+      }
 
       const { data, error } = await supabase
         .from("tasks")
@@ -1605,6 +1613,7 @@ export async function executeLunaTool(
           priority,
           assignee_id: user_id,
           due_date: dueDate,
+          reminder_minutes_before: reminderArg.value,
           position: 0,
           completed_at: status === "done" ? new Date().toISOString() : null,
         })

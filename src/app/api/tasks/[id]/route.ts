@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
+import { parseReminderMinutes } from "@/lib/tasks/reminder";
 
 /**
  * PATCH /api/tasks/[id]
@@ -26,12 +27,25 @@ export async function PATCH(
     "priority",
     "assignee_id",
     "due_date",
+    "reminder_minutes_before",
     "position",
     "project_id",
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
+  }
+
+  if ("reminder_minutes_before" in body) {
+    const reminder = parseReminderMinutes(body.reminder_minutes_before);
+    if (!reminder.ok) {
+      return NextResponse.json({ error: reminder.error }, { status: 400 });
+    }
+    update.reminder_minutes_before = reminder.value;
+    update.reminder_sent_at = null;
+  }
+  if ("due_date" in body) {
+    update.reminder_sent_at = null;
   }
 
   // Fetch old task to detect completion

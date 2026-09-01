@@ -239,6 +239,11 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
           type: "string",
           description: "Due date as YYYY-MM-DD (same as due_date)",
         },
+        reminder_minutes_before: {
+          type: "number",
+          description:
+            "Minutes before due (9:00 UTC that day) to remind via Telegram/SMS. Requires due_date. 1–10080.",
+        },
       },
       required: ["title"],
     },

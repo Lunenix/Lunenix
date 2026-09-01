@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
+import { parseReminderMinutes } from "@/lib/tasks/reminder";
 
 /**
  * GET /api/tasks?workspaceId=...&projectId=...
@@ -72,6 +73,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "title is required" }, { status: 400 });
   }
 
+  const reminder = parseReminderMinutes(body.reminder_minutes_before);
+  if (!reminder.ok) {
+    return NextResponse.json({ error: reminder.error }, { status: 400 });
+  }
+  const reminderMinutes = reminder.value;
+  if (reminderMinutes && !body.due_date) {
+    return NextResponse.json(
+      { error: "Set a due date to use a reminder." },
+      { status: 400 }
+    );
+  }
+
   let countQuery = auth.supabase
     .from("tasks")
     .select("id", { count: "exact", head: true })
@@ -87,8 +100,10 @@ export async function POST(request: NextRequest) {
     description: body.description ?? null,
     status,
     priority: body.priority ?? "medium",
-    assignee_id: body.assignee_id ?? null,
+    assignee_id: body.assignee_id ?? auth.user.id,
     due_date: body.due_date ?? null,
+    reminder_minutes_before: reminderMinutes,
+    reminder_sent_at: null,
     position: count ?? 0,
     completed_at: status === "done" ? new Date().toISOString() : null,
   };

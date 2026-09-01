@@ -21,6 +21,8 @@ export default function AlertSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isTestingSms, setIsTestingSms] = useState(false);
+  const [smsTestMsg, setSmsTestMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,8 +103,8 @@ export default function AlertSettingsPage() {
               SMS channel
             </CardTitle>
             <CardDescription>
-              Store a number for future SMS alerts. Luna never reads the full number
-              into workspace context.
+              SMS uses Twilio on the server. Save a number, then send a test.
+              Task reminders also text the assignee when SMS is on.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -128,14 +130,48 @@ export default function AlertSettingsPage() {
             {success ? (
               <p className="text-sm text-muted-foreground">Saved.</p>
             ) : null}
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Save
-            </Button>
+            {smsTestMsg ? (
+              <p className="text-sm text-muted-foreground">{smsTestMsg}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isTestingSms || isSaving}
+                onClick={async () => {
+                  setIsTestingSms(true);
+                  setSmsTestMsg(null);
+                  setError(null);
+                  try {
+                    const res = await fetch("/api/user-settings/sms-test", {
+                      method: "POST",
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Send failed");
+                    setSmsTestMsg("Test SMS sent.");
+                  } catch (err) {
+                    setError(
+                      err instanceof Error ? err.message : "Send failed"
+                    );
+                  } finally {
+                    setIsTestingSms(false);
+                  }
+                }}
+              >
+                {isTestingSms ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Send test SMS
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </form>

@@ -55,6 +55,7 @@ export function TaskSheet({
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");
+  const [reminderMinutes, setReminderMinutes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +66,11 @@ export function TaskSheet({
       setStatus((task?.status as TaskStatus) ?? "todo");
       setPriority((task?.priority as TaskPriority) ?? "medium");
       setDueDate(task?.due_date ?? "");
+      setReminderMinutes(
+        task?.reminder_minutes_before != null
+          ? String(task.reminder_minutes_before)
+          : ""
+      );
       setError(null);
     }
   }, [open, task]);
@@ -72,6 +78,10 @@ export function TaskSheet({
   async function handleSave() {
     if (!title.trim()) {
       setError("Title is required.");
+      return;
+    }
+    if (reminderMinutes.trim() && !dueDate) {
+      setError("Set a due date to use a reminder.");
       return;
     }
     setSaving(true);
@@ -85,6 +95,9 @@ export function TaskSheet({
       status,
       priority,
       due_date: dueDate || null,
+      reminder_minutes_before: reminderMinutes.trim()
+        ? Number(reminderMinutes)
+        : null,
     };
 
     try {
@@ -177,6 +190,23 @@ export function TaskSheet({
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="reminder">Remind me (minutes before)</Label>
+            <Input
+              id="reminder"
+              type="number"
+              min={1}
+              max={10080}
+              placeholder="Leave blank for no reminder"
+              value={reminderMinutes}
+              onChange={(e) => setReminderMinutes(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Telegram (workspace chat) and SMS (assignee) fire in this window.
+              Due dates are treated as 9:00 AM UTC that day. Max 10080 (7 days).
+            </p>
           </div>
 
           <div className="space-y-2">

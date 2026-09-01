@@ -24,6 +24,19 @@ export function formatTaskReminderMessage(input: {
   return `🚨 *Lunenix Reminder* ${workspaceLabel}\n\n*Task:* ${title}\n*Due in:* ${minutes} minutes`;
 }
 
+export function formatTaskReminderSms(input: {
+  workspaceName: string | null;
+  title: string;
+  reminderMinutesBefore: number;
+}): string {
+  const workspaceLabel = input.workspaceName
+    ? input.workspaceName.slice(0, 80)
+    : "Workspace";
+  const title = input.title.slice(0, 200);
+  const minutes = Math.max(1, Math.floor(input.reminderMinutesBefore));
+  return `Lunenix reminder [${workspaceLabel}] Task: ${title}. Due in ${minutes} minutes.`;
+}
+
 export async function sendTelegramAlert(
   text: string
 ): Promise<{ ok: boolean; error?: string }> {
