@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
@@ -622,15 +621,12 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   return (
     <Card className="border-border/40 bg-background/95 backdrop-blur">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <div className="flex items-center space-x-3">
-          <CardTitle className="text-xl font-bold">Luna Command Center</CardTitle>
-          <Badge variant={statusBadgeVariant} className="font-mono text-xs">
-            {status === "connecting" && (
-              <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
-            )}
-            {statusLabel}
-          </Badge>
-        </div>
+        <Badge variant={statusBadgeVariant} className="font-mono text-xs">
+          {status === "connecting" && (
+            <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+          )}
+          {statusLabel}
+        </Badge>
         <div className="flex items-center space-x-1">
           {sessionOn ? (
             <Button
