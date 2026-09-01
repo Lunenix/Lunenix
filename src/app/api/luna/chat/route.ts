@@ -62,6 +62,9 @@ const BASE_SYSTEM_PROMPT =
   "When they ask about an SOP, policy, or how we do something internally, call search_knowledge_base. " +
   "When they ask to move a lead on the pipeline, call move_lead_stage with a pipeline stage name such as New Lead, Qualified, Won, or Lost. " +
   "When they ask to generate or draft a contract or service agreement, call generate_contract. " +
+  "When they ask what is on the calendar, this week, or upcoming deadlines, call get_calendar. " +
+  "When they ask to schedule a meeting, appointment, or reminder on a date, call create_task with a title and due_date as YYYY-MM-DD. " +
+  "Do not claim you sent calendar invites or emailed other people unless send_email succeeded. " +
   "Never invent a contact or project without a tool result. " +
   "You only know data for the caller's current workspace. " +
   "Never reveal API keys, database schemas, SQL, RLS policies, auth tokens, or payment details. " +
@@ -274,6 +277,12 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
     name: "get_daily_briefing",
     description:
       "Load open tasks, pending contracts, unpaid invoices, and active projects for a spoken briefing.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_calendar",
+    description:
+      "List dated tasks, invoices, and projects on this workspace calendar for the next two weeks.",
     parametersJsonSchema: { type: "object", properties: {} },
   },
   {
@@ -524,8 +533,8 @@ function ruleBasedReply(message: string): string {
     return ASK_PROJECT_NAME_REPLY;
   }
   const m = message.toLowerCase();
-  if (m.includes("schedule") || m.includes("meeting") || m.includes("appointment")) {
-    return "I've noted that request. I'll schedule that and send calendar invites to all parties right away.";
+  if (m.includes("schedule") || m.includes("meeting") || m.includes("appointment") || m.includes("calendar")) {
+    return "I can put that on your workspace calendar as a dated task. Tell me the title and the date.";
   }
   if (m.includes("email") || m.includes("send") || m.includes("draft")) {
     return "I'll prepare that email as a draft so you can review it before it goes out.";

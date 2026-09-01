@@ -10,6 +10,7 @@ import {
 } from "@/lib/luna";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
+import { ymdFromUnknown } from "@/lib/calendar";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -695,7 +696,8 @@ export function formatLunaContextForPrompt(ctx: LunaWorkspaceContext): string {
     const num =
       typeof i.invoice_number === "string" ? i.invoice_number : "Invoice";
     const status = typeof i.status === "string" ? i.status : "";
-    return `- ${num} (${status})`;
+    const due = typeof i.due_date === "string" ? `, due ${i.due_date}` : "";
+    return `- ${num} (${status}${due})`;
   });
   const forms = ctx.forms.map((f) => {
     const name = typeof f.name === "string" ? f.name : "Form";
@@ -1093,6 +1095,14 @@ export function inferLunaForcedTools(
     }
   }
 
+  if (
+    /\b(what'?s on (my )?(calendar|schedule|plate)|show (the |my )?calendar|this week|upcoming (tasks|deadlines|meetings|invoices))\b/i.test(
+      m
+    )
+  ) {
+    tools.push({ name: "get_calendar", args: {} });
+  }
+
   return tools;
 }
 
@@ -1182,6 +1192,71 @@ export async function executeLunaTool(
           .filter((p) => p.status === "active" || p.status === "planning")
           .slice(0, 6)
           .map((p) => ({ name: p.name, status: p.status })),
+      };
+    }
+
+    if (name === "get_calendar") {
+      const from = todayIsoDate();
+      const to = plusDaysIsoDate(14);
+      const [tasksRes, invoicesRes, projectsRes] = await Promise.all([
+        supabase
+          .from("tasks")
+          .select("title, status, due_date")
+          .eq("workspace_id", workspace_id)
+          .not("due_date", "is", null)
+          .gte("due_date", from)
+          .lte("due_date", to)
+          .order("due_date", { ascending: true })
+          .limit(20),
+        supabase
+          .from("invoices")
+          .select("invoice_number, status, due_date")
+          .eq("workspace_id", workspace_id)
+          .not("due_date", "is", null)
+          .gte("due_date", from)
+          .lte("due_date", to)
+          .order("due_date", { ascending: true })
+          .limit(20),
+        supabase
+          .from("projects")
+          .select("name, status, due_date")
+          .eq("workspace_id", workspace_id)
+          .not("due_date", "is", null)
+          .gte("due_date", from)
+          .lte("due_date", to)
+          .order("due_date", { ascending: true })
+          .limit(20),
+      ]);
+      const lines: string[] = [];
+      for (const row of tasksRes.data ?? []) {
+        const due = ymdFromUnknown(row.due_date);
+        if (!due) continue;
+        const title = typeof row.title === "string" ? row.title : "Task";
+        lines.push(`Task ${title} on ${due}`);
+      }
+      for (const row of invoicesRes.data ?? []) {
+        const due = ymdFromUnknown(row.due_date);
+        if (!due) continue;
+        const num =
+          typeof row.invoice_number === "string" ? row.invoice_number : "invoice";
+        lines.push(`Invoice ${num} due ${due}`);
+      }
+      for (const row of projectsRes.data ?? []) {
+        const due = ymdFromUnknown(row.due_date);
+        if (!due) continue;
+        const pname = typeof row.name === "string" ? row.name : "Project";
+        lines.push(`Project ${pname} due ${due}`);
+      }
+      if (lines.length === 0) {
+        return {
+          ok: true,
+          summary:
+            "Nothing dated on the workspace calendar in the next two weeks.",
+        };
+      }
+      return {
+        ok: true,
+        summary: `On the calendar through ${to}: ${lines.slice(0, 12).join(". ")}.`,
       };
     }
 
@@ -1449,8 +1524,11 @@ export async function executeLunaTool(
       );
     }
 
-    if (name === "create_task") {
-      const title = argString(args, "title");
+    if (name === "create_task" || name === "schedule_event") {
+      const title =
+        argString(args, "title") ||
+        argString(args, "summary") ||
+        argString(args, "name");
       if (!title) return { error: "A task title is required." };
 
       const statusArg = argString(args, "status");
@@ -1488,6 +1566,11 @@ export async function executeLunaTool(
         }
       }
 
+      const dueDate = asIsoDate(
+        argStringAny(args, ["due_date", "dueDate"]) ??
+          argString(args, "due_date")
+      );
+
       const { data, error } = await supabase
         .from("tasks")
         .insert({
@@ -1498,23 +1581,23 @@ export async function executeLunaTool(
           status,
           priority,
           assignee_id: user_id,
-          due_date:
-            argStringAny(args, ["due_date", "dueDate"]) ??
-            argString(args, "due_date"),
+          due_date: dueDate,
           position: 0,
           completed_at: status === "done" ? new Date().toISOString() : null,
         })
-        .select("id, title, status")
+        .select("id, title, status, due_date")
         .maybeSingle();
 
       if (error || !data) {
         return { error: error?.message ?? "Could not create task." };
       }
+      const dueBit =
+        typeof data.due_date === "string" ? ` due ${data.due_date}` : "";
       return lunaMutationOk(
         supabase,
         workspace_id,
-        name,
-        `Created task ${data.title}.`
+        "create_task",
+        `Created task ${data.title}${dueBit}. It is on the workspace calendar.`
       );
     }
 
