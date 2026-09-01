@@ -1593,7 +1593,9 @@ export async function executeLunaTool(
         supabase,
         workspace_id,
         name,
-        `Created draft contract ${data.name} (${data.contract_number}).`
+        name === "generate_contract"
+          ? `Generated contract "${data.name}" valued at $${Number(value).toFixed(2)}`
+          : `Created draft contract ${data.name} (${data.contract_number}).`
       );
     }
 
@@ -1760,7 +1762,7 @@ export async function executeLunaTool(
         .select("title, category, content")
         .eq("workspace_id", workspace_id)
         .or(`title.ilike.${pattern},content.ilike.${pattern}`)
-        .limit(6);
+        .limit(3);
       if (error) {
         return { error: error.message ?? "Could not search the knowledge base." };
       }
@@ -1772,14 +1774,16 @@ export async function executeLunaTool(
       if (!results.length) {
         return {
           ok: true,
-          summary: `No knowledge articles matched ${q}.`,
+          summary: "No relevant documents found.",
           results: [],
         };
       }
-      const titles = results.map((r: { title: string }) => r.title).join(", ");
+      const searchResults = results
+        .map((r: { title: string; excerpt: string }) => `${r.title}: ${r.excerpt}`)
+        .join(" | ");
       return {
         ok: true,
-        summary: `Found ${results.length} articles: ${titles}.`,
+        summary: `Based on your knowledge base: ${searchResults}`.slice(0, 900),
         results,
       };
     }
@@ -1862,7 +1866,7 @@ export async function executeLunaTool(
         supabase,
         workspace_id,
         name,
-        `Moved ${leadTitle} to ${stage.name}.`
+        `Moved pipeline lead ${leadTitle} to ${stage.name}.`
       );
     }
 
