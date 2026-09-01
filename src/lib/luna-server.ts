@@ -1041,6 +1041,7 @@ async function lunaMutationOk(
   return { ok: true, summary };
 }
 
+/** Workspace-scoped tool runner. All writes go through here, then logLunaAction. */
 export async function executeLunaTool(
   supabase: LunaSupabaseClient,
   workspaceId: string,
@@ -1620,7 +1621,7 @@ export async function executeLunaTool(
         supabase,
         workspace_id,
         name,
-        `Created draft invoice ${data.invoice_number} for ${found.label} totaling ${currency} ${Number(data.total).toFixed(2)}, due ${data.due_date}.`
+        `Generated draft invoice #${data.invoice_number} for $${Number(data.total).toFixed(2)}`
       );
     }
 
@@ -1668,7 +1669,7 @@ export async function executeLunaTool(
         supabase,
         workspace_id,
         name,
-        `Saved a draft email to ${data.recipient_email} about ${data.subject}. It has not been sent.`
+        `Drafted email to ${data.recipient_email}: "${data.subject}"`
       );
     }
 
