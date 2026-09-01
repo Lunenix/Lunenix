@@ -109,32 +109,61 @@ async function findContactId(
   workspaceId: string,
   nameOrEmail: string | null
 ): Promise<string | null> {
-  if (!nameOrEmail) return null;
+  const matches = await findContactMatches(supabase, workspaceId, nameOrEmail);
+  return matches.length === 1 ? matches[0].id : matches[0]?.id ?? null;
+}
+
+async function findContactMatches(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  nameOrEmail: string | null
+): Promise<Array<{ id: string; label: string }>> {
+  if (!nameOrEmail) return [];
   if (nameOrEmail.includes("@")) {
     const { data } = await supabase
       .from("contacts")
-      .select("id")
+      .select("id, first_name, last_name, organization_name, email")
       .eq("workspace_id", workspaceId)
       .ilike("email", nameOrEmail)
-      .limit(1)
-      .maybeSingle();
-    return typeof data?.id === "string" ? data.id : null;
+      .limit(5);
+    return (data ?? []).map((row: Record<string, unknown>) => ({
+      id: String(row.id),
+      label: contactSpokenLabel(row),
+    }));
   }
   const { data } = await supabase
     .from("contacts")
-    .select("id, first_name, last_name, organization_name")
+    .select("id, first_name, last_name, organization_name, email")
     .eq("workspace_id", workspaceId)
     .limit(40);
-  const needle = nameOrEmail.toLowerCase();
-  const match = (data ?? []).find((row: Record<string, unknown>) => {
-    const full = [row.first_name, row.last_name].filter(Boolean).join(" ").toLowerCase();
-    const org =
-      typeof row.organization_name === "string"
-        ? row.organization_name.toLowerCase()
-        : "";
-    return full.includes(needle) || org.includes(needle);
-  });
-  return typeof match?.id === "string" ? match.id : null;
+  const needle = nameOrEmail.toLowerCase().trim();
+  return (data ?? [])
+    .filter((row: Record<string, unknown>) => {
+      const full = [row.first_name, row.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const org =
+        typeof row.organization_name === "string"
+          ? row.organization_name.toLowerCase()
+          : "";
+      const email =
+        typeof row.email === "string" ? row.email.toLowerCase() : "";
+      return full.includes(needle) || org.includes(needle) || email.includes(needle);
+    })
+    .map((row: Record<string, unknown>) => ({
+      id: String(row.id),
+      label: contactSpokenLabel(row),
+    }));
+}
+
+function contactSpokenLabel(row: Record<string, unknown>): string {
+  const full = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
+  return (
+    full ||
+    (typeof row.organization_name === "string" ? row.organization_name : "") ||
+    (typeof row.email === "string" ? row.email : "contact")
+  );
 }
 
 async function findProjectId(
@@ -142,15 +171,102 @@ async function findProjectId(
   workspaceId: string,
   name: string | null
 ): Promise<string | null> {
-  if (!name) return null;
+  const matches = await findProjectMatches(supabase, workspaceId, name);
+  return matches.length ? matches[0].id : null;
+}
+
+async function findProjectMatches(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  name: string | null
+): Promise<Array<{ id: string; name: string }>> {
+  if (!name) return [];
   const { data } = await supabase
     .from("projects")
-    .select("id")
+    .select("id, name")
     .eq("workspace_id", workspaceId)
-    .ilike("name", name)
-    .limit(1)
-    .maybeSingle();
-  return typeof data?.id === "string" ? data.id : null;
+    .limit(40);
+  const needle = name.toLowerCase().trim();
+  const rows = (data ?? []) as Array<{ id: string; name: string }>;
+  const exact = rows.filter((p) => p.name.toLowerCase() === needle);
+  if (exact.length) return exact;
+  return rows.filter((p) => p.name.toLowerCase().includes(needle));
+}
+
+function splitPersonName(full: string): { first: string | null; last: string | null } {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { first: null, last: null };
+  if (parts.length === 1) return { first: parts[0], last: null };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
+function extractEmailFromText(text: string): string | null {
+  const hit = text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i);
+  return hit?.[0] ?? null;
+}
+
+function extractPhoneFromText(text: string): string | null {
+  const hit = text.match(
+    /\b(?:phone|mobile|cell|number)\s*(?:is|:)?\s*(\+?[\d().\-\s]{7,22})/i
+  );
+  const raw = hit?.[1]?.trim();
+  return raw ? raw.replace(/\s+/g, " ").slice(0, 40) : null;
+}
+
+function asIsoDate(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
+
+async function requireOneContact(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  nameOrEmail: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  const matches = await findContactMatches(supabase, workspaceId, nameOrEmail);
+  if (!matches.length) {
+    return { error: "I could not find that contact in this workspace." };
+  }
+  if (matches.length > 1) {
+    return {
+      error: `Several contacts match. Say which one: ${matches
+        .slice(0, 4)
+        .map((m) => m.label)
+        .join(", ")}.`,
+    };
+  }
+  return matches[0];
+}
+
+async function requireOneProject(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  name: string | null,
+  projectId: string | null
+): Promise<{ id: string; name: string } | { error: string }> {
+  if (projectId) {
+    const { data } = await supabase
+      .from("projects")
+      .select("id, name")
+      .eq("workspace_id", workspaceId)
+      .eq("id", projectId)
+      .maybeSingle();
+    if (data?.id) return { id: data.id, name: data.name ?? "project" };
+  }
+  const matches = await findProjectMatches(supabase, workspaceId, name);
+  if (!matches.length) {
+    return { error: "I could not find that project in this workspace." };
+  }
+  if (matches.length > 1) {
+    return {
+      error: `Several projects match. Say which one: ${matches
+        .slice(0, 4)
+        .map((m) => m.name)
+        .join(", ")}.`,
+    };
+  }
+  return matches[0];
 }
 
 export async function getLunaWorkspaceContext(
@@ -519,6 +635,121 @@ export function interpretPendingFormName(message: string): string | null {
 export const ASK_FORM_NAME_REPLY =
   "What should I name that form? Once you give me a name, I'll create the draft.";
 
+function extractNamedRecordTitle(message: string, noun: string): string | null {
+  const m = message.trim();
+  const patterns: RegExp[] = [
+    new RegExp(
+      `\\b(?:named|called|titled)\\s+(?:it\\s+)?["']?([^"'?\\n]+)`,
+      "i"
+    ),
+    new RegExp(
+      `\\bname\\s+(?:the\\s+${noun}|this(?:\\s+${noun})?|it)\\s+(?:as\\s+|to\\s+)?["']?([^"'?\\n]+)`,
+      "i"
+    ),
+    new RegExp(
+      `\\b${noun}s?\\s+(?:named|called|titled)\\s+["']?([^"'?\\n]+)`,
+      "i"
+    ),
+    new RegExp(
+      `\\b(?:add|create|make|new|save)\\s+(?:me\\s+)?(?:a\\s+|an\\s+|the\\s+)?${noun}s?\\s+(?:named\\s+|called\\s+|for\\s+|titled\\s+)?["']?([A-Za-z][^"'?\\n]{0,60})`,
+      "i"
+    ),
+  ];
+  for (const re of patterns) {
+    let name = cleanExtractedFormName(m.match(re)?.[1]);
+    if (name) {
+      name = name
+        .replace(
+          /\s+(?:for|with|email|phone|due|budget|client|whose)\b[\s\S]*$/i,
+          ""
+        )
+        .trim();
+      if (name) return name;
+    }
+  }
+  return null;
+}
+
+function stripRecordTitleTail(name: string): string {
+  return name
+    .replace(
+      /\s+(?:for|with|email|phone|due|budget|client|whose)\b[\s\S]*$/i,
+      ""
+    )
+    .trim();
+}
+
+export function extractContactNameFromMessage(message: string): string | null {
+  const m = message.trim();
+  const extra: RegExp[] = [
+    /\b(?:add|create|make)\s+([A-Za-z][A-Za-z .'-]{1,40}?)\s+(?:as\s+(?:a\s+)?contact|to\s+(?:my\s+)?contacts?)\b/i,
+    /\bcontact\s+(?:named|called|for|titled)\s+["']?([A-Za-z][^"'?\n]{0,40})/i,
+  ];
+  for (const re of extra) {
+    const name = cleanExtractedFormName(m.match(re)?.[1]);
+    if (name) {
+      const trimmed = stripRecordTitleTail(name);
+      if (trimmed) return trimmed;
+    }
+  }
+  return extractNamedRecordTitle(m, "contact");
+}
+
+export function extractProjectNameFromMessage(message: string): string | null {
+  return extractNamedRecordTitle(message, "project");
+}
+
+export const ASK_CONTACT_NAME_REPLY =
+  "What should I name that contact? Once you give me a name, I'll add them.";
+
+export const ASK_PROJECT_NAME_REPLY =
+  "What should I name that project? Once you give me a name, I'll create it.";
+
+export function fillContactCreateArgs(
+  message: string,
+  args: Record<string, unknown>
+): Record<string, unknown> {
+  const next = { ...args };
+  const full =
+    extractContactNameFromMessage(message) ||
+    (typeof next.name === "string" ? next.name.trim() : "") ||
+    (typeof next.full_name === "string" ? next.full_name.trim() : "") ||
+    [next.first_name, next.last_name].filter((v) => typeof v === "string").join(" ").trim();
+  if (full && !next.first_name && !next.last_name && !next.organization_name) {
+    const { first, last } = splitPersonName(full);
+    next.first_name = first;
+    next.last_name = last;
+  }
+  const email = extractEmailFromText(message);
+  const phone = extractPhoneFromText(message);
+  if (email && !next.email) next.email = email;
+  if (phone && !next.phone) next.phone = phone;
+  return next;
+}
+
+export function isContactCreateRequest(message: string): boolean {
+  const m = message.trim();
+  if (/\bcontact\s+form\b/i.test(m)) return false;
+  if (/\b(update|edit|change|rename)\b/i.test(m) && !/\b(create|add|new|make)\b/i.test(m)) {
+    return false;
+  }
+  return (
+    /\b(create|add|new|make|save)\b.{0,80}\bcontacts?\b/i.test(m) ||
+    /\bcontacts?\b.{0,50}\b(create|add|new|make|save)\b/i.test(m)
+  );
+}
+
+export function isProjectCreateRequest(message: string): boolean {
+  const m = message.trim();
+  if (/\b(update|edit|change|rename)\b/i.test(m) && !/\b(create|add|new|make)\b/i.test(m)) {
+    return false;
+  }
+  return (
+    /\b(create|add|new|make|start)\b.{0,80}\bprojects?\b/i.test(m) ||
+    /\bprojects?\b.{0,50}\b(create|add|new|make|start)\b/i.test(m)
+  );
+}
+
 function defaultFormFields(message: string): string {
   const fieldsHint = message.match(/\bfields?\s*[:\-]\s*(.+)$/i)?.[1];
   if (fieldsHint?.trim()) return fieldsHint.trim().slice(0, 200);
@@ -557,6 +788,47 @@ export function inferLunaForcedTools(
       tools.push({
         name: "create_form",
         args: { name, fields: defaultFormFields(m) },
+      });
+    }
+  }
+
+  if (isContactCreateRequest(m)) {
+    const fullName = extractContactNameFromMessage(m);
+    if (fullName) {
+      const org =
+        /\b(company|organization|business|org)\b/i.test(m) &&
+        !/\bperson\b/i.test(m);
+      const { first, last } = org
+        ? { first: null, last: null }
+        : splitPersonName(fullName);
+      tools.push({
+        name: "create_contact",
+        args: {
+          first_name: first,
+          last_name: last,
+          organization_name: org ? fullName : null,
+          email: extractEmailFromText(m),
+          phone: extractPhoneFromText(m),
+          type: org ? "organization" : "person",
+        },
+      });
+    }
+  }
+
+  if (isProjectCreateRequest(m)) {
+    const name = extractProjectNameFromMessage(m);
+    if (name) {
+      const contactHint = m.match(
+        /\b(?:for|with|client)\s+([A-Za-z][A-Za-z .'-]{1,40})/i
+      )?.[1];
+      tools.push({
+        name: "create_project",
+        args: {
+          name,
+          contact_name: contactHint
+            ? cleanExtractedFormName(contactHint)
+            : null,
+        },
       });
     }
   }
@@ -620,18 +892,33 @@ export async function executeLunaTool(
     }
 
     if (name === "create_contact") {
-      const firstName = argString(args, "first_name");
-      const lastName = argString(args, "last_name");
-      const organizationName = argString(args, "organization_name");
-      const email = argString(args, "email");
-      if (!firstName && !lastName && !organizationName && !email) {
+      const filled = fillContactCreateArgs("", args);
+      // Prefer fields already on args; fillContactCreateArgs with "" still maps name/full_name.
+      const firstName =
+        argString(filled, "first_name") || argString(args, "first_name");
+      const lastName =
+        argString(filled, "last_name") || argString(args, "last_name");
+      const organizationName =
+        argString(filled, "organization_name") ||
+        argString(args, "organization_name");
+      const email = argString(filled, "email") || argString(args, "email");
+      const full =
+        argString(args, "name") || argString(args, "full_name") || "";
+      let first = firstName;
+      let last = lastName;
+      if (!first && !last && !organizationName && full) {
+        const split = splitPersonName(full);
+        first = split.first;
+        last = split.last;
+      }
+      if (!first && !last && !organizationName && !email) {
         return { error: "Need a name, organization, or email to create a contact." };
       }
       const typeArg = argString(args, "type");
       const type =
         typeArg === "organization" || typeArg === "lead" || typeArg === "person"
           ? typeArg
-          : organizationName && !firstName && !lastName
+          : organizationName && !first && !last
             ? "organization"
             : "person";
 
@@ -640,11 +927,13 @@ export async function executeLunaTool(
         .insert({
           workspace_id,
           type,
-          first_name: firstName,
-          last_name: lastName,
+          first_name: first,
+          last_name: last,
           organization_name: organizationName,
           email,
           phone: argString(args, "phone"),
+          address: argString(args, "address"),
+          notes: argString(args, "notes"),
           tags: [],
         })
         .select("id, first_name, last_name, organization_name, email")
@@ -653,12 +942,70 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not create contact." };
       }
-      const label =
-        [data.first_name, data.last_name].filter(Boolean).join(" ").trim() ||
-        data.organization_name ||
-        data.email ||
-        "contact";
+      const label = contactSpokenLabel(data as Record<string, unknown>);
       return { ok: true, summary: `Created contact ${label}.` };
+    }
+
+    if (name === "update_contact") {
+      const lookup =
+        argString(args, "contact_name") ||
+        argString(args, "current_name") ||
+        argString(args, "email") ||
+        argString(args, "lookup");
+      const found = await requireOneContact(supabase, workspace_id, lookup);
+      if ("error" in found) return found;
+
+      const updates: Record<string, unknown> = {};
+      const fullName = argString(args, "full_name") || argString(args, "new_name");
+      if (fullName) {
+        const { first, last } = splitPersonName(fullName);
+        if (first) updates.first_name = first;
+        updates.last_name = last;
+      }
+      const firstName = argString(args, "first_name");
+      const lastName = argString(args, "last_name");
+      const organizationName = argString(args, "organization_name");
+      const email = argString(args, "email");
+      const phone = argString(args, "phone");
+      const address = argString(args, "address");
+      const notes = argString(args, "notes");
+      const typeArg = argString(args, "type");
+      if (firstName) updates.first_name = firstName;
+      if (lastName) updates.last_name = lastName;
+      if (organizationName) updates.organization_name = organizationName;
+      if (email) updates.email = email;
+      if (phone) updates.phone = phone;
+      if (address) updates.address = address;
+      if (notes) updates.notes = notes;
+      if (typeArg === "organization" || typeArg === "lead" || typeArg === "person") {
+        updates.type = typeArg;
+      }
+      const tagsRaw = argString(args, "tags");
+      if (tagsRaw) {
+        updates.tags = tagsRaw
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+          .slice(0, 12);
+      }
+      if (!Object.keys(updates).length) {
+        return { error: "Tell me what to change on that contact." };
+      }
+
+      const { data, error } = await supabase
+        .from("contacts")
+        .update(updates)
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("id, first_name, last_name, organization_name, email, phone")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not update that contact." };
+      }
+      return {
+        ok: true,
+        summary: `Updated contact ${contactSpokenLabel(data as Record<string, unknown>)}.`,
+      };
     }
 
     if (name === "update_project_status") {
@@ -691,6 +1038,104 @@ export async function executeLunaTool(
       return {
         ok: true,
         summary: `Updated ${data.name ?? "project"} to ${data.status}.`,
+      };
+    }
+
+    if (name === "create_project") {
+      const projectName = argString(args, "name");
+      if (!projectName) return { error: "A project name is required." };
+      const statusArg = argString(args, "status");
+      const status =
+        statusArg && PROJECT_STATUSES.has(statusArg) ? statusArg : "planning";
+      const contactId = await findContactId(
+        supabase,
+        workspace_id,
+        argString(args, "contact_name") ?? argString(args, "contact_email")
+      );
+      const budget = argNumber(args, "budget");
+      const { data, error } = await supabase
+        .from("projects")
+        .insert({
+          workspace_id,
+          name: projectName,
+          description: argString(args, "description"),
+          status,
+          contact_id: contactId,
+          start_date: asIsoDate(argString(args, "start_date")),
+          due_date: asIsoDate(argString(args, "due_date")),
+          budget,
+          currency: argString(args, "currency") || "USD",
+        })
+        .select("id, name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not create project." };
+      }
+      return {
+        ok: true,
+        summary: `Created project ${data.name} as ${data.status}.`,
+      };
+    }
+
+    if (name === "update_project") {
+      const found = await requireOneProject(
+        supabase,
+        workspace_id,
+        argString(args, "project_name") || argString(args, "current_name"),
+        argString(args, "project_id")
+      );
+      if ("error" in found) return found;
+
+      const updates: Record<string, unknown> = {};
+      const newName = argString(args, "name") || argString(args, "new_name");
+      if (newName) updates.name = newName;
+      const description = argString(args, "description");
+      if (description) updates.description = description;
+      const statusArg = argString(args, "status");
+      if (statusArg) {
+        if (!PROJECT_STATUSES.has(statusArg)) {
+          return {
+            error:
+              "Status must be planning, active, on_hold, completed, or cancelled.",
+          };
+        }
+        updates.status = statusArg;
+      }
+      const contactRef =
+        argString(args, "contact_name") || argString(args, "contact_email");
+      if (contactRef) {
+        const contactId = await findContactId(supabase, workspace_id, contactRef);
+        if (!contactId) {
+          return { error: "I could not find that contact to attach to the project." };
+        }
+        updates.contact_id = contactId;
+      }
+      const startDate = asIsoDate(argString(args, "start_date"));
+      const dueDate = asIsoDate(argString(args, "due_date"));
+      if (startDate) updates.start_date = startDate;
+      if (dueDate) updates.due_date = dueDate;
+      const budget = argNumber(args, "budget");
+      if (budget !== null) updates.budget = budget;
+      const currency = argString(args, "currency");
+      if (currency) updates.currency = currency;
+
+      if (!Object.keys(updates).length) {
+        return { error: "Tell me what to change on that project." };
+      }
+
+      const { data, error } = await supabase
+        .from("projects")
+        .update(updates)
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("id, name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not update that project." };
+      }
+      return {
+        ok: true,
+        summary: `Updated project ${data.name}. It is ${data.status}.`,
       };
     }
 
