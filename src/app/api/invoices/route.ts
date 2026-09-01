@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/invoices
  * List all invoices for a workspace, with optional contact/contract/project joins.
  */
-export async function GET(req: NextRequest) {
-  const workspaceId = req.nextUrl.searchParams.get("workspaceId");
-  const auth = await requireWorkspaceMember(workspaceId);
-  if ("error" in auth) return auth.error;
+export async function GET(request: Request) {
+  const auth = await verifyWorkspaceAccess(request);
+  if (auth.errorResponse) return auth.errorResponse;
 
-  const { data: invoices, error } = await auth.supabase
+  const { supabase, workspaceId } = auth;
+  const { data: invoices, error } = await supabase
     .from("invoices")
     .select(
       `
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
       project:projects(id, name)
     `
     )
-    .eq("workspace_id", auth.workspaceId)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ invoices: invoices || [] });
+  return NextResponse.json({ invoices: invoices ?? [] });
 }
 
 /**
