@@ -18,8 +18,9 @@ export async function requireWorkspaceMember(
   const supabase = createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
-  if (!user) {
+  if (authError || !user) {
     return {
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
@@ -29,23 +30,23 @@ export async function requireWorkspaceMember(
   if (!id) {
     return {
       error: NextResponse.json(
-        { error: "workspaceId is required" },
+        { error: "workspaceId parameter is required" },
         { status: 400 }
       ),
     };
   }
 
-  const { data: membership, error } = await supabase
+  const { data: membership, error: memberError } = await supabase
     .from("workspace_members")
-    .select("user_id")
+    .select("workspace_id")
     .eq("workspace_id", id)
     .eq("user_id", user.id)
-    .maybeSingle();
+    .single();
 
-  if (error || !membership) {
+  if (memberError || !membership) {
     return {
       error: NextResponse.json(
-        { error: "You are not a member of this workspace" },
+        { error: "Forbidden: Access denied to workspace" },
         { status: 403 }
       ),
     };

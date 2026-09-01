@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 
@@ -6,21 +7,52 @@ import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
  * GET /api/contacts?workspaceId=...
  * Lists contacts for the given workspace.
  */
-export async function GET(request: NextRequest) {
-  const workspaceId = request.nextUrl.searchParams.get("workspaceId");
-  const auth = await requireWorkspaceMember(workspaceId);
-  if ("error" in auth) return auth.error;
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const workspaceId = searchParams.get("workspaceId");
 
-  const { data, error } = await auth.supabase
+  if (!workspaceId) {
+    return NextResponse.json(
+      { error: "workspaceId parameter is required" },
+      { status: 400 }
+    );
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: membership, error: memberError } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (memberError || !membership) {
+    return NextResponse.json(
+      { error: "Forbidden: Access denied to workspace" },
+      { status: 403 }
+    );
+  }
+
+  const { data: contacts, error } = await supabase
     .from("contacts")
     .select("*")
-    .eq("workspace_id", auth.workspaceId)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ contacts: data });
+
+  return NextResponse.json({ contacts });
 }
 
 /**
