@@ -123,6 +123,12 @@ export default function InvoiceDetailPage({
     }
   };
 
+  const handleDownloadPdf = () => {
+    if (!invoice || !activeWorkspace?.id) return;
+    const qs = new URLSearchParams({ workspaceId: activeWorkspace.id });
+    window.open(`/api/invoices/${invoice.id}/pdf?${qs.toString()}`, "_blank");
+  };
+
   const handleMarkAsPaid = async () => {
     if (!invoice) return;
     try {
@@ -197,7 +203,7 @@ export default function InvoiceDetailPage({
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem disabled>
+              <DropdownMenuItem onClick={handleDownloadPdf}>
                 <Download className="mr-2 h-4 w-4" />
                 Download PDF
               </DropdownMenuItem>
