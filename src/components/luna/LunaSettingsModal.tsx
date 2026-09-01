@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -52,6 +53,7 @@ export function LunaSettingsModal({
   const [voiceId, setVoiceId] = useState("ava");
   const [homeCity, setHomeCity] = useState("");
   const [timezone, setTimezone] = useState("");
+  const [customInstructions, setCustomInstructions] = useState("");
   const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -68,6 +70,7 @@ export function LunaSettingsModal({
             ? Intl.DateTimeFormat().resolvedOptions().timeZone
             : "")
       );
+      setCustomInstructions(settings.custom_instructions || "");
     }
   }, [open, settings]);
 
@@ -151,6 +154,7 @@ export function LunaSettingsModal({
           voice_id: voiceId,
           home_city: homeCity.trim(),
           timezone: timezone.trim(),
+          custom_instructions: customInstructions.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -177,8 +181,8 @@ export function LunaSettingsModal({
         <DialogHeader>
           <DialogTitle>Customize Your Executive Assistant</DialogTitle>
           <DialogDescription>
-            Personalize your AI assistant&apos;s name, voice, home city, and time
-            zone.
+            Personalize your AI assistant&apos;s name, voice, home city, time
+            zone, and optional speaking instructions.
           </DialogDescription>
         </DialogHeader>
 
@@ -285,6 +289,21 @@ export function LunaSettingsModal({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="custom-instructions">Custom instructions</Label>
+            <Textarea
+              id="custom-instructions"
+              value={customInstructions}
+              onChange={(e) => setCustomInstructions(e.target.value.slice(0, 1500))}
+              placeholder="Keep answers short. Prefer first names. Mention overdue invoices first."
+              rows={4}
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional style notes for Luna in this workspace. Cannot override
+              security or tenant isolation.
+            </p>
           </div>
 
           <Button

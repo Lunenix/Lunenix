@@ -3,6 +3,7 @@ import "server-only";
 import {
   sanitizeLunaContext,
   sanitizePayload,
+  sanitizeCustomInstructions,
   formatTimeInZone,
   isIanaTimeZone,
   type WorkspaceContextPayload,
@@ -446,7 +447,7 @@ export async function getWorkspaceContext(
   ] = await Promise.all([
     supabase
       .from("workspace_ai_settings")
-      .select("home_city, timezone")
+      .select("home_city, timezone, custom_instructions")
       .eq("workspace_id", workspace_id)
       .maybeSingle(),
     supabase
@@ -480,7 +481,9 @@ export async function getWorkspaceContext(
     settings: {
       home_city: settings?.home_city ?? "Not specified",
       timezone: settings?.timezone ?? "UTC",
-      custom_instructions: null,
+      custom_instructions: sanitizeCustomInstructions(
+        settings?.custom_instructions
+      ),
     },
     contacts: (contacts ?? []).map((c: Record<string, unknown>) => {
       const name =

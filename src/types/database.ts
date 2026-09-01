@@ -32,6 +32,7 @@ export interface WorkspaceAISettings {
   voice_id: string;
   home_city: string | null;
   timezone: string | null;
+  custom_instructions: string | null;
   created_at: string;
   updated_at: string;
 }
