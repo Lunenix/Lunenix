@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/projects?workspaceId=...
  * Lists projects for the workspace, including linked contact and task counts.
  */
-export async function GET(request: NextRequest) {
-  const workspaceId = request.nextUrl.searchParams.get("workspaceId");
-  const auth = await requireWorkspaceMember(workspaceId);
-  if ("error" in auth) return auth.error;
+export async function GET(request: Request) {
+  const auth = await verifyWorkspaceAccess(request);
+  if (auth.errorResponse) return auth.errorResponse;
 
-  const { data: projects, error } = await auth.supabase
+  const { supabase, workspaceId } = auth;
+  const { data: projects, error } = await supabase
     .from("projects")
     .select("*, contact:contacts(*)")
-    .eq("workspace_id", auth.workspaceId)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -23,10 +24,10 @@ export async function GET(request: NextRequest) {
   const ids = (projects ?? []).map((p) => p.id);
   const counts: Record<string, { total: number; open: number }> = {};
   if (ids.length > 0) {
-    const { data: tasks } = await auth.supabase
+    const { data: tasks } = await supabase
       .from("tasks")
       .select("project_id, status")
-      .eq("workspace_id", auth.workspaceId)
+      .eq("workspace_id", workspaceId)
       .in("project_id", ids);
     for (const t of tasks ?? []) {
       if (!t.project_id) continue;
