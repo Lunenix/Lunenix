@@ -38,15 +38,7 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 /** Simli lip-sync frames: PCM16 mono 16 kHz, ~187.5 ms per 6000-byte chunk. */
 const SIMLI_PCM_CHUNK = 6000;
 
-function sendPcmToSimli(client: SimliClient, chunk: Uint8Array, kickPlayback: boolean) {
-  if (kickPlayback) {
-    try {
-      client.sendAudioDataImmediate(chunk);
-      return;
-    } catch {
-      /* signaling not ready for PLAY_IMMEDIATE — queue instead */
-    }
-  }
+function sendPcmToSimli(client: SimliClient, chunk: Uint8Array) {
   client.sendAudioData(chunk);
 }
 
@@ -56,7 +48,6 @@ async function pipePcm16ToSimli(
 ) {
   const reader = body.getReader();
   let pending = new Uint8Array(0);
-  let first = true;
   try {
     while (getClient()) {
       const { done, value } = await reader.read();
@@ -69,12 +60,7 @@ async function pipePcm16ToSimli(
       const client = getClient();
       if (!client) break;
       while (offset + SIMLI_PCM_CHUNK <= merged.length) {
-        sendPcmToSimli(
-          client,
-          merged.slice(offset, offset + SIMLI_PCM_CHUNK),
-          first
-        );
-        first = false;
+        sendPcmToSimli(client, merged.slice(offset, offset + SIMLI_PCM_CHUNK));
         offset += SIMLI_PCM_CHUNK;
       }
       pending = merged.slice(offset);
@@ -82,7 +68,7 @@ async function pipePcm16ToSimli(
     const even = pending.length & ~1;
     const client = getClient();
     if (even > 0 && client) {
-      sendPcmToSimli(client, pending.slice(0, even), first);
+      sendPcmToSimli(client, pending.slice(0, even));
     }
   } finally {
     reader.releaseLock();
@@ -119,8 +105,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const wakeWantedRef = useRef(true);
   const handleSubmitRef = useRef<(text: string) => Promise<void>>(async () => {});
   const liveWantedRef = useRef(true);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const connectSimliRef = useRef<() => Promise<boolean>>(async () => false);
+  const sessionGenRef = useRef(0);
 
   const agentName = settings?.agent_name || "Luna";
 
@@ -167,10 +152,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   /* ----------------------- Simli teardown -------------------------- */
   const teardownSimli = useCallback(() => {
     liveWantedRef.current = false;
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
+    sessionGenRef.current += 1;
     try {
       void simliRef.current?.stop();
     } catch {
@@ -191,6 +173,17 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const connectSimli = useCallback(async (): Promise<boolean> => {
     if (simliRef.current && streamConnectedRef.current) return true;
     if (!videoRef.current || !audioRef.current) return false;
+    if (!liveWantedRef.current) return false;
+
+    const gen = ++sessionGenRef.current;
+    if (simliRef.current) {
+      try {
+        void simliRef.current.stop();
+      } catch {
+        /* ignore */
+      }
+      simliRef.current = null;
+    }
 
     setConnecting(true);
     try {
@@ -227,33 +220,39 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
       // Simli drives these events off the actual media pipeline, so the status
       // badge and lip-sync stay in sync with what the avatar is really doing.
-      client.on("speaking", () => setStatus("speaking"));
-      client.on("silent", () =>
-        setStatus((prev) => (prev === "speaking" ? "idle" : prev))
-      );
+      client.on("speaking", () => {
+        if (gen !== sessionGenRef.current) return;
+        setStatus("speaking");
+      });
+      client.on("silent", () => {
+        if (gen !== sessionGenRef.current) return;
+        setStatus((prev) => (prev === "speaking" ? "idle" : prev));
+      });
+      // STOP/ENDFRAME after a spoken clip is normal. Do not reconnect in a
+      // loop — that wiped the next session and made her vanish.
       client.on("stop", () => {
+        if (gen !== sessionGenRef.current) return;
         streamConnectedRef.current = false;
         setStreamConnected(false);
-        simliRef.current = null;
+        if (simliRef.current === client) simliRef.current = null;
         connectPromiseRef.current = null;
-        if (!liveWantedRef.current) return;
-        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = setTimeout(() => {
-          if (liveWantedRef.current && !streamConnectedRef.current) {
-            void connectSimliRef.current();
-          }
-        }, 800);
       });
       client.on("error", (detail: string) => {
+        if (gen !== sessionGenRef.current) return;
         toast(`Live avatar error: ${String(detail).slice(0, 120)}`, "error");
       });
       client.on("startup_error", (msg: string) => {
+        if (gen !== sessionGenRef.current) return;
         toast(`Live avatar failed to start: ${String(msg).slice(0, 120)}`, "error");
-        teardownSimli();
+        streamConnectedRef.current = false;
+        setStreamConnected(false);
+        if (simliRef.current === client) simliRef.current = null;
+        connectPromiseRef.current = null;
       });
 
       // 3. Establish the WebRTC connection (resolves once the first video frame arrives).
       await client.start();
+      if (gen !== sessionGenRef.current || !liveWantedRef.current) return false;
       streamConnectedRef.current = true;
       setStreamConnected(true);
       setStatus("idle");
@@ -268,26 +267,27 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         audio.muted = false;
         void audio.play().catch(() => undefined);
       }
-      // Let the video element attach and React paint before we send TTS PCM.
       await new Promise((r) => requestAnimationFrame(() => r(undefined)));
       await new Promise((r) => setTimeout(r, 400));
-      return true;
+      return gen === sessionGenRef.current && streamConnectedRef.current;
     } catch (e) {
-      toast(
-        e instanceof Error && e.message
-          ? `Live avatar error: ${e.message.slice(0, 120)}`
-          : "Could not start live avatar.",
-        "error"
-      );
-      simliRef.current = null;
-      connectPromiseRef.current = null;
-      streamConnectedRef.current = false;
-      setStreamConnected(false);
+      if (gen === sessionGenRef.current) {
+        toast(
+          e instanceof Error && e.message
+            ? `Live avatar error: ${e.message.slice(0, 120)}`
+            : "Could not start live avatar.",
+          "error"
+        );
+        simliRef.current = null;
+        connectPromiseRef.current = null;
+        streamConnectedRef.current = false;
+        setStreamConnected(false);
+      }
       return false;
     } finally {
-      setConnecting(false);
+      if (gen === sessionGenRef.current) setConnecting(false);
     }
-  }, [teardownSimli]);
+  }, []);
 
   const ensureLive = useCallback(async () => {
     liveWantedRef.current = true;
@@ -299,8 +299,6 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     }
     return connectPromiseRef.current;
   }, [connectSimli]);
-
-  connectSimliRef.current = connectSimli;
 
   // Go live as soon as the command center mounts — no start button.
   useEffect(() => {
@@ -352,8 +350,9 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
       if (!text.trim()) return;
 
       pauseWakeListening();
+      const live = await ensureLive();
       const client = simliRef.current;
-      const simliLive = Boolean(client && streamConnectedRef.current);
+      const simliLive = Boolean(live && client && streamConnectedRef.current);
 
       // If the live avatar isn't running, use the browser voice so Luna still talks.
       if (!simliLive) {
@@ -399,7 +398,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         resumeWakeListening();
       }
     },
-    [pauseWakeListening, resumeWakeListening, speakFallback]
+    [ensureLive, pauseWakeListening, resumeWakeListening, speakFallback]
   );
 
   /* ------------------------- Submit an instruction ----------------------- */
@@ -617,7 +616,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           autoPlay
           playsInline
           muted
-          className="h-full w-full object-cover"
+          className={cn(
+            "h-full w-full object-cover",
+            !streamConnected && "opacity-0"
+          )}
         />
         {/* Must stay in the layout — display:none often blocks MediaStream audio. */}
         <audio ref={audioRef} autoPlay playsInline className="sr-only" />

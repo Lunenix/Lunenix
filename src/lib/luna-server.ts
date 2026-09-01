@@ -424,9 +424,9 @@ export function inferLunaForcedTools(
   const tools: LunaForcedTool[] = [];
 
   if (/\b(weather|forecast|temperature)\b/i.test(m)) {
-    const loc =
-      m.match(/\b(?:in|for|at)\s+([A-Za-z][A-Za-z .'-]{1,48}?)(?:[?.!]|$)/i)?.[1] ??
-      m.match(/\b(?:weather|forecast|temperature)\s+(?:in\s+|for\s+|at\s+)?(.+)/i)?.[1];
+    const loc = m.match(
+      /\b(?:weather|forecast|temperature)\b(?:\s+\w+){0,4}?\s+(?:in|for|at)\s+([A-Za-z][A-Za-z .'-]{1,40})/i
+    )?.[1];
     let location = (loc ?? "")
       .replace(/[?.!]+$/g, "")
       .replace(/\b(today|right now|currently|please)\b/gi, "")

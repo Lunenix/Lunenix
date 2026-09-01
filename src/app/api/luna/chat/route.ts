@@ -345,7 +345,6 @@ async function geminiReply(params: {
     systemInstruction,
     temperature: 0.3,
     maxOutputTokens: wantsBriefing ? 2048 : 1024,
-    thinkingConfig: { thinkingBudget: 0 },
     automaticFunctionCalling: { disable: true },
     tools: [{ functionDeclarations: LUNA_TOOLS }],
   };
