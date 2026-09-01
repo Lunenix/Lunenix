@@ -21,6 +21,7 @@ import {
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
 import { ThemeToggleMenuItem } from "@/components/theme-toggle";
 import {
+  Bell,
   Building2,
   CalendarDays,
   Check,
@@ -57,6 +58,7 @@ const navItems = [
   { href: "/automation", label: "Automation", icon: Zap },
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/settings/email", label: "Settings", icon: Settings },
+  { href: "/settings/alerts", label: "Alerts", icon: Bell },
   { href: "/settings/workspaces", label: "Workspaces", icon: Building2 },
 ];
 

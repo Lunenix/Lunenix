@@ -47,6 +47,14 @@ export interface Profile {
   updated_at: string | null;
 }
 
+/** Per-user alert channels. Isolated by user_id; not a workspace CRM table. */
+export interface UserSettings {
+  user_id: string;
+  personal_phone_number: string | null;
+  sms_enabled: boolean;
+  updated_at: string;
+}
+
 export type WorkspaceRole = "owner" | "admin" | "member" | string;
 
 export interface WorkspaceMember {

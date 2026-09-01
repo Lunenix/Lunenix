@@ -34,3 +34,32 @@ export const sendEmailTool: FunctionDeclaration = {
     required: ["subject", "body"],
   },
 };
+
+export const updateUserSettingsTool: FunctionDeclaration = {
+  name: "update_user_settings",
+  description:
+    "Update the signed-in user's personal SMS alert preferences. Never pass another user's id. Do not read the number back in speech unless they asked to confirm it.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      personal_phone_number: {
+        type: Type.STRING,
+        description: "Personal phone for SMS, or empty to clear",
+      },
+      sms_enabled: {
+        type: Type.BOOLEAN,
+        description: "Whether SMS alerts are enabled",
+      },
+    },
+  },
+};
+
+export const getUserSettingsTool: FunctionDeclaration = {
+  name: "get_user_settings",
+  description:
+    "Check whether the signed-in user has SMS alerts on and a phone on file. Does not return the full phone number.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {},
+  },
+};
