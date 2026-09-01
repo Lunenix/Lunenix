@@ -11,6 +11,10 @@
     {
       "path": "/api/emails/scheduled/run",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/email-drafts/run",
+      "schedule": "15 11 * * *"
     }
   ]
 }
