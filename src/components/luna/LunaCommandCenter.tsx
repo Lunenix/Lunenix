@@ -10,10 +10,10 @@ import {
   pickFemaleVoice,
   isLunaWakePhrase,
   stripLunaWakePhrase,
+  LUNA_AVATAR_URL,
 } from "@/lib/luna";
 import { cn } from "@/lib/utils";
 import type { WorkspaceAISettings } from "@/types/database";
-import { LunaAvatar } from "./LunaAvatar";
 import { LunaSettingsModal } from "./LunaSettingsModal";
 import { Mic, MicOff, Send, Settings } from "lucide-react";
 import type { SimliClient } from "simli-client/dist/client";
@@ -97,6 +97,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const wantedRef = useRef(true);
   const connectPromiseRef = useRef<Promise<boolean> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startLiveRef = useRef<() => Promise<boolean>>(async () => false);
 
   const agentName = settings?.agent_name || "Luna";
 
@@ -138,113 +139,131 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     };
   }, []);
 
-  const endLive = useCallback(() => {
-    wantedRef.current = false;
-    sessionGenRef.current += 1;
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-    try {
-      void simliRef.current?.stop();
-    } catch {
-      /* ignore */
-    }
-    simliRef.current = null;
-    liveRef.current = false;
-    connectPromiseRef.current = null;
-    setLive(false);
+  const scheduleReconnect = useCallback(() => {
+    if (!wantedRef.current) return;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = setTimeout(() => {
+      connectPromiseRef.current = null;
+      liveRef.current = false;
+      void startLiveRef.current();
+    }, 1500);
   }, []);
-
-  useEffect(() => {
-    return () => endLive();
-  }, [endLive]);
 
   const startLive = useCallback(async (): Promise<boolean> => {
     if (simliRef.current && liveRef.current) return true;
     if (connectPromiseRef.current) return connectPromiseRef.current;
-    if (!videoRef.current || !audioRef.current) return false;
     if (!wantedRef.current) return false;
 
     const run = (async () => {
+      // Video must exist and stay unoccluded — Simli only emits "start"
+      // after requestVideoFrameCallback, which never fires under an overlay.
+      for (let i = 0; i < 20 && (!videoRef.current || !audioRef.current); i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      const videoEl = videoRef.current;
+      const audioEl = audioRef.current;
+      if (!videoEl || !audioEl || !wantedRef.current) return false;
+
       const gen = ++sessionGenRef.current;
       try {
         const sessionRes = await fetch("/api/simli-session", { method: "POST" });
-        if (!sessionRes.ok) return false;
+        if (!sessionRes.ok) {
+          scheduleReconnect();
+          return false;
+        }
         const sessionData = await sessionRes.json();
         const sessionToken: string | undefined = sessionData?.sessionToken;
-        if (!sessionToken) return false;
+        if (!sessionToken) {
+          scheduleReconnect();
+          return false;
+        }
 
-        const iceServers: RTCIceServer[] | null =
+        const iceServers: RTCIceServer[] =
           Array.isArray(sessionData?.iceServers) && sessionData.iceServers.length
             ? sessionData.iceServers
-            : null;
+            : [{ urls: ["stun:stun.l.google.com:19302"] }];
 
         const { SimliClient } = await import("simli-client/dist/client.js");
         const client = new SimliClient(
           sessionToken,
-          videoRef.current!,
-          audioRef.current!,
+          videoEl,
+          audioEl,
           iceServers
         );
         simliRef.current = client;
 
-        const scheduleReconnect = () => {
-          if (!wantedRef.current) return;
-          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-          reconnectTimerRef.current = setTimeout(() => {
-            connectPromiseRef.current = null;
-            liveRef.current = false;
-            void startLive();
-          }, 1200);
+        const bumpPlay = () => {
+          void videoEl.play().catch(() => undefined);
+          audioEl.muted = false;
+          void audioEl.play().catch(() => undefined);
         };
+        bumpPlay();
+        videoEl.addEventListener("loadeddata", bumpPlay);
+        videoEl.addEventListener("playing", () => setLive(true), { once: true });
 
-        client.on("stop", () => {
+        let started = false;
+        const onSessionEnded = () => {
           if (gen !== sessionGenRef.current) return;
           if (simliRef.current === client) simliRef.current = null;
           liveRef.current = false;
           connectPromiseRef.current = null;
-          // Keep showing the last video frame — do not swap to the still photo.
-          scheduleReconnect();
-        });
-        client.on("startup_error", () => {
-          if (gen !== sessionGenRef.current) return;
-          if (simliRef.current === client) simliRef.current = null;
-          liveRef.current = false;
-          connectPromiseRef.current = null;
-          scheduleReconnect();
-        });
+          if (started) scheduleReconnect();
+        };
+        client.on("stop", onSessionEnded);
+        client.on("startup_error", onSessionEnded);
 
         await client.start();
+        videoEl.removeEventListener("loadeddata", bumpPlay);
         if (gen !== sessionGenRef.current || !wantedRef.current) return false;
+        started = true;
         liveRef.current = true;
         setLive(true);
-        void videoRef.current?.play().catch(() => undefined);
-        if (audioRef.current) {
-          audioRef.current.muted = false;
-          void audioRef.current.play().catch(() => undefined);
-        }
-        await new Promise((r) => setTimeout(r, 400));
-        return gen === sessionGenRef.current && liveRef.current;
+        bumpPlay();
+        return true;
       } catch {
         if (gen === sessionGenRef.current) {
+          try {
+            void simliRef.current?.stop();
+          } catch {
+            /* ignore */
+          }
           simliRef.current = null;
           liveRef.current = false;
+          scheduleReconnect();
         }
         return false;
       }
     })();
 
-    connectPromiseRef.current = run.finally(() => {
-      if (!liveRef.current) connectPromiseRef.current = null;
+    connectPromiseRef.current = run;
+    void run.finally(() => {
+      if (connectPromiseRef.current === run) connectPromiseRef.current = null;
     });
-    return connectPromiseRef.current;
-  }, []);
+    return run;
+  }, [scheduleReconnect]);
+
+  startLiveRef.current = startLive;
 
   // Stay on Simli for the whole dashboard visit. Idle uses no Gemini/ElevenLabs.
   useEffect(() => {
     wantedRef.current = true;
     void startLive();
+    return () => {
+      wantedRef.current = false;
+      sessionGenRef.current += 1;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      try {
+        void simliRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      simliRef.current = null;
+      liveRef.current = false;
+      connectPromiseRef.current = null;
+    };
   }, [startLive]);
 
   const speakFallback = useCallback(async (text: string) => {
@@ -561,17 +580,14 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           autoPlay
           playsInline
           muted
-          className="absolute inset-0 h-full w-full object-cover"
+          poster={LUNA_AVATAR_URL}
+          className="absolute inset-0 z-10 h-full w-full object-cover"
         />
         <audio ref={audioRef} autoPlay playsInline className="sr-only" />
         {!live && (
-          <div className="absolute inset-0">
-            <LunaAvatar
-              fill
-              isSpeaking={status === "speaking"}
-              isAdmin={isAdmin}
-            />
-          </div>
+          <span className="pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-white/70">
+            Connecting…
+          </span>
         )}
       </div>
 
