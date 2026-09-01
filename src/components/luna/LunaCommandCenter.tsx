@@ -677,22 +677,23 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           <audio ref={audioRef} autoPlay playsInline className="sr-only" />
 
           {status === "disconnected" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center space-y-1.5 bg-background/95 p-2 text-center">
-              <div className="rounded-full bg-muted p-2">
-                <VideoOff className="h-4 w-4 text-muted-foreground" />
+            <>
+              <img
+                src={LUNA_AVATAR_URL}
+                alt={`${agentName} portrait`}
+                className="absolute inset-0 z-10 h-full w-full object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-black/70 to-transparent pb-2 pt-8">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void startAvatarSession()}
+                  className="h-6 px-2 text-[10px]"
+                >
+                  Connect
+                </Button>
               </div>
-              <p className="text-[10px] font-semibold text-muted-foreground">
-                Avatar Offline
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void startAvatarSession()}
-                className="h-6 px-2 text-[10px]"
-              >
-                Connect
-              </Button>
-            </div>
+            </>
           )}
 
           {status === "connecting" && (
