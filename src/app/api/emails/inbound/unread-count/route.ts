@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/emails/inbound/unread-count?workspaceId=...
@@ -7,7 +7,7 @@ import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
  */
 export async function GET(request: NextRequest) {
   const access = await verifyWorkspaceAccess(request);
-  if ("errorResponse" in access) return access.errorResponse;
+  if (access.errorResponse) return access.errorResponse;
 
   const { count, error } = await access.supabase
     .from("inbound_emails")

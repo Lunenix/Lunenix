@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { AutomationWorkflow } from "@/types/database";
-import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/automation-workflows?workspaceId=...
@@ -9,7 +9,7 @@ import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
  */
 export async function GET(request: NextRequest) {
   const access = await verifyWorkspaceAccess(request);
-  if ("errorResponse" in access) return access.errorResponse;
+  if (access.errorResponse) return access.errorResponse;
 
   const { data: workflows, error } = await access.supabase
     .from("automation_workflows")

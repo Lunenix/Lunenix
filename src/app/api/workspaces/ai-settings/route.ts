@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isIanaTimeZone, sanitizeCustomInstructions } from "@/lib/luna";
-import {
-  requireWorkspaceMember,
-  verifyWorkspaceAccess,
-} from "@/lib/supabase/workspaceAccess";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 const DEFAULT_SETTINGS = {
   agent_name: "Luna",
@@ -21,7 +19,7 @@ const DEFAULT_SETTINGS = {
  */
 export async function GET(request: NextRequest) {
   const access = await verifyWorkspaceAccess(request);
-  if ("errorResponse" in access) return access.errorResponse;
+  if (access.errorResponse) return access.errorResponse;
   const { supabase, workspaceId } = access;
 
   const { data, error } = await supabase

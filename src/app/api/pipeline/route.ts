@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 const DEFAULT_STAGES = [
   { name: "New Lead", color: "#6366f1" },
@@ -18,7 +18,7 @@ const DEFAULT_STAGES = [
  */
 export async function GET(request: NextRequest) {
   const access = await verifyWorkspaceAccess(request);
-  if ("errorResponse" in access) return access.errorResponse;
+  if (access.errorResponse) return access.errorResponse;
   const { supabase, workspaceId } = access;
 
   const { data: pipelines, error: pErr } = await supabase

@@ -55,13 +55,15 @@ export async function requireWorkspaceMember(
   return { supabase, user, workspaceId: id };
 }
 
+export type WorkspaceAuthed = Authed;
+
 /**
  * Auth + membership for GET routes that pass ?workspaceId=...
- * Returns { errorResponse } or { supabase, user, workspaceId }.
+ * Failures set `errorResponse`; success has supabase, user, workspaceId.
  */
-export async function verifyWorkspaceAccess(request: Request): Promise<
-  Authed | { errorResponse: NextResponse }
-> {
+export async function verifyWorkspaceAccess(
+  request: Request
+): Promise<(Authed & { errorResponse?: undefined }) | { errorResponse: NextResponse }> {
   const { searchParams } = new URL(request.url);
   const workspaceId = searchParams.get("workspaceId");
   const result = await requireWorkspaceMember(workspaceId);

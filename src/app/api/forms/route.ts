@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
+import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 
 /**
  * GET /api/forms
@@ -8,7 +8,7 @@ import { verifyWorkspaceAccess } from "@/lib/supabase/workspaceAccess";
  */
 export async function GET(req: NextRequest) {
   const access = await verifyWorkspaceAccess(req);
-  if ("errorResponse" in access) return access.errorResponse;
+  if (access.errorResponse) return access.errorResponse;
 
   const { data: forms, error } = await access.supabase
     .from("forms")
