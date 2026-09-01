@@ -994,18 +994,19 @@ export function spokenToolResult(result: LunaToolResult): string {
   return "";
 }
 
-async function logActivity(
+/** Record a Luna tool action on `activity_logs` for this workspace only. */
+export async function logLunaAction(
   supabase: LunaSupabaseClient,
   workspaceId: string,
-  actorType: "user" | "luna",
   action: string,
   description: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {
+  if (!workspaceId.trim() || !action.trim() || !description.trim()) return;
   try {
     await supabase.from("activity_logs").insert({
       workspace_id: workspaceId,
-      actor_type: actorType,
+      actor_type: "luna",
       action: action.slice(0, 80),
       description: description.slice(0, 500),
       metadata: sanitizePayload(metadata),
@@ -1022,7 +1023,7 @@ async function lunaMutationOk(
   summary: string,
   metadata: Record<string, unknown> = {}
 ): Promise<LunaToolResult> {
-  await logActivity(supabase, workspaceId, "luna", action, summary, metadata);
+  await logLunaAction(supabase, workspaceId, action, summary, metadata);
   return { ok: true, summary };
 }
 
