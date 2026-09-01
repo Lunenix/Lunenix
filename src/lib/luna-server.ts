@@ -80,6 +80,17 @@ function argString(args: Record<string, unknown>, key: string): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function argStringAny(
+  args: Record<string, unknown>,
+  keys: string[]
+): string | null {
+  for (const key of keys) {
+    const value = argString(args, key);
+    if (value) return value;
+  }
+  return null;
+}
+
 function argNumber(args: Record<string, unknown>, key: string): number | null {
   const value = args[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -830,6 +841,9 @@ export function fillContactCreateArgs(
     next.first_name = first;
     next.last_name = last;
   }
+  if (!next.organization_name && typeof next.company === "string") {
+    next.organization_name = next.company;
+  }
   const email = extractEmailFromText(message);
   const phone = extractPhoneFromText(message);
   if (email && !next.email) next.email = email;
@@ -1010,7 +1024,8 @@ export async function executeLunaTool(
         argString(filled, "last_name") || argString(args, "last_name");
       const organizationName =
         argString(filled, "organization_name") ||
-        argString(args, "organization_name");
+        argString(args, "organization_name") ||
+        argString(args, "company");
       const email = argString(filled, "email") || argString(args, "email");
       const full =
         argString(args, "name") || argString(args, "full_name") || "";
@@ -1074,7 +1089,8 @@ export async function executeLunaTool(
       }
       const firstName = argString(args, "first_name");
       const lastName = argString(args, "last_name");
-      const organizationName = argString(args, "organization_name");
+      const organizationName =
+        argString(args, "organization_name") || argString(args, "company");
       const email = argString(args, "email");
       const phone = argString(args, "phone");
       const address = argString(args, "address");
@@ -1119,7 +1135,8 @@ export async function executeLunaTool(
     }
 
     if (name === "update_project_status") {
-      const status = argString(args, "status");
+      let status = argString(args, "status");
+      if (status === "archived") status = "cancelled";
       if (!status || !PROJECT_STATUSES.has(status)) {
         return {
           error:
@@ -1127,8 +1144,8 @@ export async function executeLunaTool(
         };
       }
 
-      let projectId = argString(args, "project_id");
-      const projectName = argString(args, "project_name");
+      let projectId = argStringAny(args, ["project_id", "projectId"]);
+      const projectName = argStringAny(args, ["project_name", "name"]);
       if (!projectId) projectId = await findProjectId(supabase, workspace_id, projectName);
       if (!projectId) {
         return { error: "Need a project id or name in this workspace." };
@@ -1255,12 +1272,20 @@ export async function executeLunaTool(
 
       const statusArg = argString(args, "status");
       const status =
-        statusArg && TASK_STATUSES.has(statusArg) ? statusArg : "todo";
+        statusArg === "pending"
+          ? "todo"
+          : statusArg && TASK_STATUSES.has(statusArg)
+            ? statusArg
+            : "todo";
       const priorityArg = argString(args, "priority");
       const priority =
-        priorityArg && TASK_PRIORITIES.has(priorityArg) ? priorityArg : "medium";
+        priorityArg === "normal"
+          ? "medium"
+          : priorityArg && TASK_PRIORITIES.has(priorityArg)
+            ? priorityArg
+            : "medium";
 
-      let projectId = argString(args, "project_id");
+      let projectId = argStringAny(args, ["project_id", "projectId"]);
       if (!projectId) {
         projectId = await findProjectId(
           supabase,
@@ -1290,7 +1315,9 @@ export async function executeLunaTool(
           status,
           priority,
           assignee_id: user_id,
-          due_date: argString(args, "due_date"),
+          due_date:
+            argStringAny(args, ["due_date", "dueDate"]) ??
+            argString(args, "due_date"),
           position: 0,
           completed_at: status === "done" ? new Date().toISOString() : null,
         })

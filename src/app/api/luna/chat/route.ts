@@ -39,10 +39,12 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const MAX_TOOL_ROUNDS = 4;
 
 const BASE_SYSTEM_PROMPT =
-  "You are Luna, a warm and professional AI executive assistant for a business CRM. " +
+  "You are Luna, the real-time AI avatar assistant for Lunenix Business Hub. " +
+  "You are speaking directly to the user through a video avatar. " +
   "You MUST use tools to act. Never pretend you created a form, fetched weather, sent mail, or changed CRM data without a tool result. " +
-  "Default replies are 1 to 3 short spoken sentences. Do not use markdown, bullets, headings, " +
-  "code, asterisks, or URLs. Never spell out IDs unless asked. " +
+  "Keep responses concise, direct, and under 3 sentences unless explicitly asked for detail. " +
+  "Do not use Markdown headings, lists, bolding, tables, or code blocks. " +
+  "Speak in plain conversational text optimized for text-to-speech. Never spell out IDs unless asked. " +
   "When the user asks for a daily briefing, rundown, or what's on their plate, call get_daily_briefing " +
   "and then speak 4 to 8 short sentences covering open tasks, pending contracts, unpaid invoices, and active projects. " +
   "When they ask about weather, call get_weather. Use their home city from context if they did not name another city. " +
@@ -80,6 +82,10 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
         organization_name: {
           type: "string",
           description: "Company or organization name",
+        },
+        company: {
+          type: "string",
+          description: "Company or organization name (same as organization_name)",
         },
         email: { type: "string", description: "Email address" },
         phone: { type: "string", description: "Phone number" },
@@ -219,8 +225,31 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
           type: "string",
           description: "Due date as YYYY-MM-DD",
         },
+        dueDate: {
+          type: "string",
+          description: "Due date as YYYY-MM-DD (same as due_date)",
+        },
       },
       required: ["title"],
+    },
+  },
+  {
+    name: "update_project_status",
+    description:
+      "Update the operational status of an existing project in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "Project UUID" },
+        project_id: { type: "string", description: "Project UUID" },
+        project_name: { type: "string", description: "Project name if id is unknown" },
+        status: {
+          type: "string",
+          description:
+            "planning, active, on_hold, completed, cancelled, or archived",
+        },
+      },
+      required: ["status"],
     },
   },
   {
@@ -332,14 +361,42 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
   },
 ];
 
-function toSpokenText(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, " ")
+/** Strip markdown so Simli / ElevenLabs get audio-friendly speech. */
+function cleanTextForTTS(input: string): string {
+  return input
+    .replace(/```[\s\S]*?```/g, "")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^#+\s+/gm, "")
+    .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\|.*\|/g, "")
     .replace(/[*_#>]+/g, " ")
+    .replace(/[\r\n]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function toSpokenText(text: string): string {
+  return cleanTextForTTS(text);
+}
+
+function lunaSpeechJson(
+  raw: string,
+  extra?: { pendingAction?: string | null; executedTools?: string[] }
+) {
+  const text = cleanTextForTTS(raw);
+  return NextResponse.json(
+    {
+      reply: text,
+      text,
+      rawText: raw,
+      executedTools: extra?.executedTools ?? [],
+      pendingAction: extra?.pendingAction ?? null,
+    },
+    { status: 200 }
+  );
 }
 
 /** Deterministic, dependency-free fallback replies. */
@@ -631,11 +688,48 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  try {
+    return await handleLunaChat({
+      supabase,
+      userId: user.id,
+      message,
+      workspaceId,
+      clientTimezone,
+      pendingAction,
+    });
+  } catch (err) {
+    console.error(
+      "Luna chat error:",
+      err instanceof Error ? err.message : err
+    );
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleLunaChat(params: {
+  supabase: ReturnType<typeof createClient>;
+  userId: string;
+  message: string;
+  workspaceId: string;
+  clientTimezone: string | null;
+  pendingAction: string | null;
+}) {
+  const {
+    supabase,
+    userId,
+    workspaceId,
+    clientTimezone,
+  } = params;
+  let { message, pendingAction } = params;
+
   const { data: membership, error: memberErr } = await supabase
     .from("workspace_members")
     .select("user_id")
     .eq("workspace_id", workspaceId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (memberErr || !membership) {
@@ -646,19 +740,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (!message.trim()) {
-    return NextResponse.json(
-      { reply: "I didn't catch that — could you say it again?" },
-      { status: 200 }
-    );
+    return lunaSpeechJson("I didn't catch that — could you say it again?");
   }
 
   if (INJECTION_RE.test(message)) {
-    return NextResponse.json(
-      {
-        reply:
-          "I can't help with that. I only assist with work in your current workspace.",
-      },
-      { status: 200 }
+    return lunaSpeechJson(
+      "I can't help with that. I only assist with work in your current workspace."
     );
   }
 
@@ -712,24 +799,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (isFormCreateRequest(message) && !resolveFormCreateName(message)) {
-    return NextResponse.json(
-      { reply: ASK_FORM_NAME_REPLY, pendingAction: "create_form" },
-      { status: 200 }
-    );
+    return lunaSpeechJson(ASK_FORM_NAME_REPLY, { pendingAction: "create_form" });
   }
 
   if (isContactCreateRequest(message) && !extractContactNameFromMessage(message)) {
-    return NextResponse.json(
-      { reply: ASK_CONTACT_NAME_REPLY, pendingAction: "create_contact" },
-      { status: 200 }
-    );
+    return lunaSpeechJson(ASK_CONTACT_NAME_REPLY, {
+      pendingAction: "create_contact",
+    });
   }
 
   if (isProjectCreateRequest(message) && !extractProjectNameFromMessage(message)) {
-    return NextResponse.json(
-      { reply: ASK_PROJECT_NAME_REPLY, pendingAction: "create_project" },
-      { status: 200 }
-    );
+    return lunaSpeechJson(ASK_PROJECT_NAME_REPLY, {
+      pendingAction: "create_project",
+    });
   }
 
   const priorToolNotes: string[] = [];
@@ -739,7 +821,7 @@ export async function POST(req: NextRequest) {
     const result = await executeLunaTool(
       supabase,
       workspaceId,
-      user.id,
+      userId,
       tool.name,
       tool.args
     );
@@ -753,7 +835,7 @@ export async function POST(req: NextRequest) {
     llmReply = await geminiReply({
       message,
       workspaceId,
-      userId: user.id,
+      userId,
       supabase,
       priorToolNotes,
       completedTools,
@@ -767,7 +849,7 @@ export async function POST(req: NextRequest) {
     llmReply = null;
   }
 
-  const reply =
+  const rawReply =
     llmReply ||
     (priorToolNotes.length ? priorToolNotes.join(" ") : null) ||
     (isFormCreateRequest(message) && !resolveFormCreateName(message)
@@ -782,17 +864,14 @@ export async function POST(req: NextRequest) {
     isContactCreateRequest(message) && !extractContactNameFromMessage(message);
   const stillNeedsProjectName =
     isProjectCreateRequest(message) && !extractProjectNameFromMessage(message);
-  return NextResponse.json(
-    {
-      reply,
-      pendingAction: stillNeedsFormName
-        ? "create_form"
-        : stillNeedsContactName
-          ? "create_contact"
-          : stillNeedsProjectName
-            ? "create_project"
-            : null,
-    },
-    { status: 200 }
-  );
+  return lunaSpeechJson(rawReply, {
+    executedTools: priorToolNotes,
+    pendingAction: stillNeedsFormName
+      ? "create_form"
+      : stillNeedsContactName
+        ? "create_contact"
+        : stillNeedsProjectName
+          ? "create_project"
+          : null,
+  });
 }
