@@ -245,7 +245,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
 
   startLiveRef.current = startLive;
 
-  // Stay on Simli for the whole dashboard visit. Idle uses no Gemini/ElevenLabs.
+  // Stay on Simli for the whole dashboard visit.
   useEffect(() => {
     wantedRef.current = true;
     void startLive();
@@ -386,6 +386,10 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     async (text: string) => {
       const raw = text.trim();
       if (!raw) return;
+      if (!workspaceId) {
+        toast("No workspace selected.", "error");
+        return;
+      }
       setInstruction("");
       const woke = isLunaWakePhrase(raw);
       const command = woke ? stripLunaWakePhrase(raw) : raw;
@@ -635,8 +639,8 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         </Button>
       </div>
       <p className="px-4 pb-3 text-center text-[11px] text-white/40">
-        Type or say Hey {agentName} to talk. She stays on the live avatar;
-        idle uses no Gemini or ElevenLabs until you wake her.
+        Type or speak to Luna. Real-time avatar streaming connects automatically
+        upon interaction.
       </p>
 
       <LunaSettingsModal
