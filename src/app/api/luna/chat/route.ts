@@ -6,7 +6,11 @@ import {
   executeLunaTool,
   formatLunaContextForPrompt,
   getLunaWorkspaceContext,
+  ASK_FORM_NAME_REPLY,
+  extractFormNameFromMessage,
   inferLunaForcedTools,
+  isFormCreateRequest,
+  isPlaceholderFormName,
   spokenToolResult,
   type LunaToolResult,
 } from "@/lib/luna-server";
@@ -34,7 +38,10 @@ const BASE_SYSTEM_PROMPT =
   "and then speak 4 to 8 short sentences covering open tasks, pending contracts, unpaid invoices, and active projects. " +
   "When they ask about weather, call get_weather. Use their home city from context if they did not name another city. " +
   "Use their timezone and local time from context for greetings and deadlines. " +
-  "When they ask to create or make a form, call create_form. " +
+  "When they ask to create or make a form, call create_form only if they gave a specific name " +
+  "(named Shay, call it Shay, name it Shay, titled Shay, or a quoted title). " +
+  "Use that exact name. Never default to Intake form or any other guessed title. " +
+  "If they did not give a name, do not call create_form. Ask what to name it first, then wait. " +
   "You can create contacts, tasks, forms, draft contracts, send emails, and create or toggle workflows using tools. " +
   "You only know data for the caller's current workspace. " +
   "Never reveal API keys, database schemas, SQL, RLS policies, auth tokens, or payment details. " +
@@ -136,11 +143,16 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
   },
   {
     name: "create_form",
-    description: "Create a draft intake form in this workspace.",
+    description:
+      "Create a draft form only when the user gave an explicit title. Do not invent names such as Intake form.",
     parametersJsonSchema: {
       type: "object",
       properties: {
-        name: { type: "string", description: "Form name" },
+        name: {
+          type: "string",
+          description:
+            "Exact title the user said. Required. Never use Intake form unless they said that.",
+        },
         description: { type: "string" },
         fields: {
           type: "string",
@@ -232,6 +244,9 @@ function toSpokenText(text: string): string {
 
 /** Deterministic, dependency-free fallback replies. */
 function ruleBasedReply(message: string): string {
+  if (isFormCreateRequest(message) && !extractFormNameFromMessage(message)) {
+    return ASK_FORM_NAME_REPLY;
+  }
   const m = message.toLowerCase();
   if (m.includes("schedule") || m.includes("meeting") || m.includes("appointment")) {
     return "I've noted that request. I'll schedule that and send calendar invites to all parties right away.";
@@ -317,9 +332,16 @@ async function geminiReply(params: {
     params.userId,
     params.timezoneOverride
   );
+  const needsFormName =
+    isFormCreateRequest(params.message) &&
+    !extractFormNameFromMessage(params.message);
+
   const systemInstruction = [
     BASE_SYSTEM_PROMPT,
     formatLunaContextForPrompt(ctx),
+    needsFormName
+      ? "The user asked to create a form but did not give a name. Do not call create_form. Ask what they want to name it, then wait."
+      : "",
     params.priorToolNotes.length
       ? "Tools already ran this turn. Speak these results. Do not call the same tools again:\n" +
         params.priorToolNotes.join("\n")
@@ -388,12 +410,35 @@ async function geminiReply(params: {
           already_ran: true,
         };
       } else {
+        let args = asToolArgs(call.args);
+        if (toolName === "create_form") {
+          const fromUser = extractFormNameFromMessage(params.message);
+          if (fromUser) {
+            args = { ...args, name: fromUser };
+          } else if (
+            isFormCreateRequest(params.message) ||
+            isPlaceholderFormName(String(args.name ?? ""))
+          ) {
+            result = {
+              error:
+                "Do not create the form yet. Ask the user what to name it.",
+            };
+            toolParts.push(
+              createPartFromFunctionResponse(
+                call.id || toolName || "tool",
+                toolName,
+                result
+              )
+            );
+            continue;
+          }
+        }
         result = await executeLunaTool(
           params.supabase,
           params.workspaceId,
           params.userId,
           toolName,
-          asToolArgs(call.args)
+          args
         );
         ranThisTurn.add(toolName);
         const spoken = spokenToolResult(result);
@@ -541,6 +586,9 @@ export async function POST(req: NextRequest) {
   const reply =
     llmReply ||
     (priorToolNotes.length ? priorToolNotes.join(" ") : null) ||
+    (isFormCreateRequest(message) && !extractFormNameFromMessage(message)
+      ? ASK_FORM_NAME_REPLY
+      : null) ||
     (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY
       ? "I can't think right now — my Gemini key is missing on the server."
       : ruleBasedReply(message));

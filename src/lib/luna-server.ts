@@ -415,6 +415,71 @@ export type LunaForcedTool = {
   args: Record<string, unknown>;
 };
 
+const PLACEHOLDER_FORM_NAME_RE =
+  /^(an?\s+)?(new\s+)?(draft\s+)?((intake|contact|lead|client|feedback|survey|sign[\s-]?up)\s+)?forms?$/i;
+
+export function isPlaceholderFormName(value: string): boolean {
+  const n = value.trim().toLowerCase().replace(/['"]/g, "");
+  return !n || PLACEHOLDER_FORM_NAME_RE.test(n) || n === "untitled" || n === "default";
+}
+
+export function isFormCreateRequest(message: string): boolean {
+  const m = message.trim();
+  return (
+    /\b(create|make|build|start|new|draft|add)\b.{0,80}\bforms?\b/i.test(m) ||
+    /\bforms?\b.{0,50}\b(create|make|build|start|new|draft|add)\b/i.test(m) ||
+    /\b(contact|intake|lead|sign[- ]?up|client|feedback|survey)\s+form\b/i.test(m)
+  );
+}
+
+function cleanExtractedFormName(raw: string | undefined): string | null {
+  if (!raw) return null;
+  let s = raw.trim();
+  s = s.replace(/^[\s"'`]+/, "").replace(/[\s"'`.!?]+$/, "");
+  s = s.split(/[.?!,;]/)[0]?.trim() ?? "";
+  s = s.replace(/\s+(please|thanks|thank you|now|for me|real quick|quickly)[\s.!?]*$/i, "");
+  s = s.replace(
+    /\s+(?:with|that has|that includes|and then|and add|and include|fields?:)\b[\s\S]*$/i,
+    ""
+  );
+  s = s.replace(/\s+/g, " ").trim();
+  if (s.length < 1 || s.length > 80) return null;
+  if (isPlaceholderFormName(s)) return null;
+  return s;
+}
+
+/** Pull an explicit form title from phrasing like "name it Shay" or "called Shay". */
+export function extractFormNameFromMessage(message: string): string | null {
+  const m = message.trim();
+  const patterns: RegExp[] = [
+    /\bname\s+(?:the\s+form|this(?:\s+form)?|it|that(?:\s+form)?)\s+(?:as\s+|to\s+)?["']?([^"'?\n]+)/i,
+    /\b(?:give\s+it|with|under)\s+(?:the\s+)?name\s+["']?([^"'?\n]+)/i,
+    /\b(?:call|title)\s+(?:it|this|that|the\s+form)\s+(?:as\s+)?["']?([^"'?\n]+)/i,
+    /\b(?:named|called|titled|labelled|labeled)\s+(?:it\s+)?["']?([^"'?\n]+)/i,
+    /\bforms?\s+(?:called|named|titled|labelled|labeled)\s+["']?([^"'?\n]+)/i,
+    /\bforms?\s*[,:]\s*["']?([A-Za-z][^"'?\n]{0,60})/i,
+  ];
+  for (const re of patterns) {
+    const name = cleanExtractedFormName(m.match(re)?.[1]);
+    if (name) return name;
+  }
+  const quoted = [...m.matchAll(/["']([^"']{1,80})["']/g)]
+    .map((x) => cleanExtractedFormName(x[1]))
+    .filter((x): x is string => Boolean(x));
+  if (quoted.length === 1) return quoted[0];
+  return null;
+}
+
+export const ASK_FORM_NAME_REPLY =
+  "What should I name that form? Once you give me a name, I'll create the draft.";
+
+function defaultFormFields(message: string): string {
+  const fieldsHint = message.match(/\bfields?\s*[:\-]\s*(.+)$/i)?.[1];
+  if (fieldsHint?.trim()) return fieldsHint.trim().slice(0, 200);
+  if (/\bcontact\s+form\b/i.test(message)) return "Name, Email, Phone";
+  return "Name, Email, Phone, Message";
+}
+
 /** Run weather/forms even if Gemini skips tools or errors out. */
 export function inferLunaForcedTools(
   message: string,
@@ -440,31 +505,15 @@ export function inferLunaForcedTools(
     });
   }
 
-  if (
-    /\b(create|make|build|new|draft|add)\b.{0,60}\bforms?\b/i.test(m) ||
-    /\bforms?\b.{0,40}\b(create|make|build|new|draft)\b/i.test(m) ||
-    /\b(contact|intake|lead|sign[- ]?up|client|feedback|survey)\s+form\b/i.test(m)
-  ) {
-    const named = m.match(
-      /\bform\s+(?:called|named|titled|for)\s+["']?([^"'?.!]+)["']?/i
-    );
-    const kind = m.match(
-      /\b(contact|intake|lead|sign[- ]?up|client|feedback|survey)\s+form\b/i
-    );
-    const name = (
-      named?.[1]?.trim() ||
-      (kind ? `${kind[1].replace(/-/g, " ")} form` : "Intake form")
-    ).slice(0, 80);
-    const fieldsHint = m.match(/\bfields?\s*[:\-]\s*(.+)$/i)?.[1];
-    const fields =
-      fieldsHint?.trim() ||
-      (kind && /contact/i.test(kind[1])
-        ? "Name, Email, Phone"
-        : "Name, Email, Phone, Message");
-    tools.push({
-      name: "create_form",
-      args: { name, fields: fields.slice(0, 200) },
-    });
+  if (isFormCreateRequest(m)) {
+    const name = extractFormNameFromMessage(m);
+    // No guessed titles like "Intake form" — if they did not name it, ask first.
+    if (name) {
+      tools.push({
+        name: "create_form",
+        args: { name, fields: defaultFormFields(m) },
+      });
+    }
   }
 
   return tools;
@@ -656,7 +705,12 @@ export async function executeLunaTool(
 
     if (name === "create_form") {
       const formName = argString(args, "name");
-      if (!formName) return { error: "A form name is required." };
+      if (!formName || isPlaceholderFormName(formName)) {
+        return {
+          error:
+            "Do not create the form yet. Ask the user what to name it. Never guess a title like Intake form.",
+        };
+      }
       const labels = (argString(args, "fields") ?? "Name, Email")
         .split(",")
         .map((s) => s.trim())
