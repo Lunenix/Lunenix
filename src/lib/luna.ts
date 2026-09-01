@@ -157,6 +157,13 @@ export interface SanitizedProject {
   status: string;
 }
 
+export interface SanitizedActivity {
+  actor_type: "user" | "luna";
+  action: string;
+  description: string;
+  created_at: string;
+}
+
 export interface WorkspaceContextPayload {
   workspaceId: string;
   settings: LunaContextSettings;
@@ -164,6 +171,7 @@ export interface WorkspaceContextPayload {
   tasks: SanitizedTask[];
   invoices: SanitizedInvoice[];
   projects: SanitizedProject[];
+  recentActivity: SanitizedActivity[];
   summary: {
     totalContacts: number;
     openTasksCount: number;
@@ -236,6 +244,9 @@ ${context.invoices.map((i) => `- Invoice #${i.invoice_number}: $${i.amount} (${i
 
 [RECENT CONTACTS]
 ${context.contacts.map((c) => `- ${c.name} (${c.company ?? "No company"}, Email: ${c.email ?? "N/A"})`).join("\n") || "None"}
+
+[RECENT ACTIVITY]
+${context.recentActivity.map((a) => `- (${a.actor_type}) ${a.description}`).join("\n") || "None"}
 `.trim();
 }
 

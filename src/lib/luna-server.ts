@@ -444,6 +444,7 @@ export async function getWorkspaceContext(
     { data: tasks },
     { data: invoices },
     { data: projects },
+    { data: activityLogs },
   ] = await Promise.all([
     supabase
       .from("workspace_ai_settings")
@@ -474,6 +475,12 @@ export async function getWorkspaceContext(
       .eq("workspace_id", workspace_id)
       .eq("status", "active")
       .limit(20),
+    supabase
+      .from("activity_logs")
+      .select("actor_type, action, description, created_at")
+      .eq("workspace_id", workspace_id)
+      .order("created_at", { ascending: false })
+      .limit(12),
   ]);
 
   const rawPayload: WorkspaceContextPayload = {
@@ -518,6 +525,20 @@ export async function getWorkspaceContext(
       name: String(p.name ?? ""),
       status: String(p.status ?? ""),
     })),
+    recentActivity: (activityLogs ?? [])
+      .filter(
+        (row: Record<string, unknown>) =>
+          (row.actor_type === "user" || row.actor_type === "luna") &&
+          typeof row.description === "string" &&
+          typeof row.action === "string"
+      )
+      .map((row: Record<string, unknown>) => ({
+        actor_type: row.actor_type as "user" | "luna",
+        action: String(row.action).slice(0, 80),
+        description: String(row.description).slice(0, 240),
+        created_at:
+          typeof row.created_at === "string" ? row.created_at : "",
+      })),
     summary: {
       totalContacts: (contacts ?? []).length,
       openTasksCount: (tasks ?? []).length,
@@ -973,6 +994,38 @@ export function spokenToolResult(result: LunaToolResult): string {
   return "";
 }
 
+async function logActivity(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  actorType: "user" | "luna",
+  action: string,
+  description: string,
+  metadata: Record<string, unknown> = {}
+): Promise<void> {
+  try {
+    await supabase.from("activity_logs").insert({
+      workspace_id: workspaceId,
+      actor_type: actorType,
+      action: action.slice(0, 80),
+      description: description.slice(0, 500),
+      metadata: sanitizePayload(metadata),
+    });
+  } catch {
+    /* table may not exist until 0018 is applied */
+  }
+}
+
+async function lunaMutationOk(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  action: string,
+  summary: string,
+  metadata: Record<string, unknown> = {}
+): Promise<LunaToolResult> {
+  await logActivity(supabase, workspaceId, "luna", action, summary, metadata);
+  return { ok: true, summary };
+}
+
 export async function executeLunaTool(
   supabase: LunaSupabaseClient,
   workspaceId: string,
@@ -1071,7 +1124,12 @@ export async function executeLunaTool(
         return { error: error?.message ?? "Could not create contact." };
       }
       const label = contactSpokenLabel(data as Record<string, unknown>);
-      return { ok: true, summary: `Created contact ${label}.` };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created contact ${label}.`
+      );
     }
 
     if (name === "update_contact") {
@@ -1131,10 +1189,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not update that contact." };
       }
-      return {
-        ok: true,
-        summary: `Updated contact ${contactSpokenLabel(data as Record<string, unknown>)}.`,
-      };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Updated contact ${contactSpokenLabel(data as Record<string, unknown>)}.`
+      );
     }
 
     if (name === "update_project_status") {
@@ -1165,10 +1225,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Project not found in this workspace." };
       }
-      return {
-        ok: true,
-        summary: `Updated ${data.name ?? "project"} to ${data.status}.`,
-      };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Updated ${data.name ?? "project"} to ${data.status}.`
+      );
     }
 
     if (name === "create_project") {
@@ -1201,10 +1263,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not create project." };
       }
-      return {
-        ok: true,
-        summary: `Created project ${data.name} as ${data.status}.`,
-      };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created project ${data.name} as ${data.status}.`
+      );
     }
 
     if (name === "update_project") {
@@ -1263,10 +1327,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not update that project." };
       }
-      return {
-        ok: true,
-        summary: `Updated project ${data.name}. It is ${data.status}.`,
-      };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Updated project ${data.name}. It is ${data.status}.`
+      );
     }
 
     if (name === "create_task") {
@@ -1330,7 +1396,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not create task." };
       }
-      return { ok: true, summary: `Created task ${data.title}.` };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created task ${data.title}.`
+      );
     }
 
     if (name === "create_form") {
@@ -1380,7 +1451,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not create form." };
       }
-      return { ok: true, summary: `Created draft form ${data.name}.` };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created draft form ${data.name}.`
+      );
     }
 
     if (name === "create_contract") {
@@ -1419,10 +1495,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not create contract." };
       }
-      return {
-        ok: true,
-        summary: `Created draft contract ${data.name} (${data.contract_number}).`,
-      };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created draft contract ${data.name} (${data.contract_number}).`
+      );
     }
 
     if (name === "send_email") {
@@ -1458,7 +1536,12 @@ export async function executeLunaTool(
       if (!result.success) {
         return { error: result.error ?? "Email failed to send." };
       }
-      return { ok: true, summary: `Sent email to ${to} about ${subject}.` };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Sent email to ${to} about ${subject}.`
+      );
     }
 
     if (name === "create_workflow") {
@@ -1488,10 +1571,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not create workflow." };
       }
-      return {
-        ok: true,
-        summary: `Created workflow ${data.name} as inactive. Turn it on when you are ready.`,
-      };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created workflow ${data.name} as inactive. Turn it on when you are ready.`
+      );
     }
 
     if (name === "toggle_workflow") {
@@ -1519,10 +1604,12 @@ export async function executeLunaTool(
       if (error || !data) {
         return { error: error?.message ?? "Could not update workflow." };
       }
-      return {
-        ok: true,
-        summary: `${data.name} is now ${data.is_active ? "on" : "off"}.`,
-      };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `${data.name} is now ${data.is_active ? "on" : "off"}.`
+      );
     }
 
     return { error: "Unknown tool." };

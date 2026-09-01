@@ -53,6 +53,19 @@ export interface WorkspaceMember {
   role: WorkspaceRole;
 }
 
+export type ActivityActorType = "user" | "luna";
+
+/** Tenant-scoped audit/activity row for Luna context and workspace history. */
+export interface ActivityLog {
+  id: string;
+  workspace_id: string;
+  actor_type: ActivityActorType;
+  action: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 /**
  * A workspace joined with the current user's membership row. Useful for the
  * workspace switcher, which needs both the workspace details and the role.
