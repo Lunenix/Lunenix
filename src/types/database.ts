@@ -199,6 +199,8 @@ export interface Task {
   priority: TaskPriority;
   assignee_id: string | null;
   due_date: string | null;
+  reminder_minutes_before: number | null;
+  reminder_sent_at: string | null;
   position: number;
   completed_at: string | null;
   created_at: string;

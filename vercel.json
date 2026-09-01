@@ -15,6 +15,10 @@
     {
       "path": "/api/email-drafts/run",
       "schedule": "15 11 * * *"
+    },
+    {
+      "path": "/api/tasks/reminders/run",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

@@ -20,6 +20,7 @@ const PUBLIC_PATHS = [
   "/api/emails/scheduled/run",
   "/api/emails/inbound/run",
   "/api/email-drafts/run",
+  "/api/tasks/reminders/run",
 ];
 
 function isPublicPath(pathname: string): boolean {
