@@ -14,6 +14,8 @@ interface LunaAvatarProps {
   isSpeaking: boolean;
   isAdmin?: boolean;
   size?: number;
+  /** Fill the parent instead of a fixed pixel box. */
+  fill?: boolean;
   className?: string;
 }
 
@@ -21,11 +23,20 @@ export function LunaAvatar({
   isSpeaking,
   isAdmin = false,
   size = 96,
+  fill = false,
   className,
 }: LunaAvatarProps) {
+  const boxStyle = fill
+    ? undefined
+    : { width: size, height: size };
+  const boxClass = fill ? "h-full w-full" : "";
+
   if (!isAdmin) {
     return (
-      <div className={cn("relative", className)} style={{ width: size, height: size }}>
+      <div
+        className={cn("relative", boxClass, className)}
+        style={boxStyle}
+      >
         <div className="flex h-full w-full items-center justify-center rounded-xl border-2 border-indigo-500/50 bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg">
           <Bot
             className="text-white/90"
@@ -44,8 +55,8 @@ export function LunaAvatar({
 
   return (
     <div
-      className={cn("relative select-none", className)}
-      style={{ width: size, height: size }}
+      className={cn("relative select-none", boxClass, className)}
+      style={boxStyle}
     >
       {isSpeaking && (
         <span className="pointer-events-none absolute inset-[-4px] z-0 animate-ping rounded-xl bg-indigo-500/25" />
@@ -55,7 +66,12 @@ export function LunaAvatar({
         src={LUNA_AVATAR_URL}
         alt="Luna"
         draggable={false}
-        className="relative z-10 h-full w-full rounded-xl border-2 border-indigo-500/60 object-cover shadow-lg"
+        className={cn(
+          "relative z-10 h-full w-full object-cover",
+          fill
+            ? ""
+            : "rounded-xl border-2 border-indigo-500/60 shadow-lg"
+        )}
       />
       {isSpeaking && (
         <span
