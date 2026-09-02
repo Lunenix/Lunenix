@@ -19,6 +19,98 @@ export function isFieldServiceWorkspace(
   return industrySectorId(industryPreset) === "home_field";
 }
 
+export function isRoofingWorkspace(industryPreset?: string | null): boolean {
+  return industryPreset === "roofing_exterior_repair";
+}
+
+export const CLAIM_STATUSES = [
+  "filed",
+  "adjuster_scheduled",
+  "approved",
+  "denied",
+  "supplement_pending",
+  "paid",
+  "closed",
+] as const;
+export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
+export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
+  filed: "Filed",
+  adjuster_scheduled: "Adjuster scheduled",
+  approved: "Approved",
+  denied: "Denied",
+  supplement_pending: "Supplement pending",
+  paid: "Paid",
+  closed: "Closed",
+};
+export function isOpenClaimStatus(status: string): boolean {
+  return ["filed", "adjuster_scheduled", "denied", "supplement_pending"].includes(
+    status
+  );
+}
+
+export const CLAIM_PRICING_MODES = ["insurance", "out_of_pocket"] as const;
+export type ClaimPricingMode = (typeof CLAIM_PRICING_MODES)[number];
+export const CLAIM_PRICING_LABELS: Record<ClaimPricingMode, string> = {
+  insurance: "Insurance",
+  out_of_pocket: "Out of pocket",
+};
+
+export const MATERIAL_ORDER_STATUSES = [
+  "needed",
+  "ordered",
+  "in_transit",
+  "delivered",
+  "delayed",
+  "cancelled",
+] as const;
+export type MaterialOrderStatus = (typeof MATERIAL_ORDER_STATUSES)[number];
+export const MATERIAL_ORDER_STATUS_LABELS: Record<MaterialOrderStatus, string> =
+  {
+    needed: "Needed",
+    ordered: "Ordered",
+    in_transit: "In transit",
+    delivered: "Delivered",
+    delayed: "Delayed",
+    cancelled: "Cancelled",
+  };
+export function isOpenMaterialOrderStatus(status: string): boolean {
+  return ["needed", "ordered", "in_transit", "delayed"].includes(status);
+}
+
+export const MATERIAL_TYPES = [
+  "shingles",
+  "underlayment",
+  "dumpster",
+  "other",
+] as const;
+export type MaterialType = (typeof MATERIAL_TYPES)[number];
+export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
+  shingles: "Shingles",
+  underlayment: "Underlayment",
+  dumpster: "Dumpster / roll-off",
+  other: "Other",
+};
+
+export const ESTIMATE_PHOTO_KINDS = [
+  "photo",
+  "drone",
+  "measurement",
+  "video",
+] as const;
+export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
+export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
+  photo: "Photo",
+  drone: "Drone",
+  measurement: "Measurement",
+  video: "Video",
+};
+
+export const ROOFING_LEAD_SOURCES = [
+  "Storm / insurance",
+  "Out of pocket",
+  "Referral",
+] as const;
+
 export const ESTIMATE_STATUSES = [
   "draft",
   "sent",

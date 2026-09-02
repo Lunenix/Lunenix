@@ -44,6 +44,8 @@ import {
   Receipt,
   Repeat,
   Settings,
+  Shield,
+  Truck,
   KanbanSquare,
   Users,
   Wrench,
@@ -65,6 +67,8 @@ const fieldNav = [
   { href: "/books", label: "Books", icon: BookOpen },
   { href: "/mileage", label: "Mileage", icon: MapPin },
   { href: "/permits", label: "Permits", icon: ClipboardList },
+  { href: "/claims", label: "Claims", icon: Shield },
+  { href: "/materials", label: "Materials", icon: Truck },
   { href: "/plans", label: "Recurring", icon: Repeat },
   { href: "/team", label: "Techs", icon: HardHat },
 ];

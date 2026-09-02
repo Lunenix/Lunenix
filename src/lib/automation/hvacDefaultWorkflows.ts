@@ -869,6 +869,183 @@ export const LANDSCAPING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * Roofing & Exterior Repair default automations.
+ * Insurance claims, drone/inspection photos, materials, weather holds.
+ * Roofing workspaces only — not merged with HVAC or landscaping.
+ */
+export const ROOFING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Roofing: New lead",
+    description:
+      "When a new lead is created, capture storm/insurance vs out-of-pocket vs referral.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New roofing lead: {{lead.title}}",
+        "Set lead source on the pipeline card: storm damage/insurance, out-of-pocket, or referral. Capture name, phone, email, property address, and damage notes. Email to book an inspection. Two-way SMS is not live yet — use email and the contact record.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your roofing request. Reply with the property address, a couple of inspection times, and whether this is insurance or out-of-pocket work.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Roofing: Schedule inspection",
+    description:
+      "On Site Visit, book the inspection/estimate and put it on the calendar.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule roof inspection: {{lead.title}}",
+        "Confirm date/time, address, contact name and number, lead source, damage type/notes, and insurance info if applicable. Add it to the calendar with the address for routing. Send confirmation and a reminder. Two-way texting is not live yet.",
+        1
+      ),
+      email(
+        "Your roof inspection is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you down for an on-site roof inspection. We will come to the address on file. Reply if you need to change the time. If this is an insurance claim, have your claim number handy for the visit.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Roofing: Inspection photos and estimate",
+    description:
+      "On Estimate Sent, attach drone/roof photos and send insurance or out-of-pocket pricing.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Upload inspection photos: {{lead.title}}",
+        "On Estimates, upload roof photos, drone shots, and measurements (set photo kind). Document damage for the claim. Video files can be linked in notes until a drone video uploader is added.",
+        0
+      ),
+      task(
+        "Send roofing estimate: {{lead.title}}",
+        "Price from insurance scope or out-of-pocket. Email the estimate. Track sent / viewed / approved / expired. Approval converts to a job.",
+        0
+      ),
+      email(
+        "Your roofing estimate from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready. Please review and reply to approve, or tell us what to adjust. If this is an insurance job, we will also keep the claim file updated.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Roofing: Job, claim, permits, and materials",
+    description:
+      "After Contract Signed, open the job, claim file, permits, and material orders.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Create roofing job and assign crew: {{lead.title}}",
+        "Create the job from the approved estimate. Assign a crew. Confirm fall protection/OSHA and ladder safety on Techs. Flag weather hold on Jobs if rain, wind, or extreme heat delays work.",
+        1
+      ),
+      task(
+        "Open insurance claim file: {{lead.title}}",
+        "On Claims, log company, claim status, adjuster, and meet-the-adjuster time. Store Xactimate/scope notes. Track supplements if extra damage is found. Policy numbers stay on the claim record — do not paste them into Luna chat.",
+        1
+      ),
+      task(
+        "Permits for replacement or structural repair: {{lead.title}}",
+        "On Permits, flag full roof replacement or structural repair. Track applied, approved, inspection scheduled/passed. Store permit numbers and notes. If none is required, log not required.",
+        1
+      ),
+      task(
+        "Order materials and dumpster: {{lead.title}}",
+        "On Material orders, log shingles (color/type/qty), underlayment, and dumpster/roll-off with delivery date and drop-off notes. Flag delayed or waiting-on-delivery jobs.",
+        1
+      ),
+      email(
+        "You are on the roofing schedule — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thanks for approving. We are assigning a crew, ordering materials, and tracking any permit or insurance steps. We will confirm the work window and let you know when materials are arriving.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Roofing: Weather, stock, and receipts",
+    description: "When In Progress, check weather, stock, and receipts.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Weather, inventory, and receipts: {{lead.title}}",
+        "Ask Luna for weather before dispatch. Toggle weather hold on Jobs for rain, wind, or extreme heat. Confirm ladders, harnesses, nail guns, leftover stock, and dumpsters in Inventory. Photo receipts on Books (materials, dumpster, supplier invoices). OCR is not auto-filled. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Crew update from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We are lining up the crew and materials for your roof. We will reschedule if weather makes the job unsafe. Reply to this email with questions.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Roofing: Punch list and city inspection",
+    description: "On Punch List, finish leftovers and city inspection.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Punch list and permit inspection: {{lead.title}}",
+        "Walk leftover items, get sign-off, and log city inspection on Permits. Note roof history and insurance company on the contact. Watch pending supplements on Field ops.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Roofing: Invoice, ACV, books, and reviews",
+    description: "When Closed, invoice to insurance or customer and close books.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice and insurance payments: {{lead.title}}",
+        "Invoice to match insurance scope or out-of-pocket pricing. On Claims, track ACV vs depreciation payments. Check AR aging and send reminders if overdue. Review job profit (materials + labor + dumpster vs price/claim payout) on Field ops.",
+        1
+      ),
+      task(
+        "Books, tax set-aside, and history: {{lead.title}}",
+        "Log vendor/supplier bills in Books. Field ops shows income vs expenses and a 30% tax set-aside hint from profit. Save roof history on the contact. Flag negative reviews.",
+        1
+      ),
+      email(
+        "Thanks — invoice from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>The roof work is complete. Your invoice is coming next. If this is an insurance job, we will also note ACV and any remaining depreciation payment on the claim file.</p>"
+      ),
+    ],
+  },
+  {
+    name: "Roofing: After contract signed (e-sign)",
+    description:
+      "When an e-sign contract completes, kick off the job, claim, and materials.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off roofing job from signed contract",
+        "Create or update the job, open the claim file if insurance, order materials, and start permit tracking for full replacement or structural repair.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Roofing: After invoice sent",
+    description: "When an invoice is sent, follow AR and claim payments.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on invoice and claim payment",
+        "Watch aging. Track ACV and depreciation on Claims. Flag permit delays, weather holds, pending supplements, or negative reviews.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -907,6 +1084,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   plumbing: PLUMBING_DEFAULT_WORKFLOWS,
   electrician: ELECTRICIAN_DEFAULT_WORKFLOWS,
   landscaping_lawn_care: LANDSCAPING_DEFAULT_WORKFLOWS,
+  roofing_exterior_repair: ROOFING_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -925,6 +1103,12 @@ async function pruneForeignIndustryWorkflows(
       const name = w.name ?? "";
       for (const pack of prefixes) {
         if (name.startsWith(pack.prefix) && preset !== pack.preset) return true;
+      }
+      if (
+        preset === "roofing_exterior_repair" &&
+        name.startsWith("Roofing & Exterior Repair:")
+      ) {
+        return true;
       }
       if (name.startsWith("Field:") && !keepSharedPermits) return true;
       return false;

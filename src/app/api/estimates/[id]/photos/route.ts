@@ -43,6 +43,10 @@ export async function POST(
     .getPublicUrl(path);
 
   const caption = String(form.get("caption") ?? "").trim() || null;
+  const rawKind = String(form.get("kind") ?? "photo");
+  const kind = ["photo", "drone", "measurement", "video"].includes(rawKind)
+    ? rawKind
+    : "photo";
   const { data, error } = await authed.supabase
     .from("estimate_photos")
     .insert({
@@ -50,6 +54,7 @@ export async function POST(
       estimate_id: authed.recordId,
       file_url: publicUrl.publicUrl,
       caption,
+      kind,
     })
     .select("*")
     .single();

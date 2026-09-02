@@ -27,6 +27,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { ROOFING_LEAD_SOURCES } from "@/lib/fieldService";
 import {
   contactDisplayName,
   type Contact,
@@ -60,6 +61,7 @@ export function LeadSheet({
   const [value, setValue] = useState("");
   const [closeDate, setCloseDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [source, setSource] = useState("");
   const [contactId, setContactId] = useState<string | null>(null);
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -71,6 +73,7 @@ export function LeadSheet({
       setValue(lead?.value != null ? String(lead.value) : "");
       setCloseDate(lead?.expected_close_date ?? "");
       setNotes(lead?.notes ?? "");
+      setSource(lead?.source ?? "");
       setContactId(lead?.contact_id ?? null);
       setError(null);
     }
@@ -94,6 +97,7 @@ export function LeadSheet({
       value: value ? Number(value) : null,
       expected_close_date: closeDate || null,
       notes: notes || null,
+      source: source.trim() || null,
       contact_id: contactId,
     };
 
@@ -224,6 +228,22 @@ export function LeadSheet({
                 </Command>
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="source">Lead source</Label>
+            <Input
+              id="source"
+              list="lead-source-suggestions"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="Storm / insurance, out of pocket, referral…"
+            />
+            <datalist id="lead-source-suggestions">
+              {ROOFING_LEAD_SOURCES.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
           </div>
 
           <div className="space-y-2">

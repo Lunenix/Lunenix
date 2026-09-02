@@ -3,6 +3,8 @@ import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 import {
   monthlyRecurringAmount,
   suggestedTaxSetAside,
+  isOpenClaimStatus,
+  isOpenMaterialOrderStatus,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -29,6 +31,8 @@ export async function GET(request: Request) {
     mileage,
     permits,
     plans,
+    claims,
+    materials,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -36,7 +40,7 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("projects")
-      .select("id, name, status, urgent, due_date, budget, assignee_id")
+      .select("id, name, status, urgent, due_date, budget, assignee_id, weather_hold")
       .eq("workspace_id", workspaceId),
     supabase
       .from("invoices")
@@ -66,6 +70,14 @@ export async function GET(request: Request) {
       .from("service_plans")
       .select("name, frequency, amount, is_active, seasonal_on, next_visit_on")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("insurance_claims")
+      .select("id, status, insurance_company, pricing_mode")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("material_orders")
+      .select("id, name, status, delivery_on")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -77,6 +89,8 @@ export async function GET(request: Request) {
   const miles = mileage.data ?? [];
   const permitRows = permits.data ?? [];
   const planRows = plans.data ?? [];
+  const claimRows = claims.data ?? [];
+  const materialRows = materials.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -187,6 +201,27 @@ export async function GET(request: Request) {
         label: `Recurring visit due: ${p.name}`,
         href: "/plans",
       })),
+      ...claimRows
+        .filter((c) => isOpenClaimStatus(String(c.status)))
+        .map((c) => ({
+          kind: "claim_open",
+          label: `Claim ${c.status.replace("_", " ")}: ${c.insurance_company || "insurance"}`,
+          href: "/claims",
+        })),
+      ...materialRows
+        .filter((m) => isOpenMaterialOrderStatus(String(m.status)))
+        .map((m) => ({
+          kind: "materials_waiting",
+          label: `Materials ${m.status.replace("_", " ")}: ${m.name}`,
+          href: "/materials",
+        })),
+      ...jobs
+        .filter((j) => j.weather_hold && !["completed", "cancelled"].includes(String(j.status)))
+        .map((j) => ({
+          kind: "weather_hold",
+          label: `Weather hold: ${j.name}`,
+          href: "/jobs",
+        })),
     ],
   });
 }

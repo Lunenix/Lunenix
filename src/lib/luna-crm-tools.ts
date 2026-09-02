@@ -566,6 +566,86 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_insurance_claims",
+    description:
+      "List roofing insurance claims (status, company, adjuster). Does not return policy or claim numbers.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          description:
+            "filed, adjuster_scheduled, approved, denied, supplement_pending, paid, or closed",
+        },
+      },
+    },
+  },
+  {
+    name: "log_insurance_claim",
+    description:
+      "Log an insurance claim file for a roofing job. Do not ask the user to paste policy numbers into chat.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        insurance_company: { type: "string" },
+        status: {
+          type: "string",
+          description:
+            "filed, adjuster_scheduled, approved, denied, supplement_pending, paid, or closed",
+        },
+        pricing_mode: {
+          type: "string",
+          description: "insurance or out_of_pocket",
+        },
+        project_name: { type: "string" },
+        adjuster_name: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_material_orders",
+    description:
+      "List material and dumpster orders (status, delivery date, color).",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          description:
+            "needed, ordered, in_transit, delivered, delayed, or cancelled",
+        },
+      },
+    },
+  },
+  {
+    name: "log_material_order",
+    description:
+      "Log shingles, underlayment, dumpster, or other materials for a job, including delivery date.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        material_type: {
+          type: "string",
+          description: "shingles, underlayment, dumpster, or other",
+        },
+        status: {
+          type: "string",
+          description:
+            "needed, ordered, in_transit, delivered, delayed, or cancelled",
+        },
+        project_name: { type: "string" },
+        color: { type: "string" },
+        quantity: { type: "string" },
+        vendor: { type: "string" },
+        delivery_on: { type: "string", description: "YYYY-MM-DD" },
+        dropoff_notes: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",

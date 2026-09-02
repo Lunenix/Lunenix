@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4273,6 +4273,168 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Created recurring plan ${data.name} (${data.frequency}).`
+      );
+    }
+
+    if (name === "list_insurance_claims") {
+      let q = supabase
+        .from("insurance_claims")
+        .select(
+          "status, insurance_company, pricing_mode, adjuster_name, adjuster_at, project:projects(name)"
+        )
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      const status = argString(args, "status");
+      if (status) q = q.eq("status", status);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (c: {
+          status: string;
+          insurance_company: string | null;
+          pricing_mode: string;
+          adjuster_name: string | null;
+          project?: { name: string } | { name: string }[] | null;
+        }) => {
+          const proj = Array.isArray(c.project) ? c.project[0] : c.project;
+          return `${proj?.name ?? "claim"}: ${c.status}${c.insurance_company ? `, ${c.insurance_company}` : ""}${c.pricing_mode === "out_of_pocket" ? " (out of pocket)" : ""}${c.adjuster_name ? `, adjuster ${c.adjuster_name}` : ""}`;
+        }
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No insurance claims in this workspace.",
+      };
+    }
+
+    if (name === "log_insurance_claim") {
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const rawStatus = argString(args, "status") || "filed";
+      const status = (CLAIM_STATUSES as readonly string[]).includes(rawStatus)
+        ? rawStatus
+        : "filed";
+      const rawMode = argString(args, "pricing_mode") || "insurance";
+      const pricing_mode = (CLAIM_PRICING_MODES as readonly string[]).includes(
+        rawMode
+      )
+        ? rawMode
+        : "insurance";
+      const { data, error } = await supabase
+        .from("insurance_claims")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          insurance_company: argString(args, "insurance_company"),
+          status,
+          pricing_mode,
+          adjuster_name: argString(args, "adjuster_name"),
+          notes: argString(args, "notes"),
+        })
+        .select("status, insurance_company")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that claim." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged claim as ${data.status}${data.insurance_company ? ` with ${data.insurance_company}` : ""}. Policy and claim numbers stay on the Claims page, not in this chat.`
+      );
+    }
+
+    if (name === "list_material_orders") {
+      let q = supabase
+        .from("material_orders")
+        .select("name, material_type, status, delivery_on, color")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      const status = argString(args, "status");
+      if (status) q = q.eq("status", status);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (o: {
+          name: string;
+          material_type: string;
+          status: string;
+          delivery_on: string | null;
+          color: string | null;
+        }) =>
+          `${o.name} (${o.material_type}${o.color ? `, ${o.color}` : ""}): ${o.status}${o.delivery_on ? `, delivery ${o.delivery_on}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No material orders in this workspace.",
+      };
+    }
+
+    if (name === "log_material_order") {
+      const orderName = argString(args, "name");
+      if (!orderName) return { error: "Need a material name (for example, shingles or dumpster)." };
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const rawStatus = argString(args, "status") || "needed";
+      const status = (MATERIAL_ORDER_STATUSES as readonly string[]).includes(
+        rawStatus
+      )
+        ? rawStatus
+        : "needed";
+      const rawType = argString(args, "material_type") || "shingles";
+      const material_type = (MATERIAL_TYPES as readonly string[]).includes(rawType)
+        ? rawType
+        : "other";
+      const { data, error } = await supabase
+        .from("material_orders")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          name: orderName.slice(0, 200),
+          material_type,
+          status,
+          color: argString(args, "color"),
+          quantity: argString(args, "quantity"),
+          vendor: argString(args, "vendor"),
+          delivery_on: argString(args, "delivery_on"),
+          dropoff_notes: argString(args, "dropoff_notes"),
+          notes: argString(args, "notes"),
+        })
+        .select("name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that material order." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged material order ${data.name} as ${data.status}.`
       );
     }
 

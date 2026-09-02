@@ -142,8 +142,8 @@ export default function EstimatesPage() {
         <div>
           <h1 className="text-3xl font-bold">Estimates</h1>
           <p className="text-muted-foreground">
-            Schedule the visit, add photos, email the estimate, then approve to
-            open a job.
+            Schedule the visit, add inspection/drone photos, email the
+            estimate, then approve to open a job.
           </p>
         </div>
         <Button

@@ -197,6 +197,8 @@ export interface Project {
   address?: string | null;
   urgent?: boolean;
   route_position?: number | null;
+  weather_hold?: boolean;
+  weather_hold_reason?: string | null;
   created_at: string;
   updated_at: string;
   // Optional relations / computed fields for list + detail views.
@@ -845,7 +847,71 @@ export interface EstimatePhoto {
   estimate_id: string;
   file_url: string;
   caption: string | null;
+  kind?: "photo" | "drone" | "measurement" | "video";
   created_at: string;
+}
+
+export type InsuranceClaimStatus =
+  | "filed"
+  | "adjuster_scheduled"
+  | "approved"
+  | "denied"
+  | "supplement_pending"
+  | "paid"
+  | "closed";
+
+export interface InsuranceClaim {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  estimate_id: string | null;
+  lead_id: string | null;
+  insurance_company: string | null;
+  policy_number: string | null;
+  claim_number: string | null;
+  status: InsuranceClaimStatus;
+  pricing_mode: "insurance" | "out_of_pocket";
+  adjuster_name: string | null;
+  adjuster_phone: string | null;
+  adjuster_email: string | null;
+  adjuster_at: string | null;
+  scope_notes: string | null;
+  supplement_notes: string | null;
+  acv_amount: number | null;
+  depreciation_amount: number | null;
+  acv_paid_on: string | null;
+  depreciation_paid_on: string | null;
+  notes: string | null;
+  created_at: string;
+  contact?: Contact | null;
+  project?: { id: string; name: string } | null;
+}
+
+export type MaterialOrderStatus =
+  | "needed"
+  | "ordered"
+  | "in_transit"
+  | "delivered"
+  | "delayed"
+  | "cancelled";
+
+export interface MaterialOrder {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  name: string;
+  material_type: "shingles" | "underlayment" | "dumpster" | "other";
+  color: string | null;
+  quantity: string | null;
+  vendor: string | null;
+  status: MaterialOrderStatus;
+  delivery_on: string | null;
+  dropoff_notes: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
 }
 
 export interface TechnicianProfile {

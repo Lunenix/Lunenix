@@ -5,8 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ESTIMATE_STATUS_LABELS } from "@/lib/fieldService";
+import { ESTIMATE_STATUS_LABELS, ESTIMATE_PHOTO_KINDS, ESTIMATE_PHOTO_KIND_LABELS, type EstimatePhotoKind } from "@/lib/fieldService";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import type { Estimate, EstimateLineItem } from "@/types/database";
@@ -20,6 +27,7 @@ export default function EstimateDetailPage() {
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
+  const [photoKind, setPhotoKind] = useState<EstimatePhotoKind>("photo");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/estimates/${id}`);
@@ -82,6 +90,7 @@ export default function EstimateDetailPage() {
   async function uploadPhoto(file: File) {
     const body = new FormData();
     body.append("file", file);
+    body.append("kind", photoKind);
     const res = await fetch(`/api/estimates/${id}/photos`, {
       method: "POST",
       body,
@@ -164,26 +173,51 @@ export default function EstimateDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Visit photos</CardTitle>
+          <CardTitle className="text-base">Inspection photos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) uploadPhoto(f);
-            }}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={photoKind}
+              onValueChange={(v) => setPhotoKind(v as EstimatePhotoKind)}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ESTIMATE_PHOTO_KINDS.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {ESTIMATE_PHOTO_KIND_LABELS[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadPhoto(f);
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Mark drone, measurement, or roof photos for insurance documentation.
+            Video files are not uploaded here yet — put a link in estimate notes.
+          </p>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {(est.photos ?? []).map((p) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={p.id}
-                src={p.file_url}
-                alt={p.caption ?? ""}
-                className="h-28 w-full rounded object-cover"
-              />
+              <div key={p.id} className="space-y-1">
+                <img
+                  src={p.file_url}
+                  alt={p.caption ?? ""}
+                  className="h-28 w-full rounded object-cover"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {ESTIMATE_PHOTO_KIND_LABELS[p.kind ?? "photo"]}
+                </p>
+              </div>
             ))}
           </div>
         </CardContent>

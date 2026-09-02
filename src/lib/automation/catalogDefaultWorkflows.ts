@@ -35,6 +35,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "hvac") return "HVAC:";
   if (resolved === "electrician") return "Electrical:";
   if (resolved === "landscaping_lawn_care") return "Landscaping:";
+  if (resolved === "roofing_exterior_repair") return "Roofing:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;

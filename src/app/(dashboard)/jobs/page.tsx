@@ -46,7 +46,8 @@ export default function JobsPage() {
         <h1 className="text-3xl font-bold">Jobs</h1>
         <p className="text-muted-foreground">
           Jobs are workspace projects. Approve an estimate to create one.
-          Assign a tech, set route order, and mark urgent on the job.
+          Assign a tech, set route order, mark weather hold for rain/wind/heat,
+          and mark urgent on the job.
         </p>
       </div>
       <Table>
@@ -56,6 +57,7 @@ export default function JobsPage() {
             <TableHead>Route #</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Due</TableHead>
+            <TableHead>Weather</TableHead>
             <TableHead>Flags</TableHead>
           </TableRow>
         </TableHeader>
@@ -94,8 +96,31 @@ export default function JobsPage() {
               <TableCell>
                 {j.due_date ? new Date(j.due_date).toLocaleDateString() : "—"}
               </TableCell>
+              <TableCell>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(j.weather_hold)}
+                    onChange={async (e) => {
+                      await fetch(`/api/projects/${j.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          weather_hold: e.target.checked,
+                          weather_hold_reason: e.target.checked
+                            ? j.weather_hold_reason || "Weather delay"
+                            : null,
+                        }),
+                      });
+                      load();
+                    }}
+                  />
+                  Hold
+                </label>
+              </TableCell>
               <TableCell className="space-x-1">
                 {j.urgent ? <Badge>Urgent</Badge> : null}
+                {j.weather_hold ? <Badge variant="outline">Weather</Badge> : null}
                 {!j.assignee_id &&
                 j.status !== "completed" &&
                 j.status !== "cancelled" ? (
