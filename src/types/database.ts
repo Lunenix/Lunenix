@@ -1040,14 +1040,10 @@ export interface ServicePlan {
   last_generated_on: string | null;
   notes: string | null;
   created_at: string;
-  contact?: {
-    id: string;
-    first_name: string | null;
-    last_name: string | null;
-    organization_name: string | null;
-    type: string;
-    email: string | null;
-  } | null;
+  contact?: Pick<
+    Contact,
+    "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
+  > | null;
 }
 
 export interface JobFinishSpec {
@@ -1067,14 +1063,10 @@ export interface JobFinishSpec {
   notes: string | null;
   created_at: string;
   project?: { id: string; name: string } | null;
-  contact?: {
-    id: string;
-    first_name: string | null;
-    last_name: string | null;
-    organization_name: string | null;
-    type: string;
-    email: string | null;
-  } | null;
+  contact?: Pick<
+    Contact,
+    "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
+  > | null;
 }
 
 export interface JobPrepItem {
@@ -1122,13 +1114,10 @@ export interface PestTreatment {
   notes: string | null;
   created_at: string;
   project?: { id: string; name: string } | null;
-  contact?: {
-    id: string;
-    first_name: string | null;
-    last_name: string | null;
-    organization_name: string | null;
-    type: string;
-  } | null;
+  contact?: Pick<
+    Contact,
+    "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
+  > | null;
 }
 
 export interface PropertyAccess {
@@ -1145,12 +1134,9 @@ export interface PropertyAccess {
   special_instructions: string | null;
   notes: string | null;
   created_at: string;
-  contact?: {
-    id: string;
-    first_name: string | null;
-    last_name: string | null;
-    organization_name: string | null;
-    type: string;
-  } | null;
+  contact?: Pick<
+    Contact,
+    "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
+  > | null;
   project?: { id: string; name: string } | null;
 }

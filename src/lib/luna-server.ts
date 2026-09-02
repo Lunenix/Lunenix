@@ -4722,6 +4722,11 @@ export async function executeLunaTool(
         .order("created_at", { ascending: false })
         .limit(25);
       if (error) return { error: error.message };
+      type AccessContact = {
+        first_name?: string | null;
+        last_name?: string | null;
+        organization_name?: string | null;
+      };
       const lines = (data ?? []).map(
         (a: {
           entry_method: string;
@@ -4730,7 +4735,7 @@ export async function executeLunaTool(
           child_safety: string | null;
           chemical_sensitive: string | null;
           special_instructions: string | null;
-          contact?: { first_name?: string | null; last_name?: string | null; organization_name?: string | null; type?: string } | { first_name?: string | null }[] | null;
+          contact?: AccessContact | AccessContact[] | null;
         }) => {
           const c = Array.isArray(a.contact) ? a.contact[0] : a.contact;
           const who = c

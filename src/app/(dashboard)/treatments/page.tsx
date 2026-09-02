@@ -203,7 +203,7 @@ export default function TreatmentsPage() {
                     r.target_pest,
                     r.treatment_area,
                     r.treated_on,
-                    r.contact ? contactDisplayName(r.contact as never) : null,
+                    r.contact ? contactDisplayName(r.contact) : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
