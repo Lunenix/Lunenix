@@ -7,6 +7,7 @@ import {
   isIndustryPreset,
   normalizeIndustryCustomLabel,
 } from "@/lib/workspace";
+import { seedHvacDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
 
 /**
  * PATCH /api/workspaces/[id]
@@ -96,6 +97,22 @@ export async function PATCH(
 
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
+
+  if (typeof updates.industry_preset === "string") {
+    try {
+      await admin.rpc("seed_pipeline_stages", {
+        p_workspace_id: auth.workspaceId,
+        p_preset: updates.industry_preset,
+      });
+    } catch (e) {
+      console.error("seed_pipeline_stages failed:", e);
+    }
+    try {
+      await seedHvacDefaultWorkflows(admin, auth.workspaceId);
+    } catch (e) {
+      console.error("seedHvacDefaultWorkflows failed:", e);
+    }
   }
 
   return NextResponse.json({ workspace });

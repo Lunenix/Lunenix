@@ -160,23 +160,26 @@ export async function handleCreateTaskAction(
       ? replaceVariables(description, context) 
       : null;
     
-    // Calculate due date if due_days is provided
+    // Calculate due date if due_days is provided (0 = today).
     let dueDate = null;
-    if (due_days && typeof due_days === "number") {
+    if (typeof due_days === "number" && Number.isFinite(due_days)) {
       const date = new Date();
       date.setDate(date.getDate() + due_days);
-      dueDate = date.toISOString();
+      dueDate = date.toISOString().slice(0, 10);
     }
-    
-    // Create the task
+
+    const contactData = context.contact as { id?: string } | undefined;
+    const userData = context.user as { id?: string } | undefined;
     const { error } = await supabase.from("tasks").insert({
       workspace_id: context.workspace_id,
       project_id: project_id || projectData?.id || null,
+      contact_id: contactData?.id || null,
       title: finalTitle,
       description: finalDescription,
       due_date: dueDate,
-      assigned_to: assigned_to || null,
-      status: "pending",
+      assignee_id: assigned_to || userData?.id || null,
+      status: "todo",
+      priority: "medium",
     });
     
     if (error) {

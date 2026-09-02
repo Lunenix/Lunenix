@@ -3835,11 +3835,25 @@ export async function executeLunaTool(
           contact_id: contactId,
           position: count ?? 0,
         })
-        .select("title")
+        .select("id, title, stage_id, contact_id")
         .maybeSingle();
       if (error || !data) {
         return { error: error?.message ?? "Could not create that lead." };
       }
+      executeWorkflowsForTrigger(
+        "lead_stage_change",
+        {
+          lead_id: data.id,
+          lead: data,
+          from_stage_id: null,
+          to_stage_id: data.stage_id,
+          contact_id: data.contact_id,
+          user_id,
+        },
+        workspace_id
+      ).catch((err) => {
+        console.error("Error executing lead_stage_change workflows:", err);
+      });
       return lunaMutationOk(
         supabase,
         workspace_id,

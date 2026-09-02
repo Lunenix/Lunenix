@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 
 /**
  * POST /api/leads
@@ -53,5 +54,21 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  executeWorkflowsForTrigger(
+    "lead_stage_change",
+    {
+      lead_id: data.id,
+      lead: data,
+      from_stage_id: null,
+      to_stage_id: data.stage_id,
+      contact_id: data.contact_id,
+      user_id: user.id,
+    },
+    workspace_id
+  ).catch((err) => {
+    console.error("Error executing lead_stage_change workflows:", err);
+  });
+
   return NextResponse.json({ lead: data }, { status: 201 });
 }
