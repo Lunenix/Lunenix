@@ -132,32 +132,69 @@ ALTER TABLE public.job_expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendor_bills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_equipment ENABLE ROW LEVEL SECURITY;
 
-DO $$
-DECLARE
-  t TEXT;
-BEGIN
-  FOREACH t IN ARRAY ARRAY[
-    'estimates','estimate_photos','technician_profiles','inventory_items',
-    'job_parts','job_expenses','vendor_bills','customer_equipment'
-  ]
-  LOOP
-    EXECUTE format(
-      'DROP POLICY IF EXISTS workspace_members_%s ON public.%I',
-      t, t
-    );
-    EXECUTE format(
-      $p$
-      CREATE POLICY workspace_members_%s ON public.%I
-        FOR ALL USING (
-          workspace_id IN (
-            SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
-          )
-        )
-      $p$,
-      t, t
-    );
-  END LOOP;
-END $$;
+DROP POLICY IF EXISTS workspace_members_estimates ON public.estimates;
+CREATE POLICY workspace_members_estimates ON public.estimates
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS workspace_members_estimate_photos ON public.estimate_photos;
+CREATE POLICY workspace_members_estimate_photos ON public.estimate_photos
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS workspace_members_technician_profiles ON public.technician_profiles;
+CREATE POLICY workspace_members_technician_profiles ON public.technician_profiles
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS workspace_members_inventory_items ON public.inventory_items;
+CREATE POLICY workspace_members_inventory_items ON public.inventory_items
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS workspace_members_job_parts ON public.job_parts;
+CREATE POLICY workspace_members_job_parts ON public.job_parts
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS workspace_members_job_expenses ON public.job_expenses;
+CREATE POLICY workspace_members_job_expenses ON public.job_expenses
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS workspace_members_vendor_bills ON public.vendor_bills;
+CREATE POLICY workspace_members_vendor_bills ON public.vendor_bills
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS workspace_members_customer_equipment ON public.customer_equipment;
+CREATE POLICY workspace_members_customer_equipment ON public.customer_equipment
+  FOR ALL USING (
+    workspace_id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
 
 DROP TRIGGER IF EXISTS estimates_updated_at ON public.estimates;
 CREATE TRIGGER estimates_updated_at BEFORE UPDATE ON public.estimates
