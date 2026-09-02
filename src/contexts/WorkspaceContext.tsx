@@ -52,9 +52,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase
       .from("workspace_members")
-      .select(
-        "role, workspaces(id, name, slug, created_at, logo_url, industry_preset, phone, team_size, max_seats, tier, trial_ends_at)"
-      )
+      .select("role, workspaces(*)")
       .eq("user_id", user.id);
 
     if (error) {
@@ -72,11 +70,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
             created_at: string;
             logo_url: string | null;
             industry_preset: string | null;
-            phone: string | null;
-            team_size: string | null;
+            phone?: string | null;
+            team_size?: string | null;
             max_seats: number | null;
             tier: string | null;
-            trial_ends_at: string | null;
+            trial_ends_at?: string | null;
           }
         | null;
     }>;
@@ -92,11 +90,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           created_at: ws.created_at,
           logo_url: ws.logo_url,
           industry_preset: ws.industry_preset,
-          phone: ws.phone,
-          team_size: ws.team_size,
+          phone: ws.phone ?? null,
+          team_size: ws.team_size ?? null,
           max_seats: ws.max_seats ?? undefined,
           tier: ws.tier ?? undefined,
-          trial_ends_at: ws.trial_ends_at,
+          trial_ends_at: ws.trial_ends_at ?? null,
           membership_role: r.role,
         };
       })
