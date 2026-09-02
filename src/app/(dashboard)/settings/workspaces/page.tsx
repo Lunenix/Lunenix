@@ -206,7 +206,11 @@ export default function WorkspaceManagementPage() {
                       {/* Tier */}
                       <TableCell>
                         <Badge className="border-green-500/40 bg-green-500/10 text-green-400">
-                          Free Beta
+                          {ws.tier === "trial" && ws.trial_ends_at
+                            ? `Trial until ${new Date(ws.trial_ends_at).toLocaleDateString()}`
+                            : ws.tier === "trial"
+                              ? "Trial"
+                              : "Free Beta"}
                         </Badge>
                       </TableCell>
 

@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     agent_name: (body.agent_name ?? DEFAULT_SETTINGS.agent_name).trim() ||
       DEFAULT_SETTINGS.agent_name,
     avatar_id: body.avatar_id ?? DEFAULT_SETTINGS.avatar_id,
-    voice_id: body.voice_id ?? DEFAULT_SETTINGS.voice_id,
+    voice_id: DEFAULT_SETTINGS.voice_id,
     avatar_url: body.avatar_url ?? null,
     home_city: homeCityRaw || null,
     timezone: tzRaw && isIanaTimeZone(tzRaw) ? tzRaw : null,

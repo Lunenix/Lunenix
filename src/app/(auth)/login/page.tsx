@@ -41,7 +41,7 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
 
@@ -61,7 +61,7 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
 
@@ -89,7 +89,7 @@ function LoginForm() {
       return;
     }
 
-    const redirectTo = searchParams.get("redirectedFrom") || "/dashboard";
+    const redirectTo = searchParams.get("redirectedFrom") || "/onboarding";
     router.push(redirectTo);
     router.refresh();
   }

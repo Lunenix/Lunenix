@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/lib/toast";
 import {
-  VOICE_OPTIONS,
   LUNA_TIMEZONES,
   ensureVoicesLoaded,
   pickFemaleVoice,
@@ -50,7 +49,6 @@ export function LunaSettingsModal({
   onSaved,
 }: LunaSettingsModalProps) {
   const [agentName, setAgentName] = useState("Luna");
-  const [voiceId, setVoiceId] = useState("ava");
   const [homeCity, setHomeCity] = useState("");
   const [timezone, setTimezone] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
@@ -62,7 +60,6 @@ export function LunaSettingsModal({
   useEffect(() => {
     if (open && settings) {
       setAgentName(settings.agent_name || "Luna");
-      setVoiceId(settings.voice_id || "ava");
       setHomeCity(settings.home_city || "");
       setTimezone(
         settings.timezone ||
@@ -151,9 +148,9 @@ export function LunaSettingsModal({
           workspace_id: workspaceId,
           agent_name: agentName.trim(),
           avatar_id: "luna",
-          voice_id: voiceId,
-          home_city: homeCity.trim(),
-          timezone: timezone.trim(),
+          voice_id: "ava",
+          home_city: homeCity.trim() || null,
+          timezone: timezone.trim() || null,
           custom_instructions: customInstructions.trim() || null,
         }),
       });
@@ -181,8 +178,8 @@ export function LunaSettingsModal({
         <DialogHeader>
           <DialogTitle>Customize Your Executive Assistant</DialogTitle>
           <DialogDescription>
-            Personalize your AI assistant&apos;s name, voice, home city, time
-            zone, and optional speaking instructions.
+            Set a name, home city, and time zone. Custom instructions are
+            optional.
           </DialogDescription>
         </DialogHeader>
 
@@ -198,9 +195,8 @@ export function LunaSettingsModal({
             />
           </div>
 
-          {/* Avatar preview */}
           <div className="space-y-2">
-            <Label>Avatar</Label>
+            <Label>Avatar and voice</Label>
             <div className="flex items-center gap-4 rounded-lg border border-border p-4">
               <LunaAvatar
                 isSpeaking={isPreviewing}
@@ -208,34 +204,13 @@ export function LunaSettingsModal({
                 size={72}
                 className="shrink-0"
               />
-              <div className="text-sm text-muted-foreground">
+              <div className="min-w-0 flex-1 text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">
                   {agentName.trim() || "Luna"}
                 </p>
                 <p className="mt-0.5 text-xs">
-                  Preview the voice to see {agentName.trim() || "Luna"} talk.
+                  Luna uses one voice. Preview it with the speaker.
                 </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Voice */}
-          <div className="space-y-2">
-            <Label htmlFor="voice">Voice</Label>
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <Select value={voiceId} onValueChange={setVoiceId}>
-                  <SelectTrigger id="voice">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VOICE_OPTIONS.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               <Button
                 type="button"
@@ -251,9 +226,6 @@ export function LunaSettingsModal({
                 <Volume2 className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Click the speaker icon to preview the selected voice.
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -292,16 +264,19 @@ export function LunaSettingsModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="custom-instructions">Custom instructions</Label>
+            <Label htmlFor="custom-instructions">
+              Custom instructions{" "}
+              <span className="font-normal text-muted-foreground">(optional)</span>
+            </Label>
             <Textarea
               id="custom-instructions"
               value={customInstructions}
               onChange={(e) => setCustomInstructions(e.target.value.slice(0, 1500))}
-              placeholder="Keep answers short. Prefer first names. Mention overdue invoices first."
+              placeholder="Leave blank, or add style notes such as keep answers short."
               rows={4}
             />
             <p className="text-xs text-muted-foreground">
-              Optional style notes for Luna in this workspace. Cannot override
+              You can save without this. Style and tone only — cannot override
               security or tenant isolation.
             </p>
           </div>

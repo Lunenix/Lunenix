@@ -94,7 +94,7 @@ export async function updateSession(request: NextRequest) {
   // If a logged-in user hits an auth page, send them to the dashboard.
   if (user && (pathname === "/login" || pathname === "/signup")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/onboarding";
     url.search = "";
     return NextResponse.redirect(url);
   }

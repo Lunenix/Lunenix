@@ -33,7 +33,7 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
 
@@ -50,18 +50,23 @@ export default function SignupPage() {
     setIsLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
 
     if (error) {
       setError(error.message);
       setIsLoading(false);
+      return;
+    }
+
+    if (data.session) {
+      window.location.assign("/onboarding");
       return;
     }
 
@@ -78,7 +83,8 @@ export default function SignupPage() {
           <CardDescription>
             We sent a confirmation link to{" "}
             <span className="font-medium text-foreground">{email}</span>. Click
-            it to activate your account, then sign in.
+            it to activate your account. You get 21 days free after you set up
+            your company.
           </CardDescription>
         </CardHeader>
         <CardFooter>
@@ -94,7 +100,10 @@ export default function SignupPage() {
     <Card>
       <CardHeader>
         <CardTitle className="text-xl">Create your account</CardTitle>
-        <CardDescription>Get started with Lunenix</CardDescription>
+        <CardDescription>
+          Start a 21-day free trial. Next you will add your company name, logo,
+          phone, industry, and team size.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Button

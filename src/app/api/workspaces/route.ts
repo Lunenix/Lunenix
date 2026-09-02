@@ -1,15 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import {
+  isIndustryPreset,
+  isTeamSize,
+  seatsForTeamSize,
+  trialEndsAt,
+} from "@/lib/workspace";
+
+const LOGO_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+async function readWorkspacePayload(request: NextRequest): Promise<{
+  name: string;
+  slug: string;
+  industryPreset: string | null;
+  phone: string | null;
+  teamSize: string | null;
+  logo: File | null;
+}> {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const logo = form.get("logo");
+    return {
+      name: String(form.get("name") ?? "").trim(),
+      slug: String(form.get("slug") ?? "").trim(),
+      industryPreset: String(form.get("industry_preset") ?? "").trim() || null,
+      phone: String(form.get("phone") ?? "").trim() || null,
+      teamSize: String(form.get("team_size") ?? "").trim() || null,
+      logo: logo instanceof File && logo.size > 0 ? logo : null,
+    };
+  }
+  const body = await request.json();
+  return {
+    name: String(body.name ?? "").trim(),
+    slug: String(body.slug ?? "").trim(),
+    industryPreset:
+      typeof body.industry_preset === "string"
+        ? body.industry_preset.trim() || null
+        : null,
+    phone: typeof body.phone === "string" ? body.phone.trim() || null : null,
+    teamSize:
+      typeof body.team_size === "string" ? body.team_size.trim() || null : null,
+    logo: null,
+  };
+}
 
 /**
  * POST /api/workspaces
- * Creates a workspace and adds the current user as owner.
- * Body: { name, slug? }
- *
- * Uses the service-role (admin) client for the inserts so workspace creation
- * is not blocked by row-level security (the previous authenticated-client
- * insert failed the workspaces RLS policy). The user is still authenticated
- * first via the cookie-based client, so only logged-in users can create.
+ * Creates a workspace, starts a 21-day trial, and adds the current user as owner.
+ * Accepts JSON or multipart (optional logo file).
  */
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -21,22 +65,32 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-
-  const body = await request.json();
-  const name: string = (body.name ?? "").trim();
+  const payload = await readWorkspacePayload(request);
+  const { name } = payload;
   if (!name) {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
+    return NextResponse.json({ error: "Company name is required" }, { status: 400 });
+  }
+  if (!payload.phone) {
+    return NextResponse.json({ error: "Company phone is required" }, { status: 400 });
+  }
+  if (!payload.industryPreset || !isIndustryPreset(payload.industryPreset)) {
+    return NextResponse.json({ error: "Choose an industry." }, { status: 400 });
+  }
+  if (!payload.teamSize || !isTeamSize(payload.teamSize)) {
+    return NextResponse.json({ error: "Choose your team size." }, { status: 400 });
+  }
+  if (payload.logo && payload.logo.size > 2 * 1024 * 1024) {
+    return NextResponse.json({ error: "Logo must be 2 MB or smaller." }, { status: 400 });
+  }
+  if (payload.logo && !LOGO_TYPES[payload.logo.type]) {
+    return NextResponse.json(
+      { error: "Logo must be a PNG, JPG, WebP, or GIF." },
+      { status: 400 }
+    );
   }
 
-  const industryPreset: string | null =
-    typeof body.industry_preset === "string" && body.industry_preset.trim()
-      ? body.industry_preset.trim()
-      : null;
-
-  const slug: string =
-    (body.slug ?? "")
-      .toString()
-      .trim()
+  const slugSource =
+    payload.slug
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") ||
@@ -45,17 +99,19 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
 
-  // Ensure slug uniqueness with a short random suffix if needed.
-  const uniqueSlug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+  const uniqueSlug = `${slugSource}-${Math.random().toString(36).slice(2, 6)}`;
 
   const { data: workspace, error: wErr } = await admin
     .from("workspaces")
     .insert({
       name,
       slug: uniqueSlug,
-      tier: "free_beta",
-      max_seats: 5,
-      industry_preset: industryPreset,
+      tier: "trial",
+      max_seats: seatsForTeamSize(payload.teamSize),
+      industry_preset: payload.industryPreset,
+      phone: payload.phone.slice(0, 40),
+      team_size: payload.teamSize,
+      trial_ends_at: trialEndsAt(),
     })
     .select("*")
     .single();
@@ -64,12 +120,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: wErr.message }, { status: 500 });
   }
 
-  // Build the membership list: always the creator as owner.
   const memberRows: { workspace_id: string; user_id: string; role: string }[] =
     [{ workspace_id: workspace.id, user_id: user.id, role: "owner" }];
 
-  // Auto-grant every super-admin owner access to the new workspace, so the
-  // platform "master key" account can see and manage all workspaces.
   try {
     const { data: userList } = await admin.auth.admin.listUsers({
       page: 1,
@@ -99,17 +152,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: mErr.message }, { status: 500 });
   }
 
-  // Seed default pipeline stages for the chosen industry preset. Non-fatal:
-  // the workspace is already created, so we don't fail the request if seeding
-  // hits an issue.
+  let saved = workspace;
+  if (payload.logo) {
+    const ext = LOGO_TYPES[payload.logo.type];
+    const path = `${workspace.id}/logo.${ext}`;
+    const bytes = Buffer.from(await payload.logo.arrayBuffer());
+    const { error: uploadError } = await admin.storage
+      .from("workspace-assets")
+      .upload(path, bytes, {
+        contentType: payload.logo.type,
+        upsert: true,
+      });
+    if (!uploadError) {
+      const { data: publicUrl } = admin.storage
+        .from("workspace-assets")
+        .getPublicUrl(path);
+      const { data: withLogo } = await admin
+        .from("workspaces")
+        .update({ logo_url: publicUrl.publicUrl })
+        .eq("id", workspace.id)
+        .select("*")
+        .single();
+      if (withLogo) saved = withLogo;
+    }
+  }
+
   try {
     await admin.rpc("seed_pipeline_stages", {
       p_workspace_id: workspace.id,
-      p_preset: industryPreset ?? "general",
+      p_preset: payload.industryPreset,
     });
   } catch (e) {
     console.error("seed_pipeline_stages failed:", e);
   }
 
-  return NextResponse.json({ workspace }, { status: 201 });
+  return NextResponse.json({ workspace: saved }, { status: 201 });
 }

@@ -13,11 +13,9 @@ export interface VoiceOption {
   label: string;
 }
 
+/** Single Luna voice. Extra style names are not selectable. */
 export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: "ava", label: "Ava (Confident)" },
-  { id: "liam", label: "Liam (Professional)" },
-  { id: "nova", label: "Nova (Warm)" },
-  { id: "aria", label: "Aria (Energetic)" },
+  { id: "ava", label: "Luna" },
 ];
 
 export function voiceById(id: string | null | undefined): VoiceOption {

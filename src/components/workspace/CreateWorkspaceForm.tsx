@@ -11,6 +11,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  INDUSTRY_PRESETS,
+  TEAM_SIZE_OPTIONS,
+  TRIAL_DAYS,
+} from "@/lib/workspace";
 import { Building2, Loader2 } from "lucide-react";
 
 function slugify(value: string) {
@@ -20,28 +32,52 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-export function CreateWorkspaceForm() {
+interface WorkspaceOnboardingFormProps {
+  onCreated?: () => void;
+}
+
+export function WorkspaceOnboardingForm({
+  onCreated,
+}: WorkspaceOnboardingFormProps) {
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [industry, setIndustry] = useState("general");
+  const [teamSize, setTeamSize] = useState("1-5");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleCreate() {
     if (!name.trim()) {
-      setError("Workspace name is required.");
+      setError("Company name is required.");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Company phone is required.");
+      return;
+    }
+    if (!logoFile) {
+      setError("Upload your company logo.");
       return;
     }
     setSaving(true);
     setError(null);
     try {
+      const body = new FormData();
+      body.append("name", name.trim());
+      body.append("slug", slugify(name));
+      body.append("phone", phone.trim());
+      body.append("industry_preset", industry);
+      body.append("team_size", teamSize);
+      body.append("logo", logoFile);
       const res = await fetch("/api/workspaces", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), slug: slugify(name) }),
+        body,
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to create workspace");
-      // Reload so WorkspaceContext picks up the new workspace and sets it active.
-      window.location.reload();
+      if (onCreated) onCreated();
+      else window.location.assign("/dashboard");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setSaving(false);
@@ -50,45 +86,94 @@ export function CreateWorkspaceForm() {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Building2 className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-xl">Create your workspace</CardTitle>
+          <CardTitle className="text-xl">Set up your company</CardTitle>
           <CardDescription>
-            A workspace keeps each business&apos;s contacts, deals, and data
-            fully separate.
+            You have {TRIAL_DAYS} days free. Add your company name, logo, phone,
+            industry, and team size.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
+            {TRIAL_DAYS}-day free trial included
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="ws-name">Workspace name</Label>
+            <Label htmlFor="ws-name">Company name</Label>
             <Input
               id="ws-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Acme Nonprofit"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreate();
-              }}
+              placeholder="Acme Events Co."
             />
-            {name.trim() && (
-              <p className="text-xs text-muted-foreground">
-                URL slug: {slugify(name)}
-              </p>
-            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ws-logo">Company logo</Label>
+            <Input
+              id="ws-logo"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-xs text-muted-foreground">
+              PNG, JPG, WebP, or GIF. Max 2 MB.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ws-phone">Company phone</Label>
+            <Input
+              id="ws-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(512) 555-0100"
+              autoComplete="tel"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ws-industry">Industry</Label>
+            <Select value={industry} onValueChange={setIndustry}>
+              <SelectTrigger id="ws-industry">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INDUSTRY_PRESETS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ws-team">Team size</Label>
+            <Select value={teamSize} onValueChange={setTeamSize}>
+              <SelectTrigger id="ws-team">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TEAM_SIZE_OPTIONS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {error && (
             <p className="text-sm font-medium text-destructive">{error}</p>
           )}
 
-          <Button
-            className="w-full"
-            onClick={handleCreate}
-            disabled={saving}
-          >
+          <Button className="w-full" onClick={handleCreate} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create workspace
           </Button>
@@ -96,4 +181,8 @@ export function CreateWorkspaceForm() {
       </Card>
     </div>
   );
+}
+
+export function CreateWorkspaceForm() {
+  return <WorkspaceOnboardingForm />;
 }
