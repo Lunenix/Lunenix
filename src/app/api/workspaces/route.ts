@@ -131,9 +131,13 @@ export async function GET() {
   }
   const list: WorkspaceWithMembership[] = (data ?? [])
     .map((row) => {
-      const r = row as { role?: string; workspaces?: Record<string, unknown> | null };
-      if (!r.workspaces?.id) return null;
-      return asWorkspaceListItem(r.workspaces, r.role ?? "member");
+      const rec = row as unknown as { role?: string; workspaces?: unknown };
+      const raw = rec.workspaces;
+      const ws = Array.isArray(raw)
+        ? (raw[0] as Record<string, unknown> | undefined)
+        : (raw as Record<string, unknown> | null | undefined);
+      if (!ws || typeof ws.id !== "string") return null;
+      return asWorkspaceListItem(ws, rec.role ?? "member");
     })
     .filter((w): w is WorkspaceWithMembership => Boolean(w))
     .sort((a, b) => a.name.localeCompare(b.name));
