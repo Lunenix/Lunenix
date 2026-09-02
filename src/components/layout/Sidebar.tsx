@@ -56,6 +56,8 @@ import {
   Wrench,
   X,
   Zap,
+  ClipboardCheck,
+  Layers,
   Warehouse,
   CalendarRange,
   Cog,
