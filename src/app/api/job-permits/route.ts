@@ -40,6 +40,10 @@ export async function POST(request: NextRequest) {
         typeof body.permit_number === "string"
           ? body.permit_number.trim() || null
           : null,
+      kind:
+        body.kind === "hoa" || body.kind === "other" || body.kind === "city"
+          ? body.kind
+          : "city",
       status,
       pulled_on: body.pulled_on || (status === "pulled" ? new Date().toISOString().slice(0, 10) : null),
       approved_on:

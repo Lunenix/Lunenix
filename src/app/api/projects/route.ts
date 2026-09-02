@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     .from("projects")
     .select("*, contact:contacts(*)")
     .eq("workspace_id", workspaceId)
+    .order("route_position", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -75,6 +76,12 @@ export async function POST(request: NextRequest) {
     address: body.address ?? null,
     urgent: Boolean(body.urgent),
     estimate_id: body.estimate_id ?? null,
+    route_position:
+      body.route_position === null || body.route_position === ""
+        ? null
+        : Number.isFinite(Number(body.route_position))
+          ? Number(body.route_position)
+          : null,
   };
 
   const { data, error } = await auth.supabase

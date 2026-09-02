@@ -47,14 +47,18 @@ export default function TeamFieldPage() {
       <div>
         <h1 className="text-3xl font-bold">Techs</h1>
         <p className="text-muted-foreground">
-          Availability and license/cert notes before dispatch. Assign the tech
-          on the job (project) record.
+          Availability, pesticide/herbicide or other certs, and license dates
+          before dispatch. Assign the tech on the job (project) record.
         </p>
       </div>
       <div className="max-w-md space-y-3">
         <div className="space-y-1">
           <Label>Your certifications / license</Label>
-          <Input value={certs} onChange={(e) => setCerts(e.target.value)} />
+          <Input
+            value={certs}
+            onChange={(e) => setCerts(e.target.value)}
+            placeholder="Pesticide, herbicide, CDL, …"
+          />
         </div>
         <div className="space-y-1">
           <Label>License expires</Label>

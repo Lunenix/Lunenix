@@ -55,6 +55,7 @@ export async function PATCH(
     "address",
     "urgent",
     "estimate_id",
+    "route_position",
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {

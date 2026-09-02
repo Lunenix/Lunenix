@@ -94,8 +94,8 @@ export default function AutomationPage() {
           <h1 className="text-3xl font-bold">Automation Workflows</h1>
           <p className="text-muted-foreground">
             Automate follow-up. Each trade only gets its own pack (HVAC,
-            Handyman, Plumbing, or Electrical) — they are not merged. Turn
-            them off anytime.
+            Handyman, Plumbing, Electrical, or Landscaping) — they are not
+            merged. Turn them off anytime.
           </p>
         </div>
         <Link href="/automation/new">

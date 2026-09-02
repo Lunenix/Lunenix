@@ -196,6 +196,7 @@ export interface Project {
   assignee_id?: string | null;
   address?: string | null;
   urgent?: boolean;
+  route_position?: number | null;
   created_at: string;
   updated_at: string;
   // Optional relations / computed fields for list + detail views.
@@ -939,6 +940,7 @@ export interface JobPermit {
   contact_id: string | null;
   name: string;
   permit_number: string | null;
+  kind?: "city" | "hoa" | "other";
   status: JobPermitStatus;
   pulled_on: string | null;
   approved_on: string | null;
@@ -946,4 +948,35 @@ export interface JobPermit {
   notes: string | null;
   created_at: string;
   project?: { id: string; name: string } | null;
+}
+
+export type ServicePlanFrequency =
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "seasonal";
+
+export interface ServicePlan {
+  id: string;
+  workspace_id: string;
+  contact_id: string;
+  project_id: string | null;
+  name: string;
+  frequency: ServicePlanFrequency;
+  seasonal_on: boolean;
+  next_visit_on: string;
+  amount: number;
+  auto_invoice: boolean;
+  is_active: boolean;
+  last_generated_on: string | null;
+  notes: string | null;
+  created_at: string;
+  contact?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    organization_name: string | null;
+    type: string;
+    email: string | null;
+  } | null;
 }

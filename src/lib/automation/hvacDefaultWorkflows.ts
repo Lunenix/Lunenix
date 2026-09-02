@@ -685,6 +685,185 @@ export const ELECTRICIAN_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * Landscaping & Lawn Care default automations.
+ * Recurring mow/maintain plus one-off installs. Landscaping workspaces only.
+ */
+export const LANDSCAPING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Landscaping: New lead",
+    description:
+      "When a new lead is created, capture source and property/service interest.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New landscaping lead: {{lead.title}}",
+        "Track lead source on the pipeline card. Capture name, phone, email, property address, lot notes, and interest (mow, seasonal, install, irrigation, tree). Email to book an estimate visit. Two-way SMS is not live yet — use email and the contact record.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your landscaping request. Reply with the property address and a couple of times that work for a site visit.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: Schedule estimate visit",
+    description:
+      "On Site Visit, book the estimate and capture property/contact details.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule estimate visit: {{lead.title}}",
+        "Set the estimate time on the calendar with the property address. Confirm access, gate codes, HOA rules, and who will be on site. Save property notes on the contact.",
+        1
+      ),
+      email(
+        "Your landscape visit is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you down for an on-site estimate. We will come to the address on file. Reply if you need to change the time.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: Property photos and estimate",
+    description:
+      "On Estimate Sent, attach property photos and send the estimate for digital approval.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Upload property photos: {{lead.title}}",
+        "On-site: photo lawn, beds, drainage, and existing hardscape. Attach to the estimate, then price labor, materials, and any permit or HOA fees.",
+        0
+      ),
+      task(
+        "Send estimate for digital accept: {{lead.title}}",
+        "Email the estimate. Track sent / viewed / approved. On approval, convert to a job. Recurring mow plans are set up after contract on Recurring plans.",
+        0
+      ),
+      email(
+        "Your landscape estimate from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready. Please review and reply to approve, or tell us what to adjust.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: Job, crew, permits, and plan",
+    description:
+      "After Contract Signed, assign crew, log city/HOA approvals, and set recurring visits.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Create job and assign crew: {{lead.title}}",
+        "Create the job from the approved estimate. Assign a tech. Check availability and certifications (pesticide/herbicide if applying chemicals) on Techs before dispatch. Set route order on Jobs.",
+        1
+      ),
+      task(
+        "City permit or HOA sign-off: {{lead.title}}",
+        "On Permits, log city/county permits and HOA sign-off when the work qualifies (hardscape, trees, irrigation, fences). Mark pulled and approved. If none is required, log not required with kind other.",
+        1
+      ),
+      task(
+        "Set recurring service plan: {{lead.title}}",
+        "If this is mow/maintain, open Recurring plans. Set weekly, biweekly, monthly, or seasonal, next visit, and auto-invoice. Toggle seasonal off in the off-season so visits stop generating.",
+        1
+      ),
+      email(
+        "You are on the landscape schedule — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thanks for approving. We are assigning a crew and will confirm the first visit window. If HOA or city approval is required, we will keep you posted.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: Route, stock, and receipts",
+    description:
+      "When In Progress, order the route, log mileage, stock, and receipts.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Route order and mileage: {{lead.title}}",
+        "Set route order on Jobs for today's stops. Log home base → first job and job-to-job legs on Mileage for the tax deduction. GPS auto-optimize is not live — order stops by drive time from the map.",
+        0
+      ),
+      task(
+        "Check equipment and materials: {{lead.title}}",
+        "Confirm mowers, trimmers, and materials in Inventory. Log equipment maintenance notes. Watch low-stock alerts.",
+        0
+      ),
+      task(
+        "Capture receipts: {{lead.title}}",
+        "Photo/upload materials and supply receipts on Books. Tag by job. OCR is not auto-filled — enter the amount from the photo.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: Punch list and weather",
+    description:
+      "On Punch List, finish leftover work and note weather delays.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Punch list and weather delays: {{lead.title}}",
+        "Walk leftover items, get sign-off, and note property details on the contact. If rain or freeze skipped a visit, log it on the job and reschedule. Ask Luna for weather before dispatch. Watch permit/HOA delays on Field ops.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: Invoice, AR, books, and reviews",
+    description:
+      "When Closed, invoice, check aging, books, tax set-aside, and reviews.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice and recurring billing: {{lead.title}}",
+        "Invoice labor + materials + billed mileage. For recurring plans, auto-draft invoices generate from Recurring plans when a visit is due. Check AR aging and send reminders if overdue. Review job profit on Field ops.",
+        1
+      ),
+      task(
+        "Books, tax set-aside, and history: {{lead.title}}",
+        "Log vendor bills in Books. Field ops shows income vs expenses and a 30% tax set-aside hint from profit. Save service/plan history and property notes on the contact. Flag reviews.",
+        1
+      ),
+      email(
+        "Thanks — invoice from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>The visit or job is complete. Your invoice is coming next. Thank you for choosing {{workspace.name}}.</p>"
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: After contract signed (e-sign)",
+    description: "When an e-sign contract completes, kick off the job and plan.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off landscape job from signed contract",
+        "Create or update the job, assign a crew, start permit/HOA tracking if needed, and add a recurring plan when this is ongoing service.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Landscaping: After invoice sent",
+    description: "When an invoice is sent, follow AR and overdue reminders.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on invoice payment",
+        "Watch open invoices and aging. Send a reminder if overdue. Record payment. Flag permit/HOA delays, weather skips, or negative reviews.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -722,6 +901,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   handyman: HANDYMAN_DEFAULT_WORKFLOWS,
   plumbing: PLUMBING_DEFAULT_WORKFLOWS,
   electrician: ELECTRICIAN_DEFAULT_WORKFLOWS,
+  landscaping_lawn_care: LANDSCAPING_DEFAULT_WORKFLOWS,
 };
 
 /** Default workflow name prefixes. Each trade pack stays on its own preset. */
@@ -730,6 +910,7 @@ const TRADE_PACK_PREFIXES: { preset: string; prefix: string }[] = [
   { preset: "handyman", prefix: "Handyman:" },
   { preset: "plumbing", prefix: "Plumbing:" },
   { preset: "electrician", prefix: "Electrical:" },
+  { preset: "landscaping_lawn_care", prefix: "Landscaping:" },
 ];
 
 async function pruneForeignIndustryWorkflows(

@@ -46,13 +46,14 @@ export default function JobsPage() {
         <h1 className="text-3xl font-bold">Jobs</h1>
         <p className="text-muted-foreground">
           Jobs are workspace projects. Approve an estimate to create one.
-          Assign a tech and mark urgent on the job record.
+          Assign a tech, set route order, and mark urgent on the job.
         </p>
       </div>
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Job</TableHead>
+            <TableHead>Route #</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Due</TableHead>
             <TableHead>Flags</TableHead>
@@ -65,6 +66,27 @@ export default function JobsPage() {
                 <Link className="font-medium underline" href={`/projects/${j.id}`}>
                   {j.name}
                 </Link>
+              </TableCell>
+              <TableCell>
+                <input
+                  className="w-16 rounded border bg-background px-2 py-1 text-sm"
+                  type="number"
+                  min={1}
+                  defaultValue={j.route_position ?? ""}
+                  key={`${j.id}-${j.route_position ?? "x"}`}
+                  title="Stop order for today's route"
+                  onBlur={async (e) => {
+                    const raw = e.target.value.trim();
+                    await fetch(`/api/projects/${j.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        route_position: raw === "" ? null : Number(raw),
+                      }),
+                    });
+                    load();
+                  }}
+                />
               </TableCell>
               <TableCell>
                 {PROJECT_STATUS_LABELS[j.status] ?? j.status}

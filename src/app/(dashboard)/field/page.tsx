@@ -22,6 +22,8 @@ type Overview = {
     expenses: number;
     bills_pending: number;
     profit: number;
+    tax_set_aside?: number;
+    recurring?: number;
     mileage?: number;
     miles?: number;
     aging: { current: number; d30: number; d60: number; d90: number };
@@ -68,10 +70,10 @@ export default function FieldOpsPage() {
       <div>
         <h1 className="text-3xl font-bold">Field operations</h1>
         <p className="text-muted-foreground">
-          Lead → estimate visit → photos → send estimate → job → invoice.
+          Lead → visit → photos → estimate → job / recurring plan → invoice.
           Email customers from Estimates. Two-way SMS needs a text provider
-          later; email and in-app history cover comms for now. Receipt OCR is
-          not auto-filled — upload the photo and enter the amount.
+          later. Receipt OCR is not auto-filled. Ask Luna for weather before
+          dispatch; log rain delays on the job.
         </p>
       </div>
 
@@ -104,6 +106,12 @@ export default function FieldOpsPage() {
             {formatCurrency(data.money.expenses)} out
             {data.money.miles
               ? ` · ${Number(data.money.miles).toFixed(0)} mi`
+              : ""}
+            {typeof data.money.tax_set_aside === "number"
+              ? ` · tax set-aside ~${formatCurrency(data.money.tax_set_aside)}`
+              : ""}
+            {typeof data.money.recurring === "number"
+              ? ` · recurring ~${formatCurrency(data.money.recurring)}/mo`
               : ""}
           </CardContent>
         </Card>
@@ -159,6 +167,9 @@ export default function FieldOpsPage() {
         </Button>
         <Button asChild variant="outline">
           <Link href="/permits">Permits</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/plans">Recurring</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/pipeline">Pipeline</Link>

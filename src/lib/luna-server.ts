@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4128,7 +4128,7 @@ export async function executeLunaTool(
     if (name === "list_job_permits") {
       let q = supabase
         .from("job_permits")
-        .select("name, permit_number, status, pulled_on, approved_on")
+        .select("name, permit_number, status, pulled_on, approved_on, kind")
         .eq("workspace_id", workspace_id)
         .order("created_at", { ascending: false })
         .limit(25);
@@ -4173,6 +4173,10 @@ export async function executeLunaTool(
       const status = (PERMIT_STATUSES as readonly string[]).includes(rawStatus)
         ? rawStatus
         : "needed";
+      const rawKind = argString(args, "kind") || "city";
+      const kind = (PERMIT_KINDS as readonly string[]).includes(rawKind)
+        ? rawKind
+        : "city";
       const today = new Date().toISOString().slice(0, 10);
       const { data, error } = await supabase
         .from("job_permits")
@@ -4181,6 +4185,7 @@ export async function executeLunaTool(
           name: permitName.slice(0, 200),
           permit_number: argString(args, "permit_number"),
           status,
+          kind,
           project_id: projectId,
           notes: argString(args, "notes"),
           pulled_on: status === "pulled" ? today : null,
@@ -4197,6 +4202,77 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Logged permit ${data.name} as ${data.status}.`
+      );
+    }
+
+    if (name === "list_service_plans") {
+      const { data, error } = await supabase
+        .from("service_plans")
+        .select("name, frequency, next_visit_on, amount, is_active, seasonal_on")
+        .eq("workspace_id", workspace_id)
+        .order("next_visit_on", { ascending: true })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (p: {
+          name: string;
+          frequency: string;
+          next_visit_on: string;
+          amount: number;
+          is_active: boolean;
+          seasonal_on: boolean;
+        }) =>
+          `${p.name}: ${p.frequency}, next ${p.next_visit_on}${p.is_active ? "" : " (paused)"}${p.seasonal_on ? "" : " (off season)"}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No recurring service plans in this workspace.",
+      };
+    }
+
+    if (name === "create_service_plan") {
+      const planName = argString(args, "name");
+      const nextVisit = argString(args, "next_visit_on");
+      if (!planName || !nextVisit) {
+        return { error: "Need a plan name and next visit date." };
+      }
+      const contact = await requireOneContact(
+        supabase,
+        workspace_id,
+        argString(args, "contact_name")
+      );
+      if ("error" in contact) return contact;
+      const freqRaw = argString(args, "frequency") || "weekly";
+      const frequency = (SERVICE_PLAN_FREQUENCIES as readonly string[]).includes(
+        freqRaw
+      )
+        ? freqRaw
+        : "weekly";
+      const { data, error } = await supabase
+        .from("service_plans")
+        .insert({
+          workspace_id,
+          name: planName.slice(0, 200),
+          contact_id: contact.id,
+          frequency,
+          next_visit_on: nextVisit.slice(0, 10),
+          amount: argNumber(args, "amount") ?? 0,
+          auto_invoice: args.auto_invoice === true,
+          is_active: true,
+          seasonal_on: true,
+        })
+        .select("name, frequency")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not create that plan." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created recurring plan ${data.name} (${data.frequency}).`
       );
     }
 

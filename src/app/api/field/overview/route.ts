@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
+import {
+  monthlyRecurringAmount,
+  suggestedTaxSetAside,
+} from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
   if (!due) return 0;
@@ -24,6 +28,7 @@ export async function GET(request: Request) {
     inventory,
     mileage,
     permits,
+    plans,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -55,7 +60,11 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("job_permits")
-      .select("id, name, status, permit_number")
+      .select("id, name, status, permit_number, kind")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("service_plans")
+      .select("name, frequency, amount, is_active, seasonal_on, next_visit_on")
       .eq("workspace_id", workspaceId),
   ]);
 
@@ -67,6 +76,21 @@ export async function GET(request: Request) {
   const stock = inventory.data ?? [];
   const miles = mileage.data ?? [];
   const permitRows = permits.data ?? [];
+  const planRows = plans.data ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  const recurring = planRows
+    .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
+    .reduce(
+      (s, p) => s + monthlyRecurringAmount(String(p.frequency), Number(p.amount)),
+      0
+    );
+  const dueVisits = planRows.filter(
+    (p) =>
+      p.is_active &&
+      (p.frequency !== "seasonal" || p.seasonal_on) &&
+      p.next_visit_on &&
+      String(p.next_visit_on).slice(0, 10) <= today
+  );
 
   const paid = inv
     .filter((i) => i.status === "paid")
@@ -127,6 +151,8 @@ export async function GET(request: Request) {
       miles: mileageMiles,
       bills_pending: billsPending,
       profit: paid - costs,
+      tax_set_aside: suggestedTaxSetAside(paid - costs),
+      recurring,
       aging,
     },
     alerts: [
@@ -153,9 +179,14 @@ export async function GET(request: Request) {
         )
         .map((p) => ({
           kind: "permit_open",
-          label: `Permit not approved: ${p.name}${p.permit_number ? ` (${p.permit_number})` : ""}`,
+          label: `${p.kind === "hoa" ? "HOA" : "Permit"} not approved: ${p.name}${p.permit_number ? ` (${p.permit_number})` : ""}`,
           href: "/permits",
         })),
+      ...dueVisits.map((p) => ({
+        kind: "visit_due",
+        label: `Recurring visit due: ${p.name}`,
+        href: "/plans",
+      })),
     ],
   });
 }

@@ -545,7 +545,7 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
   {
     name: "log_job_permit",
     description:
-      "Log a city/county permit for a field job: pulled, approved, or not required.",
+      "Log a city/county or HOA permit for a field job: pulled, approved, or not required.",
     parametersJsonSchema: {
       type: "object",
       properties: {
@@ -558,6 +558,38 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
         },
         project_name: { type: "string" },
         notes: { type: "string" },
+        kind: {
+          type: "string",
+          description: "city, hoa, or other",
+        },
+      },
+    },
+  },
+  {
+    name: "list_service_plans",
+    description:
+      "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "create_service_plan",
+    description:
+      "Create a recurring service plan for a customer in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        contact_name: { type: "string" },
+        frequency: {
+          type: "string",
+          description: "weekly, biweekly, monthly, or seasonal",
+        },
+        next_visit_on: { type: "string", description: "YYYY-MM-DD" },
+        amount: { type: "number" },
+        auto_invoice: { type: "boolean" },
       },
     },
   },

@@ -42,6 +42,7 @@ import {
   Package,
   Plus,
   Receipt,
+  Repeat,
   Settings,
   KanbanSquare,
   Users,
@@ -64,6 +65,7 @@ const fieldNav = [
   { href: "/books", label: "Books", icon: BookOpen },
   { href: "/mileage", label: "Mileage", icon: MapPin },
   { href: "/permits", label: "Permits", icon: ClipboardList },
+  { href: "/plans", label: "Recurring", icon: Repeat },
   { href: "/team", label: "Techs", icon: HardHat },
 ];
 
