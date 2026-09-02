@@ -199,6 +199,7 @@ export interface Project {
   route_position?: number | null;
   weather_hold?: boolean;
   weather_hold_reason?: string | null;
+  work_phase?: string | null;
   created_at: string;
   updated_at: string;
   // Optional relations / computed fields for list + detail views.
@@ -847,7 +848,7 @@ export interface EstimatePhoto {
   estimate_id: string;
   file_url: string;
   caption: string | null;
-  kind?: "photo" | "drone" | "measurement" | "video";
+  kind?: "photo" | "drone" | "measurement" | "video" | "surface" | "swatch" | "prep";
   created_at: string;
 }
 
@@ -1045,4 +1046,58 @@ export interface ServicePlan {
     type: string;
     email: string | null;
   } | null;
+}
+
+export interface JobFinishSpec {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  room_or_surface: string;
+  brand: string | null;
+  color_name: string | null;
+  color_code: string | null;
+  sheen: string | null;
+  quantity: string | null;
+  supplier: string | null;
+  match_notes: string | null;
+  client_signed_off_at: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+  contact?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    organization_name: string | null;
+    type: string;
+    email: string | null;
+  } | null;
+}
+
+export interface JobPrepItem {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  kind: string;
+  status: string;
+  billed_separately: boolean;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface HoaColorApproval {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  status: string;
+  scheme_notes: string | null;
+  notes: string | null;
+  submitted_on: string | null;
+  decided_on: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
 }

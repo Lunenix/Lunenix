@@ -40,6 +40,8 @@ import {
   Mail,
   MapPin,
   Package,
+  Palette,
+  Paintbrush,
   Plus,
   Receipt,
   Repeat,
@@ -69,6 +71,8 @@ const fieldNav = [
   { href: "/permits", label: "Permits", icon: ClipboardList },
   { href: "/claims", label: "Claims", icon: Shield },
   { href: "/materials", label: "Materials", icon: Truck },
+  { href: "/colors", label: "Colors", icon: Palette },
+  { href: "/prep", label: "Prep", icon: Paintbrush },
   { href: "/plans", label: "Recurring", icon: Repeat },
   { href: "/team", label: "Techs", icon: HardHat },
 ];

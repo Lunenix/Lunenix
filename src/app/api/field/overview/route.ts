@@ -5,6 +5,7 @@ import {
   suggestedTaxSetAside,
   isOpenClaimStatus,
   isOpenMaterialOrderStatus,
+  isOpenHoaColorStatus,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -33,6 +34,8 @@ export async function GET(request: Request) {
     plans,
     claims,
     materials,
+    finishSpecs,
+    hoaRows,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -78,6 +81,14 @@ export async function GET(request: Request) {
       .from("material_orders")
       .select("id, name, status, delivery_on")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("job_finish_specs")
+      .select("id, room_or_surface, client_signed_off_at, project_id")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("hoa_color_approvals")
+      .select("id, status, scheme_notes")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -91,6 +102,8 @@ export async function GET(request: Request) {
   const planRows = plans.data ?? [];
   const claimRows = claims.data ?? [];
   const materialRows = materials.data ?? [];
+  const specRows = finishSpecs.data ?? [];
+  const hoaApprovals = hoaRows.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -221,6 +234,20 @@ export async function GET(request: Request) {
           kind: "weather_hold",
           label: `Weather hold: ${j.name}`,
           href: "/jobs",
+        })),
+      ...hoaApprovals
+        .filter((h) => isOpenHoaColorStatus(String(h.status)))
+        .map((h) => ({
+          kind: "hoa_color",
+          label: `HOA color ${h.status}: ${h.scheme_notes || "exterior"}`,
+          href: "/colors",
+        })),
+      ...specRows
+        .filter((s) => !s.client_signed_off_at)
+        .map((s) => ({
+          kind: "color_unsigned",
+          label: `Color not signed off: ${s.room_or_surface}`,
+          href: "/colors",
         })),
     ],
   });

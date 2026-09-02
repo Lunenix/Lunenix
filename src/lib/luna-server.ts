@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4435,6 +4435,195 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Logged material order ${data.name} as ${data.status}.`
+      );
+    }
+
+    if (name === "list_finish_specs") {
+      const { data, error } = await supabase
+        .from("job_finish_specs")
+        .select("room_or_surface, brand, color_name, color_code, sheen, client_signed_off_at")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (s: {
+          room_or_surface: string;
+          brand: string | null;
+          color_name: string | null;
+          color_code: string | null;
+          sheen: string | null;
+          client_signed_off_at: string | null;
+        }) =>
+          `${s.room_or_surface}: ${[s.brand, s.color_name, s.color_code, s.sheen].filter(Boolean).join(" ")}${s.client_signed_off_at ? " (signed off)" : " (awaiting sign-off)"}`
+      );
+      return {
+        ok: true,
+        summary: lines.length ? lines.join(". ") : "No color or finish specs in this workspace.",
+      };
+    }
+
+    if (name === "log_finish_spec") {
+      const room = argString(args, "room_or_surface") || argString(args, "name");
+      if (!room) return { error: "Need a room or surface name." };
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const sheenRaw = argString(args, "sheen");
+      const sheen = sheenRaw && (PAINT_SHEENS as readonly string[]).includes(sheenRaw)
+        ? sheenRaw
+        : null;
+      const { data, error } = await supabase
+        .from("job_finish_specs")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          room_or_surface: room.slice(0, 200),
+          brand: argString(args, "brand"),
+          color_name: argString(args, "color_name"),
+          color_code: argString(args, "color_code"),
+          sheen,
+          quantity: argString(args, "quantity"),
+          supplier: argString(args, "supplier"),
+          match_notes: argString(args, "match_notes"),
+        })
+        .select("room_or_surface")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that color spec." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged finish spec for ${data.room_or_surface}.`
+      );
+    }
+
+    if (name === "list_prep_items") {
+      const { data, error } = await supabase
+        .from("job_prep_items")
+        .select("kind, status, billed_separately, notes")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (p: { kind: string; status: string; billed_separately: boolean; notes: string | null }) =>
+          `${p.kind}: ${p.status}${p.billed_separately ? " (billed separately)" : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length ? lines.join(". ") : "No surface prep items in this workspace.",
+      };
+    }
+
+    if (name === "log_prep_item") {
+      const kindRaw = argString(args, "kind") || "other";
+      const kind = (PREP_KINDS as readonly string[]).includes(kindRaw) ? kindRaw : "other";
+      const statusRaw = argString(args, "status") || "todo";
+      const status = (PREP_STATUSES as readonly string[]).includes(statusRaw)
+        ? statusRaw
+        : "todo";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("job_prep_items")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          kind,
+          status,
+          billed_separately: args.billed_separately === true,
+          notes: argString(args, "notes"),
+        })
+        .select("kind, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that prep item." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.kind} prep as ${data.status}.`
+      );
+    }
+
+    if (name === "list_hoa_color_approvals") {
+      const { data, error } = await supabase
+        .from("hoa_color_approvals")
+        .select("status, scheme_notes")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (h: { status: string; scheme_notes: string | null }) =>
+          `${h.status}${h.scheme_notes ? `: ${h.scheme_notes}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No HOA color approvals in this workspace.",
+      };
+    }
+
+    if (name === "log_hoa_color_approval") {
+      const statusRaw = argString(args, "status") || "needed";
+      const status = (HOA_COLOR_STATUSES as readonly string[]).includes(statusRaw)
+        ? statusRaw
+        : "needed";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("hoa_color_approvals")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          status,
+          scheme_notes: argString(args, "scheme_notes") || argString(args, "notes"),
+        })
+        .select("status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that HOA approval." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged HOA color approval as ${data.status}.`
       );
     }
 

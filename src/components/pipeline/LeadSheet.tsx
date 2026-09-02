@@ -27,7 +27,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { ROOFING_LEAD_SOURCES } from "@/lib/fieldService";
+import { FIELD_LEAD_SOURCE_SUGGESTIONS } from "@/lib/fieldService";
 import {
   contactDisplayName,
   type Contact,
@@ -237,10 +237,10 @@ export function LeadSheet({
               list="lead-source-suggestions"
               value={source}
               onChange={(e) => setSource(e.target.value)}
-              placeholder="Storm / insurance, out of pocket, referral…"
+              placeholder="Interior repaint, exterior, storm / insurance…"
             />
             <datalist id="lead-source-suggestions">
-              {ROOFING_LEAD_SOURCES.map((s) => (
+              {FIELD_LEAD_SOURCE_SUGGESTIONS.map((s) => (
                 <option key={s} value={s} />
               ))}
             </datalist>

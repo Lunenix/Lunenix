@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 import { createAdminClient } from "@/lib/supabase/server";
+import { ESTIMATE_PHOTO_KINDS } from "@/lib/fieldService";
 
 const TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -44,7 +45,7 @@ export async function POST(
 
   const caption = String(form.get("caption") ?? "").trim() || null;
   const rawKind = String(form.get("kind") ?? "photo");
-  const kind = ["photo", "drone", "measurement", "video"].includes(rawKind)
+  const kind = (ESTIMATE_PHOTO_KINDS as readonly string[]).includes(rawKind)
     ? rawKind
     : "photo";
   const { data, error } = await authed.supabase

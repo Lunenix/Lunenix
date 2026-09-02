@@ -81,6 +81,10 @@ export const MATERIAL_TYPES = [
   "shingles",
   "underlayment",
   "dumpster",
+  "paint",
+  "primer",
+  "drywall",
+  "compound",
   "other",
 ] as const;
 export type MaterialType = (typeof MATERIAL_TYPES)[number];
@@ -88,6 +92,10 @@ export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
   shingles: "Shingles",
   underlayment: "Underlayment",
   dumpster: "Dumpster / roll-off",
+  paint: "Paint",
+  primer: "Primer",
+  drywall: "Drywall sheets",
+  compound: "Joint compound / tape",
   other: "Other",
 };
 
@@ -96,6 +104,9 @@ export const ESTIMATE_PHOTO_KINDS = [
   "drone",
   "measurement",
   "video",
+  "surface",
+  "swatch",
+  "prep",
 ] as const;
 export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
 export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
@@ -103,6 +114,9 @@ export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
   drone: "Drone",
   measurement: "Measurement",
   video: "Video",
+  surface: "Surface / color",
+  swatch: "Swatch",
+  prep: "Prep / drywall",
 };
 
 export const ROOFING_LEAD_SOURCES = [
@@ -110,6 +124,100 @@ export const ROOFING_LEAD_SOURCES = [
   "Out of pocket",
   "Referral",
 ] as const;
+
+export const PAINTING_LEAD_SOURCES = [
+  "Interior repaint",
+  "Exterior",
+  "New construction",
+  "Drywall",
+  "Referral",
+] as const;
+
+export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
+  new Set([...ROOFING_LEAD_SOURCES, ...PAINTING_LEAD_SOURCES])
+);
+
+export const PAINT_SHEENS = [
+  "flat",
+  "eggshell",
+  "satin",
+  "semi_gloss",
+  "gloss",
+] as const;
+export type PaintSheen = (typeof PAINT_SHEENS)[number];
+export const PAINT_SHEEN_LABELS: Record<PaintSheen, string> = {
+  flat: "Flat",
+  eggshell: "Eggshell",
+  satin: "Satin",
+  semi_gloss: "Semi-gloss",
+  gloss: "Gloss",
+};
+
+export const HOA_COLOR_STATUSES = [
+  "needed",
+  "submitted",
+  "approved",
+  "denied",
+  "not_required",
+] as const;
+export type HoaColorStatus = (typeof HOA_COLOR_STATUSES)[number];
+export const HOA_COLOR_STATUS_LABELS: Record<HoaColorStatus, string> = {
+  needed: "Needed",
+  submitted: "Submitted",
+  approved: "Approved",
+  denied: "Denied",
+  not_required: "Not required",
+};
+export function isOpenHoaColorStatus(status: string): boolean {
+  return ["needed", "submitted", "denied"].includes(status);
+}
+
+export const PREP_KINDS = [
+  "patching",
+  "sanding",
+  "caulking",
+  "priming",
+  "taping",
+  "mudding",
+  "texture",
+  "other",
+] as const;
+export type PrepKind = (typeof PREP_KINDS)[number];
+export const PREP_KIND_LABELS: Record<PrepKind, string> = {
+  patching: "Patching",
+  sanding: "Sanding",
+  caulking: "Caulking",
+  priming: "Priming",
+  taping: "Taping",
+  mudding: "Mudding",
+  texture: "Texture match",
+  other: "Other",
+};
+
+export const PREP_STATUSES = ["todo", "in_progress", "done", "skipped"] as const;
+export type PrepStatus = (typeof PREP_STATUSES)[number];
+export const PREP_STATUS_LABELS: Record<PrepStatus, string> = {
+  todo: "To do",
+  in_progress: "In progress",
+  done: "Done",
+  skipped: "Skipped",
+};
+
+export const JOB_WORK_PHASES = [
+  "scheduled",
+  "prep",
+  "priming",
+  "painting",
+  "completed",
+] as const;
+export type JobWorkPhase = (typeof JOB_WORK_PHASES)[number];
+export const JOB_WORK_PHASE_LABELS: Record<JobWorkPhase, string> = {
+  scheduled: "Scheduled",
+  prep: "Prep",
+  priming: "Priming",
+  painting: "Painting",
+  completed: "Completed",
+};
 
 export const ESTIMATE_STATUSES = [
   "draft",

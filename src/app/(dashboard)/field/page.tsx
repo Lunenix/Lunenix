@@ -73,8 +73,8 @@ export default function FieldOpsPage() {
           Lead → visit → photos → estimate → job / recurring plan → invoice.
           Email customers from Estimates. Two-way SMS needs a text provider
           later. Receipt OCR is not auto-filled. Ask Luna for weather before
-          dispatch; toggle weather hold on Jobs. Roofing workspaces also track
-          Claims and Material orders.
+          dispatch; toggle weather hold on Jobs. Roofing: Claims and Materials.
+          Painting: Colors and Prep.
         </p>
       </div>
 
@@ -174,6 +174,12 @@ export default function FieldOpsPage() {
         </Button>
         <Button asChild variant="outline">
           <Link href="/materials">Materials</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/colors">Colors</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/prep">Prep</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/plans">Recurring</Link>

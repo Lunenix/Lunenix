@@ -13,6 +13,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PROJECT_STATUS_LABELS, type Project } from "@/types/database";
+import {
+  JOB_WORK_PHASES,
+  JOB_WORK_PHASE_LABELS,
+} from "@/lib/fieldService";
 import { Loader2 } from "lucide-react";
 
 export default function JobsPage() {
@@ -46,8 +50,8 @@ export default function JobsPage() {
         <h1 className="text-3xl font-bold">Jobs</h1>
         <p className="text-muted-foreground">
           Jobs are workspace projects. Approve an estimate to create one.
-          Assign a tech, set route order, mark weather hold for rain/wind/heat,
-          and mark urgent on the job.
+          Assign a tech, set route order, paint phase (prep → priming → painting),
+          weather hold for exterior, and mark urgent on the job.
         </p>
       </div>
       <Table>
@@ -57,6 +61,7 @@ export default function JobsPage() {
             <TableHead>Route #</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Due</TableHead>
+            <TableHead>Phase</TableHead>
             <TableHead>Weather</TableHead>
             <TableHead>Flags</TableHead>
           </TableRow>
@@ -95,6 +100,29 @@ export default function JobsPage() {
               </TableCell>
               <TableCell>
                 {j.due_date ? new Date(j.due_date).toLocaleDateString() : "—"}
+              </TableCell>
+              <TableCell>
+                <select
+                  className="rounded border bg-background px-2 py-1 text-sm"
+                  value={j.work_phase ?? ""}
+                  onChange={async (e) => {
+                    await fetch(`/api/projects/${j.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        work_phase: e.target.value || null,
+                      }),
+                    });
+                    load();
+                  }}
+                >
+                  <option value="">—</option>
+                  {JOB_WORK_PHASES.map((p) => (
+                    <option key={p} value={p}>
+                      {JOB_WORK_PHASE_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
               </TableCell>
               <TableCell>
                 <label className="flex items-center gap-2 text-sm">

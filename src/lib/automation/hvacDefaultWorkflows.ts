@@ -1046,6 +1046,180 @@ export const ROOFING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * Painting & Drywall default automations.
+ * Colors, HOA exterior approval, surface prep. Painting workspaces only.
+ */
+export const PAINTING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Painting: New lead",
+    description:
+      "When a new lead is created, capture interior vs exterior and repaint vs new/drywall.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New painting lead: {{lead.title}}",
+        "Set lead source: interior repaint, exterior, new construction, or drywall. Capture name, phone, email, address, rooms/sq ft, and notes. Email to book an estimate. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your painting or drywall request. Reply with the address, interior vs exterior, and a couple of times that work for an estimate visit.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Painting: Schedule estimate visit",
+    description: "On Site Visit, book the estimate and put it on the calendar.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule paint estimate: {{lead.title}}",
+        "Confirm date/time, address, contact, source, rooms/sq ft, interior vs exterior. Add to the calendar with the address. Send confirmation and a reminder. Two-way texting is not live yet.",
+        1
+      ),
+      email(
+        "Your painting estimate visit is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you down for an on-site estimate. We will come to the address on file. Reply if you need to change the time.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Painting: Photos and estimate",
+    description:
+      "On Estimate Sent, attach surface photos and send for digital accept.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Upload surface photos: {{lead.title}}",
+        "On Estimates, upload surface condition, drywall damage, existing color, and trim/detail shots. Set photo kind to surface, swatch, or prep.",
+        0
+      ),
+      task(
+        "Send painting estimate: {{lead.title}}",
+        "Price from photos and sq ft. Email the estimate. Track sent / viewed / approved / expired. Approval converts to a job.",
+        0
+      ),
+      email(
+        "Your painting estimate from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready. Please review and reply to approve. We will lock colors and sheen with you before work starts.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Painting: Job, colors, HOA, and prep",
+    description:
+      "After Contract Signed, assign crew, lock colors, HOA if exterior, and prep.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Create paint job and assign crew: {{lead.title}}",
+        "Create the job from the approved estimate. Assign a crew. Check Techs for drywall finishing, spray vs brush/roll, and lead-safe certs on older homes. Set work phase on Jobs (scheduled → prep → priming → painting).",
+        1
+      ),
+      task(
+        "Lock colors and sheen: {{lead.title}}",
+        "On Colors, log brand, code, sheen, and quantity per room. Capture match notes or swatch. Get client sign-off before paint. Link the supplier order on Materials (paint/primer).",
+        1
+      ),
+      task(
+        "HOA exterior color approval: {{lead.title}}",
+        "If exterior, add an HOA record on Colors and track submitted / approved / denied. Interior: mark not required. Store the approved scheme in notes.",
+        1
+      ),
+      task(
+        "Build surface prep list: {{lead.title}}",
+        "On Prep, add patching, sanding, caulking, priming, taping, mudding, and texture match. Mark billed separately when prep is its own line. Upload before/after as prep photos on the estimate.",
+        1
+      ),
+      email(
+        "You are on the painting schedule — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thanks for approving. Please confirm color and sheen so we can order paint. If the HOA must approve an exterior color, we will keep you posted.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Painting: Weather, stock, and receipts",
+    description: "When In Progress, check weather for exterior, stock, and receipts.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Weather, inventory, and receipts: {{lead.title}}",
+        "Ask Luna for weather before exterior dispatch (rain, temperature, humidity). Toggle weather hold on Jobs. Confirm sprayers, ladders, scaffolding, paint, primer, drywall, and compound in Inventory. Photo receipts on Books. OCR is not auto-filled. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Crew update from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Prep is lining up and painting follows once surfaces are ready. We will reschedule exterior work if weather is unsafe. Reply to this email with questions.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Painting: Punch list",
+    description: "On Punch List, walk leftover items and confirm colors on file.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Punch list and color history: {{lead.title}}",
+        "Walk leftover items, get sign-off, and confirm Colors are signed off. Save color/paint history on the contact for the next repaint. Watch HOA delays on Field ops.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Painting: Invoice, books, and reviews",
+    description: "When Closed, invoice prep + paint and close books.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice painting job: {{lead.title}}",
+        "Invoice labor + materials, including separately billed prep. Check AR aging and reminders. Review job profit on Field ops.",
+        1
+      ),
+      task(
+        "Books, tax set-aside, and history: {{lead.title}}",
+        "Log supplier bills in Books. Field ops shows income vs expenses and a 30% tax set-aside hint. Keep color history on the contact. Flag negative reviews.",
+        1
+      ),
+      email(
+        "Thanks — invoice from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>The painting or drywall work is complete. Your invoice is coming next. We saved your colors for next time.</p>"
+      ),
+    ],
+  },
+  {
+    name: "Painting: After contract signed (e-sign)",
+    description: "When an e-sign contract completes, kick off colors and prep.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off painting job from signed contract",
+        "Create or update the job, lock colors, start HOA if exterior, and build the prep list.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Painting: After invoice sent",
+    description: "When an invoice is sent, follow AR.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on invoice payment",
+        "Watch aging. Flag weather holds, HOA pending, leftover prep, or negative reviews.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -1085,6 +1259,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   electrician: ELECTRICIAN_DEFAULT_WORKFLOWS,
   landscaping_lawn_care: LANDSCAPING_DEFAULT_WORKFLOWS,
   roofing_exterior_repair: ROOFING_DEFAULT_WORKFLOWS,
+  painting_drywall: PAINTING_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -1107,6 +1282,12 @@ async function pruneForeignIndustryWorkflows(
       if (
         preset === "roofing_exterior_repair" &&
         name.startsWith("Roofing & Exterior Repair:")
+      ) {
+        return true;
+      }
+      if (
+        preset === "painting_drywall" &&
+        name.startsWith("Painting & Drywall:")
       ) {
         return true;
       }

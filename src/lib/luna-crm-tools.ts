@@ -646,6 +646,81 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_finish_specs",
+    description:
+      "List paint color and finish specs (room, brand, code, sheen, client sign-off).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_finish_spec",
+    description:
+      "Log a paint color or finish for a room or surface in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        room_or_surface: { type: "string" },
+        name: { type: "string" },
+        brand: { type: "string" },
+        color_name: { type: "string" },
+        color_code: { type: "string" },
+        sheen: {
+          type: "string",
+          description: "flat, eggshell, satin, semi_gloss, or gloss",
+        },
+        quantity: { type: "string" },
+        supplier: { type: "string" },
+        match_notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_prep_items",
+    description:
+      "List surface prep items (patching, sanding, priming, taping, mudding, texture).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_prep_item",
+    description: "Log a surface prep or drywall item for a job.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          description:
+            "patching, sanding, caulking, priming, taping, mudding, texture, or other",
+        },
+        status: {
+          type: "string",
+          description: "todo, in_progress, done, or skipped",
+        },
+        billed_separately: { type: "boolean" },
+        notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_hoa_color_approvals",
+    description: "List HOA exterior color approval records and their status.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_hoa_color_approval",
+    description:
+      "Log HOA exterior color approval (needed, submitted, approved, denied, or not_required).",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        status: { type: "string" },
+        scheme_notes: { type: "string" },
+        notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",
