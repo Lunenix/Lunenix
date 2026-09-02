@@ -396,4 +396,122 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
       },
     },
   },
+  {
+    name: "delete_form",
+    description:
+      "Permanently delete a form in this workspace. Only when they clearly ask to delete or remove it. Identify by name.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        form_name: { type: "string" },
+        name: { type: "string" },
+        lookup: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_contract",
+    description:
+      "Permanently delete a contract in this workspace. Identify by name or contract number.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        contract_name: { type: "string" },
+        name: { type: "string" },
+        lookup: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_workflow",
+    description:
+      "Permanently delete an automation workflow in this workspace. Identify by name.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        workflow_name: { type: "string" },
+        lookup: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_project",
+    description:
+      "Permanently delete a project in this workspace. Tasks on that project are removed with it. Identify by name.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        project_name: { type: "string" },
+        lookup: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_invoice",
+    description:
+      "Permanently delete an invoice in this workspace. Identify by invoice number or client. Does not charge or refund cards.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        invoice_number: { type: "string" },
+        lookup: { type: "string" },
+        contact_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_lead",
+    description:
+      "Permanently delete a pipeline lead in this workspace. Identify by title.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        lead_title: { type: "string" },
+        lookup: { type: "string" },
+        name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_esign",
+    description:
+      "Permanently delete an e-sign document in this workspace. Identify by document name.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        document_name: { type: "string" },
+        name: { type: "string" },
+        lookup: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_email_template",
+    description:
+      "Permanently delete an email template in this workspace. Identify by name. Does not unsend mail.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        template_name: { type: "string" },
+        lookup: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_knowledge_entry",
+    description:
+      "Permanently delete a knowledge article or SOP in this workspace. Identify by title.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        name: { type: "string" },
+        lookup: { type: "string" },
+      },
+    },
+  },
 ];

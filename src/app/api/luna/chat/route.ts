@@ -68,7 +68,8 @@ const BASE_SYSTEM_PROMPT =
   "When they ask to search or list contacts, call search_contacts. To look up one person, call get_contact. " +
   "When they ask to list tasks, invoices, projects, forms, contracts, leads, workflows, submissions, e-sign files, or knowledge articles, call the matching list tool. " +
   "When they ask to add a pipeline lead, call create_lead. When they ask to save an SOP, call create_knowledge_entry. When they ask to make an email template, call create_email_template. " +
-  "When they ask to remind someone to sign, call remind_esign. When they clearly ask to delete a contact, call delete_contact. " +
+  "When they ask to remind someone to sign, call remind_esign. " +
+  "When they clearly ask to delete or remove a contact, task, form, contract, workflow, project, invoice, lead, e-sign document, email template, or knowledge article, call the matching delete tool. Identify it by name or number. Ask which one if several match. " +
   "She cannot change workspace membership, email server passwords, API keys, or Telegram. Alerts use the scheduled Telegram job. " +
   "When they ask about sent mail or email history, call list_emails. For the inbox, call list_inbox. For email templates, call list_templates. " +
   "When they ask to add or create a project, call create_project. " +

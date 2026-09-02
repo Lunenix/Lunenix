@@ -592,6 +592,85 @@ async function requireOneForm(
   );
 }
 
+async function requireOneWorkflow(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  name: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  return pickUniqueOrAsk(
+    await findTitleMatches(
+      supabase,
+      workspaceId,
+      "automation_workflows",
+      "name",
+      name
+    ),
+    "I could not find that workflow in this workspace."
+  );
+}
+
+async function requireOneEsignDoc(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  name: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  return pickUniqueOrAsk(
+    await findTitleMatches(
+      supabase,
+      workspaceId,
+      "esign_documents",
+      "name",
+      name
+    ),
+    "I could not find that e-sign document in this workspace."
+  );
+}
+
+async function requireOneLead(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  title: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  return pickUniqueOrAsk(
+    await findTitleMatches(supabase, workspaceId, "leads", "title", title),
+    "I could not find that lead in this workspace."
+  );
+}
+
+async function requireOneKnowledge(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  title: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  return pickUniqueOrAsk(
+    await findTitleMatches(
+      supabase,
+      workspaceId,
+      "knowledge_base",
+      "title",
+      title
+    ),
+    "I could not find that knowledge article in this workspace."
+  );
+}
+
+async function requireOneEmailTemplate(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  name: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  return pickUniqueOrAsk(
+    await findTitleMatches(
+      supabase,
+      workspaceId,
+      "email_templates",
+      "name",
+      name
+    ),
+    "I could not find that email template in this workspace."
+  );
+}
+
 async function requireOneContract(
   supabase: LunaSupabaseClient,
   workspaceId: string,
@@ -1582,6 +1661,31 @@ async function lunaMutationOk(
 ): Promise<LunaToolResult> {
   await logLunaAction(supabase, workspaceId, action, summary, metadata);
   return { ok: true, summary };
+}
+
+async function lunaDeleteWorkspaceRow(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  table: string,
+  found: { id: string; label: string } | { error: string },
+  action: string,
+  noun: string
+): Promise<LunaToolResult> {
+  if ("error" in found) return found;
+  const { error } = await supabase
+    .from(table)
+    .delete()
+    .eq("id", found.id)
+    .eq("workspace_id", workspaceId);
+  if (error) {
+    return { error: error.message ?? `Could not delete that ${noun}.` };
+  }
+  return lunaMutationOk(
+    supabase,
+    workspaceId,
+    action,
+    `Deleted ${noun} ${found.label}.`
+  );
 }
 
 /** Workspace-scoped tool runner. All writes go through here, then logLunaAction. */
@@ -3770,6 +3874,147 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Sent a signing reminder for ${String(doc.name)}.`
+      );
+    }
+
+    if (name === "delete_form") {
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "forms",
+        await requireOneForm(
+          supabase,
+          workspace_id,
+          argStringAny(args, ["form_name", "name", "lookup"])
+        ),
+        name,
+        "form"
+      );
+    }
+
+    if (name === "delete_contract") {
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "contracts",
+        await requireOneContract(
+          supabase,
+          workspace_id,
+          argStringAny(args, ["contract_name", "name", "lookup"])
+        ),
+        name,
+        "contract"
+      );
+    }
+
+    if (name === "delete_workflow") {
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "automation_workflows",
+        await requireOneWorkflow(
+          supabase,
+          workspace_id,
+          argStringAny(args, ["name", "workflow_name", "lookup"])
+        ),
+        name,
+        "workflow"
+      );
+    }
+
+    if (name === "delete_project") {
+      const found = await requireOneProject(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["name", "project_name", "lookup"]),
+        argStringAny(args, ["project_id", "projectId"])
+      );
+      if ("error" in found) return found;
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "projects",
+        { id: found.id, label: found.name },
+        name,
+        "project"
+      );
+    }
+
+    if (name === "delete_invoice") {
+      const found = await requireOneInvoice(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["invoice_number", "lookup"]),
+        argString(args, "contact_name")
+      );
+      if ("error" in found) return found;
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "invoices",
+        { id: found.id, label: found.invoice_number },
+        name,
+        "invoice"
+      );
+    }
+
+    if (name === "delete_lead") {
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "leads",
+        await requireOneLead(
+          supabase,
+          workspace_id,
+          argStringAny(args, ["title", "lead_title", "lookup", "name"])
+        ),
+        name,
+        "lead"
+      );
+    }
+
+    if (name === "delete_esign") {
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "esign_documents",
+        await requireOneEsignDoc(
+          supabase,
+          workspace_id,
+          argStringAny(args, ["document_name", "name", "lookup"])
+        ),
+        name,
+        "e-sign document"
+      );
+    }
+
+    if (name === "delete_email_template") {
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "email_templates",
+        await requireOneEmailTemplate(
+          supabase,
+          workspace_id,
+          argStringAny(args, ["name", "template_name", "lookup"])
+        ),
+        name,
+        "email template"
+      );
+    }
+
+    if (name === "delete_knowledge_entry") {
+      return lunaDeleteWorkspaceRow(
+        supabase,
+        workspace_id,
+        "knowledge_base",
+        await requireOneKnowledge(
+          supabase,
+          workspace_id,
+          argStringAny(args, ["title", "name", "lookup"])
+        ),
+        name,
+        "knowledge article"
       );
     }
 
