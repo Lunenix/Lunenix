@@ -527,4 +527,38 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
       },
     },
   },
+  {
+    name: "list_job_permits",
+    description:
+      "List job permits in this workspace (pulled, approved, inspection). Optional filter by status.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          description:
+            "needed, applied, pulled, approved, inspection_scheduled, passed, failed, or not_required",
+        },
+      },
+    },
+  },
+  {
+    name: "log_job_permit",
+    description:
+      "Log a city/county permit for a field job: pulled, approved, or not required.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Permit or work type" },
+        permit_number: { type: "string" },
+        status: {
+          type: "string",
+          description:
+            "needed, applied, pulled, approved, inspection_scheduled, passed, failed, or not_required",
+        },
+        project_name: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
 ];

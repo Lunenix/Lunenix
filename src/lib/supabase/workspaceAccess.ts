@@ -88,6 +88,7 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "customer_equipment",
   "technician_profiles",
   "mileage_logs",
+  "job_permits",
 ]);
 
 /**

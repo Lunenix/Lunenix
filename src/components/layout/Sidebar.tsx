@@ -63,6 +63,7 @@ const fieldNav = [
   { href: "/inventory", label: "Inventory", icon: Package },
   { href: "/books", label: "Books", icon: BookOpen },
   { href: "/mileage", label: "Mileage", icon: MapPin },
+  { href: "/permits", label: "Permits", icon: ClipboardList },
   { href: "/team", label: "Techs", icon: HardHat },
 ];
 

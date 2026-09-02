@@ -158,6 +158,9 @@ export default function FieldOpsPage() {
           <Link href="/mileage">Mileage</Link>
         </Button>
         <Button asChild variant="outline">
+          <Link href="/permits">Permits</Link>
+        </Button>
+        <Button asChild variant="outline">
           <Link href="/pipeline">Pipeline</Link>
         </Button>
         <Button asChild variant="outline">

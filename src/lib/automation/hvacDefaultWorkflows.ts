@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AutomationAction, AutomationTriggerType } from "@/types/database";
+import { isFieldServiceWorkspace } from "@/lib/fieldService";
 
 export type IndustryWorkflowDef = {
   name: string;
@@ -82,6 +83,11 @@ export const HVAC_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
       task(
         "Create job and pull parts: {{lead.title}}",
         "Turn this deal into a job, assign a tech, check inventory, and order anything short.",
+        1
+      ),
+      task(
+        "Log permits pulled or not required: {{lead.title}}",
+        "On Permits, record any permit pulled for this job (mechanical, refrigerant, or other). Mark pulled and approved when the city issues and approves it. If none is required, log not required.",
         1
       ),
       email(
@@ -232,6 +238,11 @@ export const HANDYMAN_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
       task(
         "Create job and assign tech: {{lead.title}}",
         "Create the job from the approved estimate. Assign a handyman. Check availability and skill/license for this job type (electrical, plumbing, or general) before dispatch. Flag urgent or unassigned.",
+        1
+      ),
+      task(
+        "Log permits pulled or not required: {{lead.title}}",
+        "On Permits, log electrical/plumbing/building permits pulled for this job. Mark pulled and approved. If the work does not need a permit, log not required.",
         1
       ),
       email(
@@ -404,7 +415,7 @@ export const PLUMBING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
       ),
       task(
         "Permits and inspections: {{lead.title}}",
-        "Flag if this job needs a permit (water heater replacement, repiping, sewer line). Track status: applied, approved, inspection scheduled/passed. Store permit docs/photos on the job or contact notes until a permit file field exists.",
+        "Flag if this job needs a permit (water heater replacement, repiping, sewer line). On Permits, log it as applied/pulled, then mark approved when the city approves. Track inspection scheduled/passed. Store the permit number on that record.",
         1
       ),
       email(
@@ -578,7 +589,7 @@ export const ELECTRICIAN_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
       ),
       task(
         "Permits and inspections: {{lead.title}}",
-        "Flag if this job needs a permit (panel upgrades, rewiring, new circuits, EV chargers). Track status: applied, approved, inspection scheduled/passed. Store permit docs/photos on the job or contact notes until a permit file field exists.",
+        "Flag if this job needs a permit (panel upgrades, rewiring, new circuits, EV chargers). On Permits, log it as applied/pulled, then mark approved when the city approves. Track inspection scheduled/passed. Store the permit number on that record.",
         1
       ),
       email(
@@ -674,6 +685,38 @@ export const ELECTRICIAN_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/** Shared Home & Field permit tracking — seeded for every field-service workspace. */
+export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Field: Log permits pulled",
+    description:
+      "When a job is contracted, log whether a permit was pulled and track approval.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Log permits on Permits: {{lead.title}}",
+        "Open Permits. If the work needs a city/county permit, log it as needed or applied, then mark pulled when issued and approved when the city approves. If no permit is required, log not required so the job still has a record.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Field: Confirm permits approved",
+    description:
+      "Before close-out, confirm pulled permits are approved or inspection-passed.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Confirm permits approved: {{lead.title}}",
+        "On Permits, confirm every pulled permit for this job is approved or inspection passed. Do not invoice permit-required work that is still applied/pulled without approval. Flag delays on Field ops.",
+        1
+      ),
+    ],
+  },
+];
+
 const PACKS: Record<string, IndustryWorkflowDef[]> = {
   hvac: HVAC_DEFAULT_WORKFLOWS,
   handyman: HANDYMAN_DEFAULT_WORKFLOWS,
@@ -691,8 +734,11 @@ export async function seedIndustryDefaultWorkflows(
     .eq("id", workspaceId)
     .maybeSingle();
   const preset = workspace?.industry_preset ?? "";
-  const pack = PACKS[preset];
-  if (!pack) return 0;
+  const trade = PACKS[preset] ?? [];
+  const pack = isFieldServiceWorkspace(preset)
+    ? [...trade, ...FIELD_PERMIT_WORKFLOWS]
+    : trade;
+  if (pack.length === 0) return 0;
 
   const { data: stages } = await supabase
     .from("pipeline_stages")

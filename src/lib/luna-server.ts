@@ -21,6 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
+import { PERMIT_STATUSES } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4121,6 +4122,81 @@ export async function executeLunaTool(
         ),
         name,
         "knowledge article"
+      );
+    }
+
+    if (name === "list_job_permits") {
+      let q = supabase
+        .from("job_permits")
+        .select("name, permit_number, status, pulled_on, approved_on")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      const status = argString(args, "status");
+      if (status) q = q.eq("status", status);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (p: {
+          name: string;
+          permit_number: string | null;
+          status: string;
+          pulled_on: string | null;
+          approved_on: string | null;
+        }) =>
+          `${p.name}${p.permit_number ? ` #${p.permit_number}` : ""}: ${p.status}${p.pulled_on ? `, pulled ${p.pulled_on}` : ""}${p.approved_on ? `, approved ${p.approved_on}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No permits logged in this workspace.",
+      };
+    }
+
+    if (name === "log_job_permit") {
+      const permitName = argString(args, "name");
+      if (!permitName) return { error: "Need a permit or work type name." };
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const rawStatus = argString(args, "status") || "needed";
+      const status = (PERMIT_STATUSES as readonly string[]).includes(rawStatus)
+        ? rawStatus
+        : "needed";
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("job_permits")
+        .insert({
+          workspace_id,
+          name: permitName.slice(0, 200),
+          permit_number: argString(args, "permit_number"),
+          status,
+          project_id: projectId,
+          notes: argString(args, "notes"),
+          pulled_on: status === "pulled" ? today : null,
+          approved_on:
+            status === "approved" || status === "passed" ? today : null,
+        })
+        .select("name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that permit." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged permit ${data.name} as ${data.status}.`
       );
     }
 

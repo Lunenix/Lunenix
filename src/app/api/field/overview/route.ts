@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     bills,
     inventory,
     mileage,
+    permits,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -52,6 +53,10 @@ export async function GET(request: Request) {
       .from("mileage_logs")
       .select("miles, amount")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("job_permits")
+      .select("id, name, status, permit_number")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -61,6 +66,7 @@ export async function GET(request: Request) {
   const vb = bills.data ?? [];
   const stock = inventory.data ?? [];
   const miles = mileage.data ?? [];
+  const permitRows = permits.data ?? [];
 
   const paid = inv
     .filter((i) => i.status === "paid")
@@ -139,6 +145,17 @@ export async function GET(request: Request) {
         label: `Low stock: ${s.name}`,
         href: "/inventory",
       })),
+      ...permitRows
+        .filter((p) =>
+          ["needed", "applied", "pulled", "inspection_scheduled", "failed"].includes(
+            String(p.status)
+          )
+        )
+        .map((p) => ({
+          kind: "permit_open",
+          label: `Permit not approved: ${p.name}${p.permit_number ? ` (${p.permit_number})` : ""}`,
+          href: "/permits",
+        })),
     ],
   });
 }

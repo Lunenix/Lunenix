@@ -921,3 +921,29 @@ export interface CustomerEquipment {
   installed_on: string | null;
   notes: string | null;
 }
+
+export type JobPermitStatus =
+  | "needed"
+  | "applied"
+  | "pulled"
+  | "approved"
+  | "inspection_scheduled"
+  | "passed"
+  | "failed"
+  | "not_required";
+
+export interface JobPermit {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  name: string;
+  permit_number: string | null;
+  status: JobPermitStatus;
+  pulled_on: string | null;
+  approved_on: string | null;
+  inspection_on: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}

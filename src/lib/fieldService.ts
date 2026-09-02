@@ -35,6 +35,37 @@ export const EXPENSE_CATEGORIES = [
   "other",
 ] as const;
 
+/** Permit lifecycle for Home & Field jobs. */
+export const PERMIT_STATUSES = [
+  "needed",
+  "applied",
+  "pulled",
+  "approved",
+  "inspection_scheduled",
+  "passed",
+  "failed",
+  "not_required",
+] as const;
+
+export type PermitStatus = (typeof PERMIT_STATUSES)[number];
+
+export const PERMIT_STATUS_LABELS: Record<PermitStatus, string> = {
+  needed: "Needed",
+  applied: "Applied",
+  pulled: "Pulled",
+  approved: "Approved",
+  inspection_scheduled: "Inspection scheduled",
+  passed: "Inspection passed",
+  failed: "Inspection failed",
+  not_required: "Not required",
+};
+
+export function isOpenPermitStatus(status: string): boolean {
+  return ["needed", "applied", "pulled", "inspection_scheduled", "failed"].includes(
+    status
+  );
+}
+
 /** Default reimbursement rate per mile (editable per trip). */
 export const DEFAULT_MILEAGE_RATE = 0.7;
 
