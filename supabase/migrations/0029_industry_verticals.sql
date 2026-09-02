@@ -4,6 +4,8 @@
 ALTER TABLE workspaces
   ADD COLUMN IF NOT EXISTS industry_custom_label TEXT DEFAULT NULL;
 
+NOTIFY pgrst, 'reload schema';
+
 UPDATE workspaces SET industry_preset = 'bridal_shop'
   WHERE industry_preset = 'bridal';
 UPDATE workspaces SET industry_preset = 'mobile_bartending'

@@ -74,7 +74,9 @@ export async function PATCH(
       );
     }
     updates.industry_preset = preset;
-    updates.industry_custom_label = custom;
+    if (custom) {
+      updates.industry_custom_label = custom;
+    }
   }
 
   if (Object.keys(updates).length === 0) {

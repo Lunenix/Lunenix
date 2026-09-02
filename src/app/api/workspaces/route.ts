@@ -248,19 +248,23 @@ export async function POST(request: NextRequest) {
   const uniqueSlug = `${slugSource}-${Math.random().toString(36).slice(2, 6)}`;
   const extraPaid = !entitlement.unlimited && entitlement.ownedCount > 0;
 
+  const insertRow: Record<string, unknown> = {
+    name,
+    slug: uniqueSlug,
+    tier: extraPaid ? "paid" : "trial",
+    max_seats: seatsForTeamSize(payload.teamSize),
+    industry_preset: payload.industryPreset,
+    phone: payload.phone.slice(0, 40),
+    team_size: payload.teamSize,
+    trial_ends_at: extraPaid ? null : trialEndsAt(),
+  };
+  if (industryCustomLabel) {
+    insertRow.industry_custom_label = industryCustomLabel;
+  }
+
   const { data: workspace, error: wErr } = await admin
     .from("workspaces")
-    .insert({
-      name,
-      slug: uniqueSlug,
-      tier: extraPaid ? "paid" : "trial",
-      max_seats: seatsForTeamSize(payload.teamSize),
-      industry_preset: payload.industryPreset,
-      industry_custom_label: industryCustomLabel,
-      phone: payload.phone.slice(0, 40),
-      team_size: payload.teamSize,
-      trial_ends_at: extraPaid ? null : trialEndsAt(),
-    })
+    .insert(insertRow)
     .select("*")
     .single();
 
