@@ -270,15 +270,59 @@ ${context.openContracts.map((c) => `- ${c.name} (${c.status}${c.value != null ? 
 `.trim();
 }
 
-export const LUNA_WAKE_RE = /^(hey|hello|hi)\s+luna\b/i;
-
-export function isLunaWakePhrase(text: string): boolean {
-  return LUNA_WAKE_RE.test(text.trim());
+function escapeWakeName(name: string): string {
+  return name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") || "Luna";
 }
 
-/** Strip a leading "hey/hello/hi luna" so the rest can be treated as a command. */
-export function stripLunaWakePhrase(text: string): string {
-  return text.trim().replace(LUNA_WAKE_RE, "").replace(/^[,.\s]+/, "").trim();
+/** Leading address: "hey Luna", "ok Luna", or just "Luna". */
+export const LUNA_WAKE_RE =
+  /^(?:(?:hey|hi|hello|ok|okay|yo|excuse me)(?:\s+there)?[,.\s]+)?luna\b/i;
+
+function wakeNamePattern(agentName = "Luna"): string {
+  return escapeWakeName(agentName);
+}
+
+export function isLunaWakePhrase(
+  text: string,
+  agentName = "Luna"
+): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  const n = wakeNamePattern(agentName);
+  const greet = "(?:hey|hi|hello|ok|okay|yo|excuse me)(?:\\s+there)?";
+  if (new RegExp(`^(?:${greet}[,.\\s]+)?${n}\\b`, "i").test(t)) return true;
+  if (new RegExp(`\\bwake(?:\\s+up)?\\s+${n}\\b`, "i").test(t)) return true;
+  if (new RegExp(`\\b${n}\\s*,`, "i").test(t.slice(0, 48))) return true;
+  const firstWords = t.split(/\s+/).slice(0, 4);
+  return firstWords.some((w) =>
+    new RegExp(`^${n}[,.!?]*$`, "i").test(w)
+  );
+}
+
+/** Strip a leading address so the rest can be treated as a command. */
+export function stripLunaWakePhrase(
+  text: string,
+  agentName = "Luna"
+): string {
+  const n = wakeNamePattern(agentName);
+  const greet = "(?:hey|hi|hello|ok|okay|yo|excuse me)(?:\\s+there)?";
+  return text
+    .trim()
+    .replace(new RegExp(`^(?:${greet}[,.\\s]+)+${n}\\b`, "i"), "")
+    .replace(new RegExp(`^${n}\\b`, "i"), "")
+    .replace(new RegExp(`\\bwake(?:\\s+up)?\\s+${n}\\b`, "i"), "")
+    .replace(new RegExp(`^[,.\\s]+${n}\\b`, "i"), "")
+    .replace(/^[,.\s]+/, "")
+    .replace(/[,.\s]+$/, "")
+    .trim();
+}
+
+/** Drop filler / too-short mic noise so Luna is not triggered by "um". */
+export function isLikelyLunaCommand(text: string): boolean {
+  const t = text.trim();
+  if (t.length < 2) return false;
+  if (/^(um+|uh+|ah+|oh+|hmm+|huh|ha|what)\.?$/i.test(t)) return false;
+  return true;
 }
 
 /**

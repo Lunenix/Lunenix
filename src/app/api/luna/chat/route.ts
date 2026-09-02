@@ -76,6 +76,7 @@ const BASE_SYSTEM_PROMPT =
   "When they ask to email a calendar invite, call send_calendar_invite. That creates the dated task and emails a calendar file. It is not Google Calendar. " +
   "When they ask to change, complete, or delete a task, call update_task, complete_task, or delete_task. " +
   "Telegram reminders are sent by a scheduled job using the workspace bot. There is no Telegram tool. Do not claim you messaged Telegram. " +
+  "Use earlier turns in this conversation for follow-ups such as that one, her email, or do the same for them. Still call tools to change CRM data. " +
   "Do not claim you sent calendar invites or emailed other people unless the matching send tool succeeded. " +
   "Never invent a contact or project without a tool result. " +
   "You only know data for the caller's current workspace. " +
@@ -602,6 +603,26 @@ function asToolArgs(raw: unknown): Record<string, unknown> {
   return {};
 }
 
+function parseChatHistory(raw: unknown): Content[] {
+  if (!Array.isArray(raw)) return [];
+  const turns: Content[] = [];
+  for (const item of raw.slice(-10)) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { role?: unknown; text?: unknown };
+    const text = typeof row.text === "string" ? row.text.trim().slice(0, 800) : "";
+    if (!text || INJECTION_RE.test(text)) continue;
+    const role =
+      row.role === "luna" || row.role === "model" || row.role === "assistant"
+        ? "model"
+        : row.role === "user"
+          ? "user"
+          : null;
+    if (!role) continue;
+    turns.push({ role, parts: [{ text }] });
+  }
+  return turns;
+}
+
 async function geminiReply(params: {
   message: string;
   workspaceId: string;
@@ -610,6 +631,7 @@ async function geminiReply(params: {
   priorToolNotes: string[];
   completedTools: Set<string>;
   timezoneOverride?: string | null;
+  history?: unknown;
 }): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return null;
@@ -654,7 +676,16 @@ async function geminiReply(params: {
     "@google/genai"
   );
   const ai = new GoogleGenAI({ apiKey });
+  const historyTurns = parseChatHistory(params.history);
+  const lastHist = historyTurns[historyTurns.length - 1];
+  const lastText =
+    lastHist?.parts?.[0] && "text" in lastHist.parts[0]
+      ? String(lastHist.parts[0].text ?? "")
+      : "";
   const contents: Content[] = [
+    ...(lastText.trim() === params.message.trim()
+      ? historyTurns.slice(0, -1)
+      : historyTurns),
     { role: "user", parts: [{ text: params.message }] },
   ];
 
@@ -665,8 +696,8 @@ async function geminiReply(params: {
 
   const config = {
     systemInstruction,
-    temperature: 0.3,
-    maxOutputTokens: wantsBriefing ? 2048 : 1024,
+    temperature: 0.35,
+    maxOutputTokens: wantsBriefing ? 2048 : 1536,
     automaticFunctionCalling: { disable: true },
     tools: [{ functionDeclarations: LUNA_TOOLS }],
   };
@@ -788,6 +819,7 @@ export async function POST(req: NextRequest) {
   let workspaceId = "";
   let clientTimezone: string | null = null;
   let pendingAction: string | null = null;
+  let history: unknown = [];
   try {
     const body = await req.json();
     message = typeof body?.message === "string" ? body.message : "";
@@ -802,6 +834,7 @@ export async function POST(req: NextRequest) {
     if (body?.pendingAction === "create_form") pendingAction = "create_form";
     if (body?.pendingAction === "create_contact") pendingAction = "create_contact";
     if (body?.pendingAction === "create_project") pendingAction = "create_project";
+    if (Array.isArray(body?.history)) history = body.history;
   } catch {
     /* ignore malformed body */
   }
@@ -821,6 +854,7 @@ export async function POST(req: NextRequest) {
       workspaceId,
       clientTimezone,
       pendingAction,
+      history,
     });
   } catch (err) {
     console.error(
@@ -841,12 +875,14 @@ async function handleLunaChat(params: {
   workspaceId: string;
   clientTimezone: string | null;
   pendingAction: string | null;
+  history: unknown;
 }) {
   const {
     supabase,
     userId,
     workspaceId,
     clientTimezone,
+    history,
   } = params;
   let { message, pendingAction } = params;
 
@@ -965,6 +1001,7 @@ async function handleLunaChat(params: {
       priorToolNotes,
       completedTools,
       timezoneOverride,
+      history,
     });
   } catch (err) {
     console.error(

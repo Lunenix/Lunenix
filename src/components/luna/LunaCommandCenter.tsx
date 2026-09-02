@@ -16,6 +16,7 @@ import {
   pickFemaleVoice,
   isLunaWakePhrase,
   stripLunaWakePhrase,
+  isLikelyLunaCommand,
   LUNA_AVATAR_URL,
 } from "@/lib/luna";
 import type { WorkspaceAISettings } from "@/types/database";
@@ -44,7 +45,15 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
-const SIMLI_PCM_CHUNK = 6000;
+const ATTENTIVE_MS = 3 * 60 * 1000;
+
+function looksLikeLunaEcho(heard: string, spoken: string | null): boolean {
+  if (!spoken) return false;
+  const a = heard.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+  const b = spoken.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (a.length < 10) return false;
+  return b.includes(a) || a.includes(b.slice(0, Math.min(a.length, 80)));
+}
 const PCM_HZ = 16000;
 
 function sendPcmChunks(client: SimliClient, bytes: Uint8Array) {
@@ -112,8 +121,15 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startLiveRef = useRef<() => Promise<boolean>>(async () => false);
   const pendingActionRef = useRef<string | null>(null);
+  const agentNameRef = useRef("Luna");
+  const attentiveUntilRef = useRef(0);
+  const busyRef = useRef(false);
+  const lastSpokenRef = useRef<string | null>(null);
+  const chatLogRef = useRef<{ role: "user" | "luna"; text: string }[]>([]);
 
   const agentName = settings?.agent_name || "Luna";
+  agentNameRef.current = agentName;
+  chatLogRef.current = chatLog;
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -277,12 +293,14 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     }
     simliRef.current = null;
     liveRef.current = false;
+    attentiveUntilRef.current = 0;
     setLive(false);
     setStatus("disconnected");
   }, []);
 
   const startAvatarSession = useCallback(async (): Promise<boolean> => {
     wantedRef.current = true;
+    attentiveUntilRef.current = Date.now() + ATTENTIVE_MS;
     return startLive();
   }, [startLive]);
 
@@ -410,6 +428,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           await speakFallback(text);
         }
       } finally {
+        busyRef.current = false;
         resumeWakeListening();
       }
     },
@@ -431,11 +450,18 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         return;
       }
       setInstruction("");
-      const woke = isLunaWakePhrase(raw);
-      const command = woke ? stripLunaWakePhrase(raw) : raw;
+      const name = agentNameRef.current;
+      const woke = isLunaWakePhrase(raw, name);
+      const command = woke ? stripLunaWakePhrase(raw, name) : raw;
 
+      const history = chatLogRef.current.slice(-10).map((entry) => ({
+        role: entry.role,
+        text: entry.text,
+      }));
       setChatLog((prev) => [...prev, { role: "user", text: raw }]);
       wantedRef.current = true;
+      attentiveUntilRef.current = Date.now() + ATTENTIVE_MS;
+      busyRef.current = true;
       void startLive();
       setStatus("thinking");
 
@@ -454,11 +480,13 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
             workspaceId,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             pendingAction: pendingActionRef.current,
+            history,
           }),
         });
         if (res.status === 401) {
           toast("Sign in to talk to Luna.", "error");
           setStatus("idle");
+          busyRef.current = false;
           return;
         }
         const data = await res.json();
@@ -468,13 +496,16 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
           (typeof data?.text === "string" && data.text.trim()) ||
           (typeof data?.reply === "string" && data.reply.trim()) ||
           "Understood! I'll take care of that right away.";
+        lastSpokenRef.current = reply;
         setChatLog((prev) => [...prev, { role: "luna", text: reply }]);
         await speakText(reply);
       } catch {
         await speakText("Sorry, I ran into a problem processing that request.");
+      } finally {
+        busyRef.current = false;
       }
     },
-    [speakText, workspaceId]
+    [speakText, workspaceId, startLive]
   );
 
   handleSubmitRef.current = handleSubmit;
@@ -539,13 +570,19 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
     rec.lang = "en-US";
     rec.onresult = (e: SpeechRecognitionEventLike) => {
       if (commandMicRef.current) return;
+      if (busyRef.current) return;
       for (let i = e.resultIndex ?? 0; i < e.results.length; i++) {
         const result = e.results[i];
         if (result.isFinal === false) continue;
         const transcript = result[0]?.transcript?.trim() ?? "";
-        if (transcript && isLunaWakePhrase(transcript)) {
-          void handleSubmitRef.current(transcript);
-        }
+        if (!transcript || !isLikelyLunaCommand(transcript)) continue;
+        if (looksLikeLunaEcho(transcript, lastSpokenRef.current)) continue;
+        const addressed = isLunaWakePhrase(transcript, agentNameRef.current);
+        const listeningNow =
+          liveRef.current || Date.now() < attentiveUntilRef.current;
+        if (!addressed && !listeningNow) continue;
+        attentiveUntilRef.current = Date.now() + ATTENTIVE_MS;
+        void handleSubmitRef.current(transcript);
       }
     };
     rec.onend = () => {
@@ -773,7 +810,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         <p className="text-center text-[11px] text-muted-foreground">
           {isListening
             ? "Speak now. Your query will automatically send when you finish speaking."
-            : "Click the mic or type to send queries. Disconnect anytime to stop Simli credit use."}
+            : "Say Luna, hey Luna, or ok Luna to wake her. After she is live, keep talking without the wake word. Typing always sends."}
         </p>
       </CardContent>
 
