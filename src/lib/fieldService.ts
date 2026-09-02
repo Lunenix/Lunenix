@@ -40,6 +40,12 @@ export function isWoodworkingWorkspace(
   return resolveIndustryPreset(industryPreset) === "woodworking_custom_carpentry";
 }
 
+export function isSteelworkingWorkspace(
+  industryPreset?: string | null
+): boolean {
+  return resolveIndustryPreset(industryPreset) === "steelworking_metal_fabrication";
+}
+
 export const CLAIM_STATUSES = [
   "filed",
   "adjuster_scheduled",
@@ -110,6 +116,10 @@ export const MATERIAL_TYPES = [
   "fixture",
   "hardware",
   "stain",
+  "steel",
+  "aluminum",
+  "stainless",
+  "gas",
   "other",
 ] as const;
 export type MaterialType = (typeof MATERIAL_TYPES)[number];
@@ -129,6 +139,10 @@ export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
   fixture: "Fixture / finish",
   hardware: "Hardware",
   stain: "Finish / stain",
+  steel: "Steel",
+  aluminum: "Aluminum",
+  stainless: "Stainless",
+  gas: "Gas / consumable",
   other: "Other",
 };
 
@@ -152,6 +166,9 @@ export const ESTIMATE_PHOTO_KINDS = [
   "shop",
   "joinery",
   "final",
+  "mill",
+  "weld",
+  "erection",
 ] as const;
 export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
 export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
@@ -174,6 +191,9 @@ export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
   shop: "Shop / build",
   joinery: "Joinery check",
   final: "Final / install",
+  mill: "Mill / existing steel",
+  weld: "Weld documentation",
+  erection: "Erection / install",
 };
 
 export const ROOFING_LEAD_SOURCES = [
@@ -231,6 +251,15 @@ export const WOODWORKING_LEAD_SOURCES = [
   "Portfolio",
 ] as const;
 
+export const STEEL_LEAD_SOURCES = [
+  "Structural steel",
+  "Ornamental / railings",
+  "Custom fab",
+  "Industrial equipment",
+  "Referral",
+  "Bid invite",
+] as const;
+
 export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
   new Set([
     ...ROOFING_LEAD_SOURCES,
@@ -240,6 +269,7 @@ export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
     ...RENTAL_LEAD_SOURCES,
     ...CONSTRUCTION_LEAD_SOURCES,
     ...WOODWORKING_LEAD_SOURCES,
+    ...STEEL_LEAD_SOURCES,
   ])
 );
 
@@ -768,6 +798,117 @@ export const SHOP_FAB_STEP_LABELS: Record<ShopFabStep, string> = {
   finishing: "Finishing",
 };
 
+export const STEEL_DRAWING_STATUSES = [
+  "draft",
+  "sent",
+  "revision_requested",
+  "approved",
+] as const;
+export type SteelDrawingStatus = (typeof STEEL_DRAWING_STATUSES)[number];
+export const STEEL_DRAWING_STATUS_LABELS: Record<SteelDrawingStatus, string> = {
+  draft: "Draft",
+  sent: "Sent for review",
+  revision_requested: "Revisions requested",
+  approved: "Approved",
+};
+export function isPendingSteelDrawingStatus(status: string): boolean {
+  return ["draft", "sent", "revision_requested"].includes(status);
+}
+
+export const STEEL_PE_STATUSES = [
+  "needed",
+  "submitted",
+  "stamped",
+  "not_required",
+] as const;
+export type SteelPeStatus = (typeof STEEL_PE_STATUSES)[number];
+export const STEEL_PE_STATUS_LABELS: Record<SteelPeStatus, string> = {
+  needed: "PE stamp needed",
+  submitted: "With engineer",
+  stamped: "Stamped",
+  not_required: "Not required",
+};
+export function isOpenPeStatus(status: string): boolean {
+  return ["needed", "submitted"].includes(status);
+}
+
+export const STEEL_METALS = ["mild", "stainless", "aluminum", "other"] as const;
+export type SteelMetal = (typeof STEEL_METALS)[number];
+export const STEEL_METAL_LABELS: Record<SteelMetal, string> = {
+  mild: "Mild steel",
+  stainless: "Stainless",
+  aluminum: "Aluminum",
+  other: "Other",
+};
+
+export const STEEL_FINISHES = ["powder", "galvanized", "raw", "paint"] as const;
+export type SteelFinish = (typeof STEEL_FINISHES)[number];
+export const STEEL_FINISH_LABELS: Record<SteelFinish, string> = {
+  powder: "Powder coat",
+  galvanized: "Galvanized",
+  raw: "Raw / patina",
+  paint: "Paint",
+};
+
+export const STEEL_STAGES = [
+  "design_approved",
+  "material_in",
+  "in_fabrication",
+  "finishing",
+  "ready",
+  "install",
+] as const;
+export type SteelStage = (typeof STEEL_STAGES)[number];
+export const STEEL_STAGE_LABELS: Record<SteelStage, string> = {
+  design_approved: "Design approved",
+  material_in: "Waiting on mill",
+  in_fabrication: "In fabrication",
+  finishing: "Finishing",
+  ready: "Ready for install",
+  install: "Install / erection",
+};
+export function isWaitingSteelMaterial(stage: string): boolean {
+  return stage === "material_in";
+}
+
+export const STEEL_FAB_STEPS = ["cut", "weld", "assembly", "finishing"] as const;
+export type SteelFabStep = (typeof STEEL_FAB_STEPS)[number];
+export const STEEL_FAB_STEP_LABELS: Record<SteelFabStep, string> = {
+  cut: "Cutting",
+  weld: "Welding",
+  assembly: "Assembly",
+  finishing: "Finishing",
+};
+
+export const WELD_TYPES = ["tig", "mig", "stick", "other"] as const;
+export type WeldType = (typeof WELD_TYPES)[number];
+export const WELD_TYPE_LABELS: Record<WeldType, string> = {
+  tig: "TIG",
+  mig: "MIG",
+  stick: "Stick",
+  other: "Other",
+};
+
+export const WELD_RESULTS = ["pending", "pass", "fail"] as const;
+export type WeldResult = (typeof WELD_RESULTS)[number];
+export const WELD_RESULT_LABELS: Record<WeldResult, string> = {
+  pending: "Pending",
+  pass: "Pass",
+  fail: "Fail",
+};
+
+export const NDT_RESULTS = ["none", "pending", "pass", "fail"] as const;
+export type NdtResult = (typeof NDT_RESULTS)[number];
+export const NDT_RESULT_LABELS: Record<NdtResult, string> = {
+  none: "No NDT",
+  pending: "NDT pending",
+  pass: "NDT pass",
+  fail: "NDT fail",
+};
+export function isFailedWeldLog(result: string, ndt: string): boolean {
+  return result === "fail" || ndt === "fail";
+}
+
 export const ACCESS_ENTRY_METHODS = [
   "occupant",
   "gate",
@@ -859,6 +1000,8 @@ export const PERMIT_KINDS = [
   "electrical",
   "plumbing",
   "mechanical",
+  "structural",
+  "weld",
   "other",
 ] as const;
 export type PermitKind = (typeof PERMIT_KINDS)[number];
@@ -869,6 +1012,8 @@ export const PERMIT_KIND_LABELS: Record<PermitKind, string> = {
   electrical: "Electrical",
   plumbing: "Plumbing",
   mechanical: "Mechanical",
+  structural: "Structural",
+  weld: "Weld inspection",
   other: "Other",
 };
 

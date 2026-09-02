@@ -69,6 +69,10 @@ import {
   PencilRuler,
   TreePine,
   Hammer,
+  Compass,
+  Cylinder,
+  Factory,
+  Flame,
 } from "lucide-react";
 
 const coreNav = [
@@ -93,6 +97,10 @@ const fieldNav = [
   { href: "/designs", label: "Designs", icon: PencilRuler },
   { href: "/selections", label: "Selections", icon: TreePine },
   { href: "/shop", label: "Shop", icon: Hammer },
+  { href: "/drawings", label: "Drawings", icon: Compass },
+  { href: "/specs", label: "Specs", icon: Cylinder },
+  { href: "/fab", label: "Fab", icon: Factory },
+  { href: "/welds", label: "Welds", icon: Flame },
   { href: "/claims", label: "Claims", icon: Shield },
   { href: "/materials", label: "Materials", icon: Truck },
   { href: "/colors", label: "Colors", icon: Palette },

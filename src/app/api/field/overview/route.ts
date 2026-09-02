@@ -14,6 +14,10 @@ import {
   isOpenDrawStatus,
   isPendingShopDesignStatus,
   isWaitingShopMaterial,
+  isPendingSteelDrawingStatus,
+  isOpenPeStatus,
+  isWaitingSteelMaterial,
+  isFailedWeldLog,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -58,6 +62,10 @@ export async function GET(request: Request) {
     shopDesigns,
     shopSelections,
     shopQueue,
+    steelDrawings,
+    steelSpecs,
+    steelQueue,
+    steelWelds,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -167,6 +175,22 @@ export async function GET(request: Request) {
       .from("shop_queue")
       .select("id, title, stage, install_on")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("steel_drawings")
+      .select("id, title, status, pe_status")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("steel_specs")
+      .select("id, name, signed_off_at, quote_valid_until")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("steel_queue")
+      .select("id, title, stage, install_on")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("steel_weld_logs")
+      .select("id, welder_name, result, ndt_result")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -196,6 +220,10 @@ export async function GET(request: Request) {
   const shopDesignRows = shopDesigns.data ?? [];
   const shopSelectionRows = shopSelections.data ?? [];
   const shopQueueRows = shopQueue.data ?? [];
+  const steelDrawingRows = steelDrawings.data ?? [];
+  const steelSpecRows = steelSpecs.data ?? [];
+  const steelQueueRows = steelQueue.data ?? [];
+  const steelWeldRows = steelWelds.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -573,6 +601,65 @@ export async function GET(request: Request) {
           kind: "shop_behind",
           label: `Shop behind schedule: ${q.title}`,
           href: "/shop",
+        })),
+      ...steelDrawingRows
+        .filter((d) => isPendingSteelDrawingStatus(String(d.status)))
+        .map((d) => ({
+          kind: "drawing_pending",
+          label: `Drawing ${d.status.replace("_", " ")}: ${d.title}`,
+          href: "/drawings",
+        })),
+      ...steelDrawingRows
+        .filter((d) => isOpenPeStatus(String(d.pe_status)))
+        .map((d) => ({
+          kind: "pe_pending",
+          label: `PE stamp ${d.pe_status}: ${d.title}`,
+          href: "/drawings",
+        })),
+      ...steelSpecRows
+        .filter((s) => !s.signed_off_at)
+        .map((s) => ({
+          kind: "spec_signoff",
+          label: `Spec needs sign-off: ${s.name}`,
+          href: "/specs",
+        })),
+      ...steelSpecRows
+        .filter((s) => {
+          const d = daysUntil(s.quote_valid_until);
+          return d !== null && d <= 0;
+        })
+        .map((s) => ({
+          kind: "quote_expired",
+          label: `Steel quote expired: ${s.name}`,
+          href: "/specs",
+        })),
+      ...steelQueueRows
+        .filter((q) => isWaitingSteelMaterial(String(q.stage)))
+        .map((q) => ({
+          kind: "mill_wait",
+          label: `Waiting on mill: ${q.title}`,
+          href: "/fab",
+        })),
+      ...steelQueueRows
+        .filter(
+          (q) =>
+            q.install_on &&
+            String(q.install_on).slice(0, 10) < today &&
+            !["ready", "install"].includes(String(q.stage))
+        )
+        .map((q) => ({
+          kind: "fab_behind",
+          label: `Fab behind schedule: ${q.title}`,
+          href: "/fab",
+        })),
+      ...steelWeldRows
+        .filter((w) =>
+          isFailedWeldLog(String(w.result), String(w.ndt_result))
+        )
+        .map((w) => ({
+          kind: "weld_fail",
+          label: `Weld/NDT fail: ${w.welder_name}`,
+          href: "/welds",
         })),
     ],
   });

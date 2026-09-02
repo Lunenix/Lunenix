@@ -1967,6 +1967,149 @@ export const WOODWORKING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+export const STEELWORKING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Steel: New lead",
+    description:
+      "When a new lead is created, capture structural vs ornamental vs fab source.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New steel lead: {{lead.title}}",
+        "Set lead source: structural steel, ornamental/railings, custom fab, industrial equipment, referral, or bid invite. Capture name, phone, email, address, project type, and load requirements if structural. Email to book a consult. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your fabrication inquiry. Reply with a couple of visit times, the address, and whether this is structural, ornamental, custom fab, or equipment.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Steel: Schedule consult",
+    description:
+      "On Site Visit, book the consult on the calendar with the address.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule consult / site visit: {{lead.title}}",
+        "Confirm date/time, address, source, project type, load notes. Add to the calendar with the address. Capture existing-structure and measurement photos. Send confirmation and a reminder. Two-way texting is not live. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Your site visit is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you on the calendar for a site visit. Reply if the time or address changes.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Steel: Quote after drawings",
+    description:
+      "On Estimate Sent, quote from drawings, specs, labor, and engineering fees. Lock quote validity.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Send steel quote: {{lead.title}}",
+        "Confirm drawings approved and PE stamped if load-bearing. Specs signed off with quote-valid date (steel pricing is volatile). On Estimates, include drawings + materials + labor + engineering. Email it. Approval creates the job. Two-way SMS is not live.",
+        0
+      ),
+      email(
+        "Your fabrication quote from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your quote is ready based on the shop drawings and material specs. Please review and reply to approve. Pricing is valid through the date on the quote.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Steel: Materials, permits, and queue",
+    description:
+      "After Contract Signed, order mill steel, log permits, and queue fab.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Order steel, log permits, queue fab: {{lead.title}}",
+        "On Materials, order steel/aluminum/stainless/hardware/gas and track mill lead time. On Permits, log structural or weld inspection if required. On Fab, add the piece. Invoice the deposit. Check low stock on Inventory. OCR is not auto-filled.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Steel: Fabrication and weld logs",
+    description:
+      "When In Progress, run cut/weld/assembly/finish and weld/NDT documentation.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Run the fab shop: {{lead.title}}",
+        "On Fab, move stages. Assign welder/fabricator. On Welds, log weld type, joint, inspection, and NDT. Upload mill, weld, and progress photos on Estimates. Check welder certs on Techs. GPS auto-track is not live.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Steel: Delivery and erection",
+    description:
+      "On Punch List, schedule delivery/erection and walk punch items.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Deliver or erect: {{lead.title}}",
+        "On Fab, set install date, crew, and site prep (access, power, crane/rigging). Confirm weld inspections passed on Permits. Upload erection/final photos. Walk punch items. Two-way SMS is not live.",
+        0
+      ),
+      email(
+        "Ready for install — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your steel is ready. We will confirm delivery or erection next. Reply if crane access or power needs extra planning.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Steel: Invoice and books",
+    description:
+      "When Closed, invoice remaining milestones and check fab margin vs steel cost.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Completion invoice and books: {{lead.title}}",
+        "Invoice remaining (material, fab complete, install/final). Check AR aging. Log mill and gas receipts in Books. Compare materials + shop labor + install vs price on Field ops. Flag negative reviews. OCR is not auto-filled.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Steel: After contract signed (e-sign)",
+    description:
+      "When an e-sign contract completes, order mill steel and queue fab.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off fab from signed contract",
+        "Create or update the job, log permits, order steel, add the fab queue row, and send the deposit invoice.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Steel: After invoice sent",
+    description:
+      "When an invoice is sent, follow AR (deposit, material, fab, install).",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on steel invoice",
+        "Watch aging. Send a reminder if overdue. Flag delayed mill delivery, pending PE stamps, failed weld inspections, or jobs behind on Fab.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -2012,6 +2155,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   rental_company: RENTAL_DEFAULT_WORKFLOWS,
   contractors_construction: CONSTRUCTION_DEFAULT_WORKFLOWS,
   woodworking_custom_carpentry: WOODWORKING_DEFAULT_WORKFLOWS,
+  steelworking_metal_fabrication: STEELWORKING_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -2080,6 +2224,12 @@ async function pruneForeignIndustryWorkflows(
       if (
         preset === "woodworking_custom_carpentry" &&
         name.startsWith("Woodworking & Custom Carpentry:")
+      ) {
+        return true;
+      }
+      if (
+        preset === "steelworking_metal_fabrication" &&
+        name.startsWith("Steelworking & Metal Fabrication:")
       ) {
         return true;
       }

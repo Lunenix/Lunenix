@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES, CHANGE_ORDER_STATUSES, SUB_TRADES, PHASE_KINDS, PHASE_STATUSES, DELAY_CAUSES, DRAW_KINDS, DRAW_STATUSES, LIEN_WAIVER_STATUSES, SHOP_DESIGN_STATUSES, SHOP_SELECTION_KINDS, SHOP_STAGES, SHOP_FAB_STEPS } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES, CHANGE_ORDER_STATUSES, SUB_TRADES, PHASE_KINDS, PHASE_STATUSES, DELAY_CAUSES, DRAW_KINDS, DRAW_STATUSES, LIEN_WAIVER_STATUSES, SHOP_DESIGN_STATUSES, SHOP_SELECTION_KINDS, SHOP_STAGES, SHOP_FAB_STEPS, STEEL_DRAWING_STATUSES, STEEL_PE_STATUSES, STEEL_METALS, STEEL_FINISHES, STEEL_STAGES, STEEL_FAB_STEPS, WELD_TYPES, WELD_RESULTS, NDT_RESULTS } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -5811,6 +5811,310 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Queued ${data.title} as ${data.stage}.`
+      );
+    }
+
+    if (name === "list_steel_drawings") {
+      const { data, error } = await supabase
+        .from("steel_drawings")
+        .select("title, version, status, pe_status")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (d: {
+          title: string;
+          version: number;
+          status: string;
+          pe_status: string;
+        }) => `${d.title} v${d.version}: ${d.status}, PE ${d.pe_status}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No steel drawings in this workspace.",
+      };
+    }
+
+    if (name === "log_steel_drawing") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a drawing title." };
+      const stRaw = argString(args, "status") || "draft";
+      const status = (STEEL_DRAWING_STATUSES as readonly string[]).includes(
+        stRaw
+      )
+        ? stRaw
+        : "draft";
+      const peRaw = argString(args, "pe_status") || "not_required";
+      const pe_status = (STEEL_PE_STATUSES as readonly string[]).includes(peRaw)
+        ? peRaw
+        : "not_required";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("steel_drawings")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          title: title.slice(0, 200),
+          status,
+          pe_status,
+          version: Number(args.version) || 1,
+          dimensions: argString(args, "dimensions"),
+          weld_notes: argString(args, "weld_notes"),
+        })
+        .select("title, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that drawing." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged drawing ${data.title} as ${data.status}.`
+      );
+    }
+
+    if (name === "list_steel_specs") {
+      const { data, error } = await supabase
+        .from("steel_specs")
+        .select("name, metal, finish, quote_valid_until, signed_off_at")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (s: {
+          name: string;
+          metal: string;
+          finish: string;
+          quote_valid_until: string | null;
+          signed_off_at: string | null;
+        }) =>
+          `${s.metal} ${s.name} (${s.finish})${
+            s.signed_off_at ? " signed off" : " needs sign-off"
+          }`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No steel specs in this workspace.",
+      };
+    }
+
+    if (name === "log_steel_spec") {
+      const selName = argString(args, "name");
+      if (!selName) return { error: "Need a spec name." };
+      const metalRaw = argString(args, "metal") || "mild";
+      const metal = (STEEL_METALS as readonly string[]).includes(metalRaw)
+        ? metalRaw
+        : "mild";
+      const finRaw = argString(args, "finish") || "raw";
+      const finish = (STEEL_FINISHES as readonly string[]).includes(finRaw)
+        ? finRaw
+        : "raw";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("steel_specs")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          metal,
+          finish,
+          thickness: argString(args, "thickness"),
+          name: selName.slice(0, 200),
+          cost: Number(args.cost) || 0,
+          quote_valid_until: argString(args, "quote_valid_until"),
+          signed_off_at: args.signed_off ? new Date().toISOString() : null,
+        })
+        .select("name, metal")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that spec." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.metal} spec ${data.name}.`
+      );
+    }
+
+    if (name === "list_steel_queue") {
+      const { data, error } = await supabase
+        .from("steel_queue")
+        .select("title, stage, fab_step, fabricator_name")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (q: {
+          title: string;
+          stage: string;
+          fab_step: string | null;
+          fabricator_name: string | null;
+        }) =>
+          `${q.title}: ${q.stage}${q.fab_step ? ` (${q.fab_step})` : ""}${
+            q.fabricator_name ? `, ${q.fabricator_name}` : ""
+          }`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "Nothing on the fab queue in this workspace.",
+      };
+    }
+
+    if (name === "log_steel_queue_item") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a piece title." };
+      const stageRaw = argString(args, "stage") || "design_approved";
+      const stage = (STEEL_STAGES as readonly string[]).includes(stageRaw)
+        ? stageRaw
+        : "design_approved";
+      const stepRaw = argString(args, "fab_step");
+      const fab_step =
+        stepRaw && (STEEL_FAB_STEPS as readonly string[]).includes(stepRaw)
+          ? stepRaw
+          : null;
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("steel_queue")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          title: title.slice(0, 200),
+          stage,
+          fab_step,
+          fabricator_name: argString(args, "fabricator_name"),
+          install_on: argString(args, "install_on"),
+          access_notes: argString(args, "access_notes"),
+        })
+        .select("title, stage")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not queue that piece." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Queued ${data.title} as ${data.stage}.`
+      );
+    }
+
+    if (name === "list_steel_weld_logs") {
+      const { data, error } = await supabase
+        .from("steel_weld_logs")
+        .select("welder_name, weld_type, result, ndt_result")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (w: {
+          welder_name: string;
+          weld_type: string;
+          result: string;
+          ndt_result: string;
+        }) =>
+          `${w.welder_name} ${w.weld_type}: visual ${w.result}, NDT ${w.ndt_result}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} Certification numbers are not spoken.`
+          : "No weld logs in this workspace.",
+      };
+    }
+
+    if (name === "log_steel_weld") {
+      const welder = argString(args, "welder_name");
+      if (!welder) return { error: "Need a welder name." };
+      const typeRaw = argString(args, "weld_type") || "mig";
+      const weld_type = (WELD_TYPES as readonly string[]).includes(typeRaw)
+        ? typeRaw
+        : "mig";
+      const resRaw = argString(args, "result") || "pending";
+      const result = (WELD_RESULTS as readonly string[]).includes(resRaw)
+        ? resRaw
+        : "pending";
+      const ndtRaw = argString(args, "ndt_result") || "none";
+      const ndt_result = (NDT_RESULTS as readonly string[]).includes(ndtRaw)
+        ? ndtRaw
+        : "none";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("steel_weld_logs")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          welder_name: welder.slice(0, 200),
+          weld_type,
+          joint: argString(args, "joint"),
+          result,
+          ndt_result,
+          notes: argString(args, "notes"),
+        })
+        .select("welder_name, weld_type")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that weld." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.weld_type} weld for ${data.welder_name}. Do not store cert numbers.`
       );
     }
 

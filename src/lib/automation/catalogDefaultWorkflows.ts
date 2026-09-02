@@ -42,6 +42,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "rental_company") return "Rental:";
   if (resolved === "contractors_construction") return "Build:";
   if (resolved === "woodworking_custom_carpentry") return "Shop:";
+  if (resolved === "steelworking_metal_fabrication") return "Steel:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;

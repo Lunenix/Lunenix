@@ -1412,3 +1412,66 @@ export interface ShopQueueItem {
   created_at: string;
   project?: { id: string; name: string } | null;
 }
+
+export interface SteelDrawing {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  title: string;
+  version: number;
+  status: string;
+  pe_status: string;
+  dimensions: string | null;
+  weld_notes: string | null;
+  drawing_url: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface SteelSpec {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  metal: string;
+  finish: string;
+  thickness: string | null;
+  name: string;
+  cost: number;
+  quote_valid_until: string | null;
+  signed_off_at: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface SteelQueueItem {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  title: string;
+  stage: string;
+  fab_step: string | null;
+  fabricator_name: string | null;
+  install_on: string | null;
+  access_notes: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface SteelWeldLog {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  welder_name: string;
+  weld_type: string;
+  joint: string | null;
+  result: string;
+  ndt_result: string;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}

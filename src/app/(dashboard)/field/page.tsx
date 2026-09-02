@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import {
   isConstructionWorkspace,
+  isSteelworkingWorkspace,
   isWoodworkingWorkspace,
 } from "@/lib/fieldService";
 
@@ -80,7 +81,9 @@ export default function FieldOpsPage() {
       <div>
         <h1 className="text-3xl font-bold">Field operations</h1>
         <p className="text-muted-foreground">
-          {isWoodworkingWorkspace(activeWorkspace.industry_preset)
+          {isSteelworkingWorkspace(activeWorkspace.industry_preset)
+            ? "Lead → consult/photos → drawings and PE stamp → metal specs with quote-valid dates → quote → mill order, permits, fab queue → weld/NDT logs → erection → punch → invoice. Approval still creates a job."
+            : isWoodworkingWorkspace(activeWorkspace.industry_preset)
             ? "Lead → consult/photos → designs and wood/finish/hardware sign-off → quote → materials and shop queue → fab photos → delivery/install → punch → invoice. Approval still creates a job."
             : isConstructionWorkspace(activeWorkspace.industry_preset)
             ? "Lead → site visit → photos → bid → contract → permits/phases/subs → daily logs and draws → punch → close. Change orders need approval before extra work."
@@ -92,8 +95,8 @@ export default function FieldOpsPage() {
           Inspection: Findings, Reports, Add-ons. Rental: Fleet, Rentals,
           Maintenance. General contractors: Change orders, Subs, Phases, Daily
           logs, Draws, plus Permits and Materials. Woodworking: Designs,
-          Selections, Shop, plus Materials and Inventory for lumber and
-          equipment.
+          Selections, Shop. Steel: Drawings, Specs, Fab, Welds, plus Permits
+          and Materials.
         </p>
       </div>
 
@@ -253,6 +256,18 @@ export default function FieldOpsPage() {
         </Button>
         <Button asChild variant="outline">
           <Link href="/shop">Shop</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/drawings">Drawings</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/specs">Specs</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/fab">Fab</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/welds">Welds</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/plans">Recurring</Link>

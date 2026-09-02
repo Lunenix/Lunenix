@@ -112,6 +112,10 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "shop_designs",
   "shop_selections",
   "shop_queue",
+  "steel_drawings",
+  "steel_specs",
+  "steel_queue",
+  "steel_weld_logs",
 ]);
 
 /**

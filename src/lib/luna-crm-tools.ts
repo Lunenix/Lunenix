@@ -1169,6 +1169,110 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_steel_drawings",
+    description:
+      "List steel shop drawings (title, version, client status, PE stamp). Does not return CAD files.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_steel_drawing",
+    description:
+      "Log a shop drawing. Client status is draft, sent, revision requested, or approved. PE is needed, submitted, stamped, or not required.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        status: { type: "string" },
+        pe_status: { type: "string" },
+        version: { type: "number" },
+        dimensions: { type: "string" },
+        weld_notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_steel_specs",
+    description:
+      "List steel/aluminum specs (metal, finish, quote valid date, sign-off).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_steel_spec",
+    description: "Log a metal spec with cost and optional quote validity date.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        metal: {
+          type: "string",
+          description: "mild, stainless, aluminum, or other",
+        },
+        finish: {
+          type: "string",
+          description: "powder, galvanized, raw, or paint",
+        },
+        thickness: { type: "string" },
+        cost: { type: "number" },
+        quote_valid_until: { type: "string", description: "YYYY-MM-DD" },
+        signed_off: { type: "boolean" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_steel_queue",
+    description: "List the steel fab queue (stage, fab step, fabricator).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_steel_queue_item",
+    description: "Add a piece to the steel fab queue.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        stage: { type: "string" },
+        fab_step: {
+          type: "string",
+          description: "cut, weld, assembly, or finishing",
+        },
+        fabricator_name: { type: "string" },
+        install_on: { type: "string", description: "YYYY-MM-DD" },
+        access_notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_steel_weld_logs",
+    description:
+      "List weld logs (welder, type, visual result, NDT). Does not return cert numbers.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_steel_weld",
+    description: "Log a weld: welder, type, joint, visual result, and NDT.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        welder_name: { type: "string" },
+        weld_type: {
+          type: "string",
+          description: "tig, mig, stick, or other",
+        },
+        joint: { type: "string" },
+        result: { type: "string", description: "pending, pass, or fail" },
+        ndt_result: {
+          type: "string",
+          description: "none, pending, pass, or fail",
+        },
+        project_name: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",
