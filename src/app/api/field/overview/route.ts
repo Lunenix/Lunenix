@@ -9,6 +9,7 @@ import {
   daysUntil,
   isPendingInspectionReport,
   isOpenAddonStatus,
+  isOpenReservationStatus,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -43,6 +44,9 @@ export async function GET(request: Request) {
     techs,
     inspReports,
     addons,
+    rentalAssets,
+    rentalReservations,
+    rentalMaint,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -112,6 +116,18 @@ export async function GET(request: Request) {
       .from("inspection_addons")
       .select("id, kind, status, specialist_name")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("rental_assets")
+      .select("id, name, category, status, location, next_service_on")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("rental_reservations")
+      .select("id, status, ends_on, starts_on, asset_id")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("rental_maintenance")
+      .select("id, title, status, due_on")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -131,6 +147,9 @@ export async function GET(request: Request) {
   const techRows = techs.data ?? [];
   const reportRows = inspReports.data ?? [];
   const addonRows = addons.data ?? [];
+  const fleetRows = rentalAssets.data ?? [];
+  const rentalRows = rentalReservations.data ?? [];
+  const maintRows = rentalMaint.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -209,6 +228,12 @@ export async function GET(request: Request) {
       tax_set_aside: suggestedTaxSetAside(paid - costs),
       recurring,
       aging,
+    },
+    fleet: {
+      available: fleetRows.filter((a) => a.status === "available").length,
+      reserved: fleetRows.filter((a) => a.status === "reserved").length,
+      out: fleetRows.filter((a) => a.status === "out").length,
+      maintenance: fleetRows.filter((a) => a.status === "maintenance").length,
     },
     alerts: [
       ...overdueInvoices.map((i) => ({
@@ -345,6 +370,77 @@ export async function GET(request: Request) {
           kind: "calibration",
           label: `Calibration overdue: ${s.name}`,
           href: "/inventory",
+        })),
+      ...rentalRows
+        .filter(
+          (r) =>
+            String(r.status) === "checked_out" &&
+            r.ends_on &&
+            String(r.ends_on).slice(0, 10) < today
+        )
+        .map(() => ({
+          kind: "overdue_return",
+          label: "Overdue return",
+          href: "/rentals",
+        })),
+      ...rentalRows
+        .filter(
+          (r) =>
+            String(r.status) === "checked_out" &&
+            r.ends_on &&
+            String(r.ends_on).slice(0, 10) === today
+        )
+        .map(() => ({
+          kind: "due_back",
+          label: "Due back today",
+          href: "/rentals",
+        })),
+      ...rentalRows
+        .filter((r) => {
+          if (!isOpenReservationStatus(String(r.status)) || !r.ends_on)
+            return false;
+          const d = daysUntil(r.ends_on);
+          return d !== null && d > 0 && d <= 2;
+        })
+        .map(() => ({
+          kind: "return_soon",
+          label: "Return reminder window",
+          href: "/rentals",
+        })),
+      ...fleetRows
+        .filter((a) => {
+          const d = daysUntil(a.next_service_on);
+          return d !== null && d <= 0;
+        })
+        .map((a) => ({
+          kind: "service_due",
+          label: `Service due: ${a.name}`,
+          href: "/maintenance",
+        })),
+      ...maintRows
+        .filter(
+          (m) =>
+            ["scheduled", "in_repair"].includes(String(m.status)) &&
+            m.due_on &&
+            String(m.due_on).slice(0, 10) <= today
+        )
+        .map((m) => ({
+          kind: "repair_due",
+          label: `Repair due: ${m.title}`,
+          href: "/maintenance",
+        })),
+      ...Array.from(
+        new Set(fleetRows.map((a) => String(a.category || "other")))
+      )
+        .filter((cat) => {
+          const group = fleetRows.filter((a) => String(a.category) === cat);
+          if (group.length === 0) return false;
+          return group.every((a) => a.status !== "available");
+        })
+        .map((cat) => ({
+          kind: "low_availability",
+          label: `No units available: ${cat}`,
+          href: "/fleet",
         })),
     ],
   });

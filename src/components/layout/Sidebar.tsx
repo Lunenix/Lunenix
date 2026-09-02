@@ -56,8 +56,9 @@ import {
   Wrench,
   X,
   Zap,
-  ClipboardCheck,
-  Layers,
+  Warehouse,
+  CalendarRange,
+  Cog,
 } from "lucide-react";
 
 const coreNav = [
@@ -83,6 +84,9 @@ const fieldNav = [
   { href: "/findings", label: "Findings", icon: ClipboardCheck },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/addons", label: "Add-ons", icon: Layers },
+  { href: "/fleet", label: "Fleet", icon: Warehouse },
+  { href: "/rentals", label: "Rentals", icon: CalendarRange },
+  { href: "/maintenance", label: "Maintenance", icon: Cog },
   { href: "/plans", label: "Recurring", icon: Repeat },
   { href: "/team", label: "Techs", icon: HardHat },
 ];

@@ -1210,3 +1210,83 @@ export interface InspectionAddon {
   created_at: string;
   project?: { id: string; name: string } | null;
 }
+
+export interface RentalAsset {
+  id: string;
+  workspace_id: string;
+  name: string;
+  sku: string | null;
+  category: string;
+  location: string;
+  status: string;
+  hourly_rate: number;
+  daily_rate: number;
+  weekly_rate: number;
+  purchase_cost: number | null;
+  purchased_on: string | null;
+  hours_used: number;
+  service_interval_hours: number | null;
+  last_serviced_on: string | null;
+  next_service_on: string | null;
+  fuel_level: string | null;
+  last_known_location: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface RentalReservation {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  asset_id: string | null;
+  estimate_id: string | null;
+  starts_on: string;
+  ends_on: string;
+  pickup_method: string;
+  job_site_address: string | null;
+  status: string;
+  rate_type: string;
+  rate_amount: number;
+  deposit_amount: number;
+  damage_waiver: boolean;
+  late_fee: number;
+  damage_charge: number;
+  account_terms: string | null;
+  checked_out_on: string | null;
+  returned_on: string | null;
+  notes: string | null;
+  created_at: string;
+  asset?: { id: string; name: string; daily_rate?: number } | null;
+  contact?: Pick<
+    Contact,
+    "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
+  > | null;
+  logs?: RentalConditionLog[];
+}
+
+export interface RentalConditionLog {
+  id: string;
+  workspace_id: string;
+  reservation_id: string | null;
+  asset_id: string | null;
+  kind: string;
+  photo_url: string | null;
+  fuel_level: string | null;
+  notes: string | null;
+  logged_on: string;
+}
+
+export interface RentalMaintenance {
+  id: string;
+  workspace_id: string;
+  asset_id: string | null;
+  title: string;
+  status: string;
+  hours_at_service: number | null;
+  cost: number | null;
+  due_on: string | null;
+  completed_on: string | null;
+  notes: string | null;
+  created_at: string;
+  asset?: { id: string; name: string } | null;
+}

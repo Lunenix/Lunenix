@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -5003,6 +5003,256 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Logged ${data.kind} add-on as ${data.status}.`
+      );
+    }
+
+    if (name === "list_rental_assets") {
+      const { data, error } = await supabase
+        .from("rental_assets")
+        .select("name, category, location, status")
+        .eq("workspace_id", workspace_id)
+        .order("name")
+        .limit(40);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (a: {
+          name: string;
+          category: string;
+          location: string;
+          status: string;
+        }) => `${a.name}: ${a.status} (${a.category}, ${a.location})`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No rental assets in this workspace.",
+      };
+    }
+
+    if (name === "log_rental_asset") {
+      const assetName = argString(args, "name");
+      if (!assetName) return { error: "Need an asset name." };
+      const catRaw = argString(args, "category") || "other";
+      const category = (ASSET_CATEGORIES as readonly string[]).includes(catRaw)
+        ? catRaw
+        : "other";
+      const locRaw = argString(args, "location") || "yard";
+      const location = (ASSET_LOCATIONS as readonly string[]).includes(locRaw)
+        ? locRaw
+        : "yard";
+      const stRaw = argString(args, "status") || "available";
+      const status = (ASSET_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "available";
+      const { data, error } = await supabase
+        .from("rental_assets")
+        .insert({
+          workspace_id,
+          name: assetName.slice(0, 200),
+          sku: argString(args, "sku"),
+          category,
+          location,
+          status,
+          hourly_rate: Number(args.hourly_rate) || 0,
+          daily_rate: Number(args.daily_rate) || 0,
+          weekly_rate: Number(args.weekly_rate) || 0,
+          notes: argString(args, "notes"),
+        })
+        .select("name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not save that asset." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged fleet asset ${data.name} as ${data.status}.`
+      );
+    }
+
+    if (name === "list_rental_reservations") {
+      const { data, error } = await supabase
+        .from("rental_reservations")
+        .select("starts_on, ends_on, status, deposit_amount, pickup_method")
+        .eq("workspace_id", workspace_id)
+        .order("starts_on", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (r: {
+          starts_on: string;
+          ends_on: string;
+          status: string;
+          deposit_amount: number;
+          pickup_method: string;
+        }) =>
+          `${r.starts_on} to ${r.ends_on}: ${r.status} (${r.pickup_method}, deposit ${r.deposit_amount})`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} Card numbers are not stored.`
+          : "No rental reservations in this workspace.",
+      };
+    }
+
+    if (name === "log_rental_reservation") {
+      const startsOn = argString(args, "starts_on");
+      const endsOn = argString(args, "ends_on");
+      if (!startsOn || !endsOn) return { error: "Need start and end dates." };
+      const pickRaw = argString(args, "pickup_method") || "pickup";
+      const pickup_method = (PICKUP_METHODS as readonly string[]).includes(
+        pickRaw
+      )
+        ? pickRaw
+        : "pickup";
+      const rateRaw = argString(args, "rate_type") || "daily";
+      const rate_type = (RATE_TYPES as readonly string[]).includes(rateRaw)
+        ? rateRaw
+        : "daily";
+      const stRaw = argString(args, "status") || "hold";
+      const status = (RESERVATION_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "hold";
+      let contactId: string | null = null;
+      const contactRef = argString(args, "contact_name");
+      if (contactRef) {
+        const contact = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactRef
+        );
+        if ("error" in contact) return contact;
+        contactId = contact.id;
+      }
+      let assetId: string | null = null;
+      const assetRef = argString(args, "asset_name");
+      if (assetRef) {
+        const { data: assets } = await supabase
+          .from("rental_assets")
+          .select("id, name")
+          .eq("workspace_id", workspace_id)
+          .ilike("name", `%${assetRef}%`)
+          .limit(5);
+        if (!assets?.length) {
+          return { error: "I could not find that asset in this workspace." };
+        }
+        if (assets.length > 1) {
+          return {
+            error: `Which asset: ${assets.map((a: { name: string }) => a.name).join(", ")}?`,
+          };
+        }
+        assetId = assets[0].id;
+      }
+      const { data, error } = await supabase
+        .from("rental_reservations")
+        .insert({
+          workspace_id,
+          contact_id: contactId,
+          asset_id: assetId,
+          starts_on: startsOn.slice(0, 10),
+          ends_on: endsOn.slice(0, 10),
+          pickup_method,
+          job_site_address: argString(args, "job_site_address"),
+          status,
+          rate_type,
+          rate_amount: Number(args.rate_amount) || 0,
+          deposit_amount: Number(args.deposit_amount) || 0,
+          notes: argString(args, "notes"),
+        })
+        .select("starts_on, ends_on, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not save that reservation." };
+      }
+      if (assetId && (status === "hold" || status === "reserved")) {
+        await supabase
+          .from("rental_assets")
+          .update({ status: "reserved" })
+          .eq("id", assetId)
+          .eq("workspace_id", workspace_id);
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged rental ${data.starts_on} to ${data.ends_on} as ${data.status}. Deposit is an amount only.`
+      );
+    }
+
+    if (name === "list_rental_maintenance") {
+      const { data, error } = await supabase
+        .from("rental_maintenance")
+        .select("title, status, due_on")
+        .eq("workspace_id", workspace_id)
+        .order("due_on", { ascending: true })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (m: { title: string; status: string; due_on: string | null }) =>
+          `${m.title}: ${m.status}${m.due_on ? `, due ${m.due_on}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No rental maintenance records in this workspace.",
+      };
+    }
+
+    if (name === "log_rental_maintenance") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a service title." };
+      const stRaw = argString(args, "status") || "scheduled";
+      const status = (MAINT_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "scheduled";
+      let assetId: string | null = null;
+      const assetRef = argString(args, "asset_name");
+      if (assetRef) {
+        const { data: assets } = await supabase
+          .from("rental_assets")
+          .select("id, name")
+          .eq("workspace_id", workspace_id)
+          .ilike("name", `%${assetRef}%`)
+          .limit(5);
+        if (!assets?.length) {
+          return { error: "I could not find that asset in this workspace." };
+        }
+        if (assets.length > 1) {
+          return {
+            error: `Which asset: ${assets.map((a: { name: string }) => a.name).join(", ")}?`,
+          };
+        }
+        assetId = assets[0].id;
+      }
+      const { data, error } = await supabase
+        .from("rental_maintenance")
+        .insert({
+          workspace_id,
+          asset_id: assetId,
+          title: title.slice(0, 200),
+          status,
+          due_on: argString(args, "due_on"),
+          hours_at_service:
+            args.hours_at_service == null
+              ? null
+              : Number(args.hours_at_service),
+          cost: args.cost == null ? null : Number(args.cost),
+          notes: argString(args, "notes"),
+        })
+        .select("title, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that service." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged maintenance ${data.title} as ${data.status}.`
       );
     }
 

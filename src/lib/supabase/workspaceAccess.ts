@@ -100,6 +100,10 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "inspection_findings",
   "inspection_reports",
   "inspection_addons",
+  "rental_assets",
+  "rental_reservations",
+  "rental_condition_logs",
+  "rental_maintenance",
 ]);
 
 /**

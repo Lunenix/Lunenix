@@ -193,6 +193,35 @@ export async function POST(
       .eq("workspace_id", authed.workspaceId)
       .select("*, contact:contacts(*)")
       .single();
+
+    const { data: workspace } = await authed.supabase
+      .from("workspaces")
+      .select("industry_preset")
+      .eq("id", authed.workspaceId)
+      .maybeSingle();
+    if (workspace?.industry_preset === "rental_company") {
+      const start = estimate.visit_at
+        ? String(estimate.visit_at).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const rawEnd = estimate.valid_until
+        ? String(estimate.valid_until).slice(0, 10)
+        : start;
+      const end = rawEnd >= start ? rawEnd : start;
+      await authed.supabase.from("rental_reservations").insert({
+        workspace_id: authed.workspaceId,
+        contact_id: estimate.contact_id,
+        estimate_id: estimate.id,
+        starts_on: start,
+        ends_on: end,
+        pickup_method: "pickup",
+        job_site_address: estimate.address || null,
+        status: "reserved",
+        rate_type: "daily",
+        rate_amount: Number(estimate.total) || 0,
+        notes: "Created from approved estimate",
+      });
+    }
+
     return NextResponse.json({ estimate: data, project_id: project.id });
   }
 

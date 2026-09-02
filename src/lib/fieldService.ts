@@ -23,6 +23,10 @@ export function isRoofingWorkspace(industryPreset?: string | null): boolean {
   return industryPreset === "roofing_exterior_repair";
 }
 
+export function isRentalWorkspace(industryPreset?: string | null): boolean {
+  return industryPreset === "rental_company";
+}
+
 export const CLAIM_STATUSES = [
   "filed",
   "adjuster_scheduled",
@@ -165,12 +169,20 @@ export const INSPECTION_LEAD_SOURCES = [
   "Investor",
 ] as const;
 
+export const RENTAL_LEAD_SOURCES = [
+  "Walk-in",
+  "Phone",
+  "Online booking",
+  "Contractor account",
+] as const;
+
 export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
   new Set([
     ...ROOFING_LEAD_SOURCES,
     ...PAINTING_LEAD_SOURCES,
     ...PEST_LEAD_SOURCES,
     ...INSPECTION_LEAD_SOURCES,
+    ...RENTAL_LEAD_SOURCES,
   ])
 );
 
@@ -404,6 +416,119 @@ export const ADDON_STATUS_LABELS: Record<AddonStatus, string> = {
 };
 export function isOpenAddonStatus(status: string): boolean {
   return ["ordered", "scheduled", "in_progress"].includes(status);
+}
+
+export const ASSET_CATEGORIES = [
+  "excavator",
+  "loader",
+  "lift",
+  "generator",
+  "trailer",
+  "tool",
+  "other",
+] as const;
+export type AssetCategory = (typeof ASSET_CATEGORIES)[number];
+export const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = {
+  excavator: "Excavator",
+  loader: "Loader",
+  lift: "Lift",
+  generator: "Generator",
+  trailer: "Trailer",
+  tool: "Tool",
+  other: "Other",
+};
+
+export const ASSET_LOCATIONS = ["yard", "out", "in_transit", "in_repair"] as const;
+export type AssetLocation = (typeof ASSET_LOCATIONS)[number];
+export const ASSET_LOCATION_LABELS: Record<AssetLocation, string> = {
+  yard: "Yard",
+  out: "Out on rental",
+  in_transit: "In transit",
+  in_repair: "In repair",
+};
+
+export const ASSET_STATUSES = [
+  "available",
+  "reserved",
+  "out",
+  "maintenance",
+  "retired",
+] as const;
+export type AssetStatus = (typeof ASSET_STATUSES)[number];
+export const ASSET_STATUS_LABELS: Record<AssetStatus, string> = {
+  available: "Available",
+  reserved: "Reserved",
+  out: "Out",
+  maintenance: "Maintenance",
+  retired: "Retired",
+};
+
+export const RESERVATION_STATUSES = [
+  "hold",
+  "reserved",
+  "checked_out",
+  "returned",
+  "cancelled",
+  "overdue",
+] as const;
+export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
+export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
+  hold: "Hold",
+  reserved: "Reserved",
+  checked_out: "Checked out",
+  returned: "Returned",
+  cancelled: "Cancelled",
+  overdue: "Overdue",
+};
+export function isOpenReservationStatus(status: string): boolean {
+  return ["hold", "reserved", "checked_out", "overdue"].includes(status);
+}
+
+export const RATE_TYPES = ["hourly", "daily", "weekly"] as const;
+export type RateType = (typeof RATE_TYPES)[number];
+export const RATE_TYPE_LABELS: Record<RateType, string> = {
+  hourly: "Hourly",
+  daily: "Daily",
+  weekly: "Weekly",
+};
+
+export const PICKUP_METHODS = ["pickup", "delivery"] as const;
+export type PickupMethod = (typeof PICKUP_METHODS)[number];
+export const PICKUP_METHOD_LABELS: Record<PickupMethod, string> = {
+  pickup: "Customer pickup",
+  delivery: "Delivery",
+};
+
+export const CONDITION_KINDS = ["checkout", "checkin", "delivery"] as const;
+export type ConditionKind = (typeof CONDITION_KINDS)[number];
+export const CONDITION_KIND_LABELS: Record<ConditionKind, string> = {
+  checkout: "Check-out",
+  checkin: "Check-in",
+  delivery: "Delivery",
+};
+
+export const MAINT_STATUSES = ["scheduled", "in_repair", "complete"] as const;
+export type MaintStatus = (typeof MAINT_STATUSES)[number];
+export const MAINT_STATUS_LABELS: Record<MaintStatus, string> = {
+  scheduled: "Scheduled",
+  in_repair: "In repair",
+  complete: "Complete",
+};
+
+export function daysBetween(from: string, to: string): number {
+  const a = new Date(`${from.slice(0, 10)}T00:00:00`);
+  const b = new Date(`${to.slice(0, 10)}T00:00:00`);
+  if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime())) return 0;
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000));
+}
+
+export function lateFeeAmount(
+  endsOn: string,
+  returnedOn: string,
+  dailyRate: number
+): number {
+  const lateDays = daysBetween(endsOn, returnedOn);
+  return Math.round(lateDays * (Number(dailyRate) || 0) * 100) / 100;
 }
 
 export const ACCESS_ENTRY_METHODS = [

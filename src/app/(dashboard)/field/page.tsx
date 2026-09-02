@@ -28,6 +28,12 @@ type Overview = {
     miles?: number;
     aging: { current: number; d30: number; d60: number; d90: number };
   };
+  fleet?: {
+    available: number;
+    reserved: number;
+    out: number;
+    maintenance: number;
+  };
   alerts: { kind: string; label: string; href: string }[];
 };
 
@@ -71,10 +77,13 @@ export default function FieldOpsPage() {
         <h1 className="text-3xl font-bold">Field operations</h1>
         <p className="text-muted-foreground">
           Lead → visit → photos → estimate → job / recurring plan → invoice.
-          Email customers from Estimates. Two-way SMS needs a text provider
-          later. Receipt OCR is not auto-filled. Ask Luna for weather before
-          dispatch; toggle weather hold on Jobs. Roofing: Claims and Materials.
-          Painting: Colors and Prep. Pest: Treatments, Access, Recurring.
+          Rental workspaces track assets on Fleet and Rentals instead of jobs
+          as the core loop. Email customers from Estimates. Two-way SMS needs a
+          text provider later. Receipt OCR is not auto-filled. Ask Luna for
+          weather before dispatch; toggle weather hold on Jobs. Roofing: Claims
+          and Materials. Painting: Colors and Prep. Pest: Treatments, Access,
+          Recurring. Inspection: Findings, Reports, Add-ons. Rental: Fleet,
+          Rentals, Maintenance.
         </p>
       </div>
 
@@ -128,6 +137,18 @@ export default function FieldOpsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {data.fleet ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Fleet</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            Available {data.fleet.available} · Reserved {data.fleet.reserved} ·
+            Out {data.fleet.out} · Maintenance {data.fleet.maintenance}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -186,6 +207,18 @@ export default function FieldOpsPage() {
         </Button>
         <Button asChild variant="outline">
           <Link href="/access">Access</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/findings">Findings</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/fleet">Fleet</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/rentals">Rentals</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/maintenance">Maintenance</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/plans">Recurring</Link>

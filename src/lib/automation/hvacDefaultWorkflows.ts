@@ -1543,6 +1543,145 @@ export const INSPECTION_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * Rental Company default automations.
+ * Fleet, reservations, check-out/in. Rental workspaces only.
+ */
+export const RENTAL_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Rental: New inquiry",
+    description:
+      "When a new inquiry is created, capture walk-in vs phone vs online vs contractor.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New rental inquiry: {{lead.title}}",
+        "Set lead source: walk-in, phone, online booking, or contractor account. Capture name, phone, email, needed dates, pickup vs delivery, and job site if delivered. Email to confirm. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your rental request. Reply with the dates you need, pickup or delivery, and the equipment type if you know it.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Rental: Availability and hold",
+    description: "On Site Visit, check fleet availability and place a hold.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Check availability and hold: {{lead.title}}",
+        "On Fleet, confirm the item is available for those dates. On Rentals, create a hold with pickup vs delivery and job site. Record deposit amount — do not take card numbers in Luna. GPS auto-track is not live. Two-way texting is not live.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Rental: Quote and waiver",
+    description: "On Estimate Sent, send rates, add-ons, and damage waiver.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Send rental quote: {{lead.title}}",
+        "Build the estimate from hourly/daily/weekly rates plus attachments. Include damage waiver. Email it. Approval converts to a job and a reserved rental on Rentals.",
+        0
+      ),
+      email(
+        "Your rental quote from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your rental quote is ready. Please review rates, add-ons, and the damage waiver, then reply to approve.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Rental: Confirm reservation and delivery",
+    description:
+      "After Contract Signed, confirm the reservation and schedule delivery if needed.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Confirm reservation and logistics: {{lead.title}}",
+        "Mark the rental reserved. If delivery, assign a driver on Techs (CDL if required) and set route order. Send confirmation and a reminder before pickup/delivery. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Your rental is reserved — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your reservation is confirmed. We will remind you before pickup or delivery. Reply if dates change.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Rental: Check-out",
+    description:
+      "When In Progress, document condition and check the unit out.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Check out equipment: {{lead.title}}",
+        "On Rentals, log check-out photos/notes and fuel if it uses gas. Verify ID and signed contract in person — do not store ID or card numbers in Luna. Record the deposit amount only. Set the asset out. OCR is not auto-filled.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Rental: Check-in and damage",
+    description:
+      "On Punch List, check the unit in, compare condition, and apply late or damage charges.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Check in and inspect: {{lead.title}}",
+        "On Rentals, log check-in photos and fuel. Compare to check-out notes. Late fees calculate from the due date vs return. Add damage charges if needed. Return the asset to the yard or send it to Maintenance.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Rental: Invoice, books, and utilization",
+    description:
+      "When Closed, invoice the rental period plus fees and review utilization.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice rental and books: {{lead.title}}",
+        "Invoice base rate + extensions + late fees + damage. Contractor net terms stay on the rental notes. Check AR. Log parts/fuel in Books. Field ops shows overdue returns, maintenance due, and utilization on Fleet. Flag negative reviews.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Rental: After contract signed (e-sign)",
+    description: "When an e-sign rental agreement completes, confirm the hold.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Confirm rental from signed agreement",
+        "Create or update the reservation, assign delivery if needed, and send pickup/delivery confirmation.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Rental: After invoice sent",
+    description: "When an invoice is sent, follow AR.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on rental invoice",
+        "Watch aging. Flag overdue returns, maintenance due, or negative reviews.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -1585,6 +1724,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   painting_drywall: PAINTING_DEFAULT_WORKFLOWS,
   pest_control: PEST_CONTROL_DEFAULT_WORKFLOWS,
   inspection_service: INSPECTION_DEFAULT_WORKFLOWS,
+  rental_company: RENTAL_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -1625,6 +1765,12 @@ async function pruneForeignIndustryWorkflows(
       if (
         preset === "inspection_service" &&
         name.startsWith("Inspection Services:")
+      ) {
+        return true;
+      }
+      if (
+        preset === "rental_company" &&
+        name.startsWith("Rental Company:")
       ) {
         return true;
       }

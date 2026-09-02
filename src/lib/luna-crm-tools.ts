@@ -868,6 +868,96 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_rental_assets",
+    description:
+      "List rental fleet assets (name, category, location, status). Does not return card or ID numbers.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_rental_asset",
+    description:
+      "Add a rental fleet asset. Rates are hourly/daily/weekly. Do not store card numbers.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        sku: { type: "string" },
+        category: {
+          type: "string",
+          description:
+            "excavator, loader, lift, generator, trailer, tool, or other",
+        },
+        location: {
+          type: "string",
+          description: "yard, out, in_transit, or in_repair",
+        },
+        status: {
+          type: "string",
+          description: "available, reserved, out, maintenance, or retired",
+        },
+        hourly_rate: { type: "number" },
+        daily_rate: { type: "number" },
+        weekly_rate: { type: "number" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_rental_reservations",
+    description:
+      "List rental holds and check-outs (dates, status, deposit amount). Does not return payment cards.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_rental_reservation",
+    description:
+      "Create a rental hold. Deposit is an amount only. Do not collect card or license numbers.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        contact_name: { type: "string" },
+        asset_name: { type: "string" },
+        starts_on: { type: "string", description: "YYYY-MM-DD" },
+        ends_on: { type: "string", description: "YYYY-MM-DD" },
+        pickup_method: { type: "string", description: "pickup or delivery" },
+        rate_type: { type: "string", description: "hourly, daily, or weekly" },
+        rate_amount: { type: "number" },
+        deposit_amount: { type: "number" },
+        job_site_address: { type: "string" },
+        status: {
+          type: "string",
+          description:
+            "hold, reserved, checked_out, returned, cancelled, or overdue",
+        },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_rental_maintenance",
+    description: "List equipment service and repair records.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_rental_maintenance",
+    description: "Log a service or repair for a rental asset.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        asset_name: { type: "string" },
+        status: {
+          type: "string",
+          description: "scheduled, in_repair, or complete",
+        },
+        due_on: { type: "string", description: "YYYY-MM-DD" },
+        hours_at_service: { type: "number" },
+        cost: { type: "number" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",
