@@ -5,6 +5,7 @@ export {
   industryDisplayLabel,
   isIndustryPreset,
   normalizeIndustryCustomLabel,
+  resolveIndustryPreset,
 } from "@/lib/industryVerticals";
 
 export const TEAM_SIZE_OPTIONS: {

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -15,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
+import { EditWorkspaceDialog } from "@/components/workspace/EditWorkspaceDialog";
 import { toast } from "@/lib/toast";
 import { industryDisplayLabel } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
@@ -52,9 +52,7 @@ export default function WorkspaceManagementPage() {
   } = useWorkspace();
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<WorkspaceWithMembership | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -92,56 +90,6 @@ export default function WorkspaceManagementPage() {
 
   const canManage = (ws: WorkspaceWithMembership) =>
     ws.membership_role === "owner" || ws.membership_role === "admin";
-
-  const startEdit = (ws: WorkspaceWithMembership) => {
-    setEditingId(ws.id);
-    setEditValue(ws.name);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditValue("");
-  };
-
-  const saveEdit = async (ws: WorkspaceWithMembership) => {
-    const newName = editValue.trim();
-    if (!newName || newName === ws.name) {
-      cancelEdit();
-      return;
-    }
-    setSavingId(ws.id);
-    try {
-      const res = await fetch(`/api/workspaces/${ws.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to rename workspace");
-      }
-      const data = await res.json();
-      const list = await refreshWorkspaces();
-
-      // If we renamed the active workspace, update it so the sidebar reflects it.
-      if (activeWorkspace?.id === ws.id) {
-        const updated =
-          list.find((w) => w.id === ws.id) ??
-          ({ ...activeWorkspace, name: data.workspace.name } as WorkspaceWithMembership);
-        setActiveWorkspace(updated);
-      }
-
-      toast("Workspace renamed", "success");
-      cancelEdit();
-    } catch (e) {
-      toast(
-        e instanceof Error ? e.message : "Failed to rename workspace",
-        "error"
-      );
-    } finally {
-      setSavingId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -183,7 +131,7 @@ export default function WorkspaceManagementPage() {
                 <TableRow>
                   <TableHead>Workspace Name</TableHead>
                   <TableHead>Your Role</TableHead>
-                  <TableHead>Industry Preset</TableHead>
+                  <TableHead>Industry</TableHead>
                   <TableHead>Tier</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -191,40 +139,18 @@ export default function WorkspaceManagementPage() {
               <TableBody>
                 {workspaces.map((ws) => {
                   const isActive = activeWorkspace?.id === ws.id;
-                  const isEditing = editingId === ws.id;
                   return (
                     <TableRow key={ws.id}>
-                      {/* Name (inline rename) */}
                       <TableCell className="font-medium">
-                        {isEditing ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") saveEdit(ws);
-                                if (e.key === "Escape") cancelEdit();
-                              }}
-                              onBlur={() => saveEdit(ws)}
-                              autoFocus
-                              className="h-8 max-w-[220px]"
-                              disabled={savingId === ws.id}
-                            />
-                            {savingId === ws.id && (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            )}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span>{ws.name}</span>
-                            {isActive && (
-                              <Badge className="border-green-500/40 bg-green-500/10 text-green-400">
-                                <Check className="mr-1 h-3 w-3" />
-                                Active
-                              </Badge>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span>{ws.name}</span>
+                          {isActive && (
+                            <Badge className="border-green-500/40 bg-green-500/10 text-green-400">
+                              <Check className="mr-1 h-3 w-3" />
+                              Active
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Role */}
@@ -276,9 +202,8 @@ export default function WorkspaceManagementPage() {
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8"
-                              onClick={() => startEdit(ws)}
-                              disabled={isEditing}
-                              aria-label="Rename workspace"
+                              onClick={() => setEditing(ws)}
+                              aria-label="Edit workspace"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -288,8 +213,8 @@ export default function WorkspaceManagementPage() {
                               variant="ghost"
                               className="h-8 w-8 cursor-not-allowed opacity-40"
                               disabled
-                              title="Only Admins can rename this workspace"
-                              aria-label="Only Admins can rename this workspace"
+                              title="Only owners and admins can edit this workspace"
+                              aria-label="Only owners and admins can edit this workspace"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -306,6 +231,13 @@ export default function WorkspaceManagementPage() {
       </Card>
 
       <AddCompanyModal open={showAddModal} onOpenChange={setShowAddModal} />
+      <EditWorkspaceDialog
+        workspace={editing}
+        open={Boolean(editing)}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
     </div>
   );
 }

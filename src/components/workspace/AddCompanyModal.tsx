@@ -184,7 +184,7 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
               ? `Your plan includes one owned workspace. Additional workspaces are $${extraWorkspacePriceUsd} each.`
               : extraPaidCreate
                 ? "This uses a workspace slot you already purchased."
-                : `Each company is a separate workspace. Your first workspace includes a ${TRIAL_DAYS}-day free trial.`}
+                : `Each company is a separate workspace. Choose its industry now. You can change it later. Your first workspace includes a ${TRIAL_DAYS}-day free trial.`}
           </DialogDescription>
         </DialogHeader>
 

@@ -1,77 +1,94 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { isSuperAdmin } from "@/lib/auth/superAdmin";
-import { ensureSuperAdminMembership } from "@/lib/supabase/grantSuperAdminWorkspaces";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import {
+  CUSTOM_INDUSTRY_PRESET,
+  isIndustryPreset,
+  normalizeIndustryCustomLabel,
+} from "@/lib/workspace";
 
 /**
  * PATCH /api/workspaces/[id]
- * Renames a workspace. Only owners/admins of the workspace may rename it.
- * Body: { name }
+ * Update name and/or industry for one workspace. Owners and admins only.
+ * Body: { name?, industry_preset?, industry_custom_label? }
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const workspaceId = params.id;
+  const auth = await requireWorkspaceMember(params.id);
+  if ("error" in auth) return auth.error;
 
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json();
-  const name: string = (body.name ?? "").trim();
-  if (!name) {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
-  }
-
-  // Verify the user is an owner/admin of this workspace before allowing rename.
-  const { data: membership, error: memberErr } = await supabase
+  const { data: membership } = await auth.supabase
     .from("workspace_members")
     .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", user.id)
-    .single();
+    .eq("workspace_id", auth.workspaceId)
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
 
-  if (memberErr || !membership) {
-    if (isSuperAdmin(user)) {
-      try {
-        await ensureSuperAdminMembership(
-          createAdminClient(),
-          user.id,
-          workspaceId
-        );
-      } catch {
-        return NextResponse.json(
-          { error: "You are not a member of this workspace" },
-          { status: 403 }
-        );
-      }
-    } else {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 }
-      );
-    }
-  }
-
-  const role = membership?.role;
-  if (!isSuperAdmin(user) && !["owner", "admin"].includes(role ?? "")) {
+  if (
+    !isSuperAdmin(auth.user) &&
+    !["owner", "admin"].includes(membership?.role ?? "")
+  ) {
     return NextResponse.json(
-      { error: "Only owners and admins can rename this workspace" },
+      { error: "Only owners and admins can update this workspace" },
       { status: 403 }
     );
   }
 
-  // Use the admin client for the update so it is not blocked by RLS.
+  const body = await request.json();
+  const updates: Record<string, unknown> = {};
+
+  if (typeof body.name === "string") {
+    const name = body.name.trim();
+    if (!name) {
+      return NextResponse.json(
+        { error: "Company name is required" },
+        { status: 400 }
+      );
+    }
+    updates.name = name;
+  }
+
+  if (typeof body.industry_preset === "string") {
+    const preset = body.industry_preset.trim();
+    if (!preset || !isIndustryPreset(preset)) {
+      return NextResponse.json(
+        { error: "Choose an industry." },
+        { status: 400 }
+      );
+    }
+    const custom =
+      preset === CUSTOM_INDUSTRY_PRESET
+        ? normalizeIndustryCustomLabel(
+            typeof body.industry_custom_label === "string"
+              ? body.industry_custom_label
+              : null
+          )
+        : null;
+    if (preset === CUSTOM_INDUSTRY_PRESET && !custom) {
+      return NextResponse.json(
+        { error: "Describe your business type for Other." },
+        { status: 400 }
+      );
+    }
+    updates.industry_preset = preset;
+    updates.industry_custom_label = custom;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json(
+      { error: "Nothing to update" },
+      { status: 400 }
+    );
+  }
+
   const admin = createAdminClient();
   const { data: workspace, error: updateErr } = await admin
     .from("workspaces")
-    .update({ name })
-    .eq("id", workspaceId)
+    .update(updates)
+    .eq("id", auth.workspaceId)
     .select("*")
     .single();
 

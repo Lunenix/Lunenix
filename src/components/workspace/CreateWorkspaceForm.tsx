@@ -107,7 +107,8 @@ export function WorkspaceOnboardingForm({
           <CardTitle className="text-xl">Set up your company</CardTitle>
           <CardDescription>
             You have {TRIAL_DAYS} days free. Add your company name, logo, phone,
-            industry, and team size.
+            industry, and team size. You can change the industry later in
+            Workspace Management.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

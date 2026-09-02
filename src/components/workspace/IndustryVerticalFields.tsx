@@ -37,7 +37,9 @@ export function IndustryVerticalFields({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor={selectId}>Industry</Label>
+        <Label htmlFor={selectId}>
+          Industry <span className="text-destructive">*</span>
+        </Label>
         <Select
           value={value || undefined}
           onValueChange={(next) => {
