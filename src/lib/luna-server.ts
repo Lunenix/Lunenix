@@ -11,6 +11,7 @@ import {
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
 import { sendEsignEmail } from "@/lib/esign/sendEmail";
 import { generateSignToken, getAppBaseUrl } from "@/lib/esign/helpers";
+import { sendSigningReminder } from "@/lib/esign/reminders";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
@@ -3073,6 +3074,527 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Scheduled ${task.title} on ${dueDate} and emailed a calendar invite to ${to}.`
+      );
+    }
+
+    if (name === "get_contact") {
+      const found = await requireOneContact(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["lookup", "contact_name", "email"])
+      );
+      if ("error" in found) return found;
+      const { data } = await supabase
+        .from("contacts")
+        .select(
+          "first_name, last_name, organization_name, email, phone, type, notes"
+        )
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .maybeSingle();
+      if (!data) return { error: "I could not load that contact." };
+      const bits = [
+        contactSpokenLabel(data as Record<string, unknown>),
+        typeof data.type === "string" ? data.type : null,
+        typeof data.email === "string" ? data.email : null,
+        typeof data.phone === "string" ? data.phone : null,
+      ].filter(Boolean);
+      const notes =
+        typeof data.notes === "string" && data.notes.trim()
+          ? ` Notes: ${data.notes.trim().slice(0, 220)}`
+          : "";
+      return {
+        ok: true,
+        summary: `${bits.join(", ")}.${notes}`,
+      };
+    }
+
+    if (name === "delete_contact") {
+      const found = await requireOneContact(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["lookup", "contact_name", "email"])
+      );
+      if ("error" in found) return found;
+      const { error } = await supabase
+        .from("contacts")
+        .delete()
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id);
+      if (error) return { error: error.message };
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Deleted contact ${found.label}.`
+      );
+    }
+
+    if (name === "list_tasks") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      const status = argString(args, "status");
+      let q = supabase
+        .from("tasks")
+        .select("title, status, priority, due_date")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (status && TASK_STATUSES.has(status)) q = q.eq("status", status);
+      else if (!query) q = q.in("status", ["todo", "in_progress"]);
+      if (query) q = q.ilike("title", `%${query}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        title: string;
+        status: string;
+        due_date: string | null;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No matching tasks in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Tasks: ${rows
+          .map((r) => `${r.title}, ${r.status}${r.due_date ? `, due ${r.due_date}` : ""}`)
+          .join(". ")}.`,
+      };
+    }
+
+    if (name === "list_invoices") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      const status = argString(args, "status");
+      let q = supabase
+        .from("invoices")
+        .select("invoice_number, status, total, due_date")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (status && INVOICE_STATUSES.has(status)) q = q.eq("status", status);
+      if (query) q = q.ilike("invoice_number", `%${query}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        invoice_number: string;
+        status: string;
+        total: number;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No matching invoices in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Invoices: ${rows
+          .map(
+            (r) =>
+              `${r.invoice_number}, ${r.status}, $${Number(r.total).toFixed(2)}`
+          )
+          .join(". ")}.`,
+      };
+    }
+
+    if (name === "list_projects") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      const status = argString(args, "status");
+      let q = supabase
+        .from("projects")
+        .select("name, status, due_date")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (status && PROJECT_STATUSES.has(status)) q = q.eq("status", status);
+      if (query) q = q.ilike("name", `%${query}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{ name: string; status: string }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No matching projects in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Projects: ${rows.map((r) => `${r.name}, ${r.status}`).join(". ")}.`,
+      };
+    }
+
+    if (name === "list_forms") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      let q = supabase
+        .from("forms")
+        .select("name, status")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (query) q = q.ilike("name", `%${query}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{ name: string; status: string }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No forms in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Forms: ${rows.map((r) => `${r.name}, ${r.status}`).join(". ")}.`,
+      };
+    }
+
+    if (name === "list_contracts") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      let q = supabase
+        .from("contracts")
+        .select("name, status, contract_number")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (query) q = q.ilike("name", `%${query}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        name: string;
+        status: string;
+        contract_number: string;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No contracts in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Contracts: ${rows
+          .map((r) => `${r.name}, ${r.status}`)
+          .join(". ")}.`,
+      };
+    }
+
+    if (name === "list_leads") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      const { data: stages } = await supabase
+        .from("pipeline_stages")
+        .select("id, name")
+        .eq("workspace_id", workspace_id);
+      const stageNames = new Map(
+        ((stages ?? []) as Array<{ id: string; name: string }>).map((s) => [
+          s.id,
+          s.name,
+        ])
+      );
+      let q = supabase
+        .from("leads")
+        .select("title, value, stage_id")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (query) q = q.ilike("title", `%${query}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        title: string;
+        value: number | null;
+        stage_id: string;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No pipeline leads in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Leads: ${rows
+          .map(
+            (r) =>
+              `${r.title}, ${stageNames.get(r.stage_id) || "unassigned"}`
+          )
+          .join(". ")}.`,
+      };
+    }
+
+    if (name === "list_workflows") {
+      const { data, error } = await supabase
+        .from("automation_workflows")
+        .select("name, is_active, trigger_type")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        name: string;
+        is_active: boolean;
+        trigger_type: string;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No automations in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Workflows: ${rows
+          .map((r) => `${r.name}, ${r.is_active ? "on" : "off"}`)
+          .join(". ")}.`,
+      };
+    }
+
+    if (name === "list_submissions") {
+      const formName = argString(args, "form_name");
+      let formId: string | null = null;
+      if (formName) {
+        const form = await requireOneForm(supabase, workspace_id, formName);
+        if ("error" in form) return form;
+        formId = form.id;
+      }
+      let q = supabase
+        .from("form_submissions")
+        .select("submitted_at, form:forms(name)")
+        .eq("workspace_id", workspace_id)
+        .order("submitted_at", { ascending: false })
+        .limit(8);
+      if (formId) q = q.eq("form_id", formId);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        submitted_at: string;
+        form?: { name?: string } | { name?: string }[] | null;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No form submissions in this workspace." };
+      }
+      const spoken = rows.map((r) => {
+        const f = Array.isArray(r.form) ? r.form[0] : r.form;
+        const fname = f?.name || "a form";
+        const day =
+          typeof r.submitted_at === "string"
+            ? r.submitted_at.slice(0, 10)
+            : "";
+        return `${fname}${day ? ` on ${day}` : ""}`;
+      });
+      return { ok: true, summary: `Submissions: ${spoken.join(". ")}.` };
+    }
+
+    if (name === "list_esign") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      let q = supabase
+        .from("esign_documents")
+        .select("name, status, signer_email")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (query) q = q.ilike("name", `%${query}%`);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        name: string;
+        status: string;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No e-sign documents in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `E-sign: ${rows.map((r) => `${r.name}, ${r.status}`).join(". ")}.`,
+      };
+    }
+
+    if (name === "list_knowledge_base") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      let q = supabase
+        .from("knowledge_base")
+        .select("title, category")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (query) {
+        q = q.or(`title.ilike.%${query}%,content.ilike.%${query}%`);
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{ title: string; category: string }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No knowledge articles in this workspace." };
+      }
+      return {
+        ok: true,
+        summary: `Knowledge: ${rows.map((r) => r.title).join(", ")}.`,
+      };
+    }
+
+    if (name === "create_lead") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a lead title." };
+      const { data: pipeline } = await supabase
+        .from("pipelines")
+        .select("id")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!pipeline?.id) {
+        return {
+          error:
+            "This workspace has no pipeline yet. Open Pipeline once to create it, then ask me again.",
+        };
+      }
+      const stage =
+        (await findPipelineStage(
+          supabase,
+          workspace_id,
+          argString(args, "stage_name") || "New Lead"
+        )) ||
+        (await findPipelineStage(supabase, workspace_id, "New Lead"));
+      if (!stage) {
+        return { error: "I could not find a pipeline stage in this workspace." };
+      }
+      let contactId: string | null = null;
+      const contactRef = argString(args, "contact_name");
+      if (contactRef) {
+        const contact = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactRef
+        );
+        if ("error" in contact) return contact;
+        contactId = contact.id;
+      }
+      const { count } = await supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("stage_id", stage.id)
+        .eq("workspace_id", workspace_id);
+      const { data, error } = await supabase
+        .from("leads")
+        .insert({
+          workspace_id,
+          pipeline_id: pipeline.id,
+          stage_id: stage.id,
+          title,
+          value: argNumber(args, "value"),
+          notes: argString(args, "notes"),
+          contact_id: contactId,
+          position: count ?? 0,
+        })
+        .select("title")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not create that lead." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Added lead ${data.title} to ${stage.name}.`
+      );
+    }
+
+    if (name === "create_knowledge_entry") {
+      const title = argString(args, "title");
+      const content = argString(args, "content");
+      if (!title || !content) {
+        return { error: "Need a title and the article text." };
+      }
+      const { data, error } = await supabase
+        .from("knowledge_base")
+        .insert({
+          workspace_id,
+          title: title.slice(0, 200),
+          content: content.slice(0, 20000),
+          category: (argString(args, "category") || "general").slice(0, 40),
+        })
+        .select("title")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not save that article." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Saved knowledge article ${data.title}.`
+      );
+    }
+
+    if (name === "create_email_template") {
+      const tmplName = argString(args, "name");
+      const subject = argString(args, "subject");
+      const body = argString(args, "body");
+      if (!tmplName || !subject || !body) {
+        return { error: "Need a template name, subject, and body." };
+      }
+      const safe = body
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      const { data, error } = await supabase
+        .from("email_templates")
+        .insert({
+          workspace_id,
+          name: tmplName.slice(0, 120),
+          subject: subject.slice(0, 500),
+          body: `<p>${safe.replace(/\n/g, "<br/>")}</p>`,
+          variables: [],
+        })
+        .select("name")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not create that template." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Created email template ${data.name}.`
+      );
+    }
+
+    if (name === "remind_esign") {
+      const docName = argStringAny(args, ["document_name", "name"]);
+      if (!docName) return { error: "Need the e-sign document name." };
+      const matches = await findTitleMatches(
+        supabase,
+        workspace_id,
+        "esign_documents",
+        "name",
+        docName
+      );
+      const picked = pickUniqueOrAsk(
+        matches,
+        "I could not find that e-sign document in this workspace."
+      );
+      if ("error" in picked) return picked;
+      const { data: doc } = await supabase
+        .from("esign_documents")
+        .select(
+          "id, workspace_id, name, status, sign_token, signer_name, signer_email, contact_id, reminder_count"
+        )
+        .eq("id", picked.id)
+        .eq("workspace_id", workspace_id)
+        .maybeSingle();
+      if (!doc?.id) {
+        return { error: "I could not find that e-sign document in this workspace." };
+      }
+      if (!["sent", "viewed"].includes(String(doc.status))) {
+        return {
+          error:
+            "I can only remind while a document is awaiting signature.",
+        };
+      }
+      const admin = createAdminClient();
+      const result = await sendSigningReminder(
+        admin,
+        {
+          id: String(doc.id),
+          workspace_id,
+          name: String(doc.name),
+          sign_token: typeof doc.sign_token === "string" ? doc.sign_token : null,
+          signer_name:
+            typeof doc.signer_name === "string" ? doc.signer_name : null,
+          signer_email:
+            typeof doc.signer_email === "string" ? doc.signer_email : null,
+          contact_id:
+            typeof doc.contact_id === "string" ? doc.contact_id : null,
+          reminder_count: Number(doc.reminder_count) || 0,
+        },
+        getAppBaseUrl()
+      );
+      if (!result.success) {
+        return { error: result.error ?? "Could not send that reminder." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Sent a signing reminder for ${String(doc.name)}.`
       );
     }
 

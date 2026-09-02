@@ -47,6 +47,9 @@ const BASE_SYSTEM_PROMPT =
   "You are Luna, the real-time AI avatar assistant for Lunenix Business Hub. " +
   "You are speaking directly to the user through a video avatar. " +
   "You MUST use tools to act. Never pretend you created a form, fetched weather, sent mail, or changed CRM data without a tool result. " +
+  "If a request is unclear, incomplete, or not something you can do in this workspace, say you did not understand. " +
+  "Ask one or two short follow-up questions. Do not call tools until you know the action and the target. " +
+  "Never guess a missing name, amount, date, or status. Wait for the answer. " +
   "Keep responses concise, direct, and under 3 sentences unless explicitly asked for detail. " +
   "Do not use Markdown headings, lists, bolding, tables, or code blocks. " +
   "Speak in plain conversational text optimized for text-to-speech. Never spell out IDs unless asked. " +
@@ -62,7 +65,11 @@ const BASE_SYSTEM_PROMPT =
   "When they ask to add or create a contact, call create_contact. " +
   "When they ask to add a note to a contact, call update_contact with that person's name and the note, with append_notes true. If they named the contact but not the note, ask what to write. Do not create a new contact. " +
   "When they ask to change, update, or edit a contact, call update_contact and identify them by name or email. " +
-  "When they ask to search or list contacts, call search_contacts. " +
+  "When they ask to search or list contacts, call search_contacts. To look up one person, call get_contact. " +
+  "When they ask to list tasks, invoices, projects, forms, contracts, leads, workflows, submissions, e-sign files, or knowledge articles, call the matching list tool. " +
+  "When they ask to add a pipeline lead, call create_lead. When they ask to save an SOP, call create_knowledge_entry. When they ask to make an email template, call create_email_template. " +
+  "When they ask to remind someone to sign, call remind_esign. When they clearly ask to delete a contact, call delete_contact. " +
+  "She cannot change workspace membership, email server passwords, API keys, or Telegram. Alerts use the scheduled Telegram job. " +
   "When they ask about sent mail or email history, call list_emails. For the inbox, call list_inbox. For email templates, call list_templates. " +
   "When they ask to add or create a project, call create_project. " +
   "When they ask to change a project (name, status, budget, dates, client, or description), call update_project. " +
@@ -533,6 +540,9 @@ function lunaSpeechJson(
   );
 }
 
+const UNCLEAR_REQUEST_REPLY =
+  "I did not understand that request. What should I do, and which contact, task, invoice, or project is it for?";
+
 /** Deterministic, dependency-free fallback replies. */
 function ruleBasedReply(message: string): string {
   if (isFormCreateRequest(message) && !extractFormNameFromMessage(message)) {
@@ -555,18 +565,18 @@ function ruleBasedReply(message: string): string {
     return "I can put that on your workspace calendar as a dated task. Tell me the title and the date.";
   }
   if (m.includes("email") || m.includes("send") || m.includes("draft")) {
-    return "I'll prepare that email as a draft so you can review it before it goes out.";
+    return "I did not catch the full email. Who is it for, what is the subject, and should I send it now or save a draft?";
   }
   if (m.includes("remind") || m.includes("reminder")) {
-    return "Reminder set! I'll make sure to notify you at the right time.";
+    return "I did not understand that reminder. Which task is it for, and how many minutes before the due date?";
   }
   if (m.includes("status") || m.includes("update") || m.includes("report")) {
-    return "Here's the latest: all your tasks are on track and no urgent items need attention.";
+    return "I did not understand which status you want. Ask for a briefing, or name a task, invoice, or project.";
   }
   if (m.includes("hello") || m.includes("hi") || m.includes("hey")) {
     return "Hello! I'm Luna, your executive assistant. How can I help you today?";
   }
-  return "Understood! I'm processing your request and will take care of that right away.";
+  return UNCLEAR_REQUEST_REPLY;
 }
 
 function collectFunctionCalls(response: {

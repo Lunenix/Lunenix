@@ -227,4 +227,171 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
       required: ["title", "due_date"],
     },
   },
+  {
+    name: "get_contact",
+    description:
+      "Look up one contact in this workspace by name or email. Returns name, email, phone, type, and notes. No IDs unless asked.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        lookup: { type: "string" },
+        contact_name: { type: "string" },
+        email: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "delete_contact",
+    description:
+      "Delete a contact in this workspace. Only when they clearly say delete or remove that contact.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        lookup: { type: "string" },
+        contact_name: { type: "string" },
+        email: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_tasks",
+    description: "List tasks in this workspace. Optional status todo, in_progress, or done.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        status: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_invoices",
+    description: "List invoices in this workspace. Optional status draft, sent, paid, overdue, cancelled.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        status: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_projects",
+    description: "List projects in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: { query: { type: "string" }, status: { type: "string" } },
+    },
+  },
+  {
+    name: "list_forms",
+    description: "List forms in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+    },
+  },
+  {
+    name: "list_contracts",
+    description: "List contracts in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+    },
+  },
+  {
+    name: "list_leads",
+    description: "List pipeline leads in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+    },
+  },
+  {
+    name: "list_workflows",
+    description: "List automation workflows in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "list_submissions",
+    description: "List recent form submissions in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: { form_name: { type: "string" } },
+    },
+  },
+  {
+    name: "list_esign",
+    description: "List e-sign documents in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+    },
+  },
+  {
+    name: "list_knowledge_base",
+    description: "List SOP or knowledge article titles in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+    },
+  },
+  {
+    name: "create_lead",
+    description:
+      "Create a pipeline lead in this workspace. Identify an optional contact by name. Stage names like New Lead, Qualified, Won.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        stage_name: { type: "string" },
+        contact_name: { type: "string" },
+        value: { type: "number" },
+        notes: { type: "string" },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "create_knowledge_entry",
+    description: "Save an SOP or knowledge article in this workspace.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        content: { type: "string" },
+        category: { type: "string" },
+      },
+      required: ["title", "content"],
+    },
+  },
+  {
+    name: "create_email_template",
+    description:
+      "Create an email template in this workspace. Body is plain text. Does not send mail.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        subject: { type: "string" },
+        body: { type: "string" },
+      },
+      required: ["name", "subject", "body"],
+    },
+  },
+  {
+    name: "remind_esign",
+    description:
+      "Re-send the signing email for an e-sign document that is already sent or viewed.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        document_name: { type: "string" },
+        name: { type: "string" },
+      },
+    },
+  },
 ];

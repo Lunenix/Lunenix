@@ -497,7 +497,7 @@ export function LunaCommandCenter({ workspaceId }: LunaCommandCenterProps) {
         const reply: string =
           (typeof data?.text === "string" && data.text.trim()) ||
           (typeof data?.reply === "string" && data.reply.trim()) ||
-          "Understood! I'll take care of that right away.";
+          "I did not understand that request. Could you say it another way?";
         lastSpokenRef.current = reply;
         setChatLog((prev) => [...prev, { role: "luna", text: reply }]);
         await speakText(reply);
