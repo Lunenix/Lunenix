@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { AutomationWorkflow } from "@/types/database";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
-import { seedHvacDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
+import { seedIndustryDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
 
 /**
  * GET /api/automation-workflows?workspaceId=...
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const access = await verifyWorkspaceAccess(request);
   if (access.errorResponse) return access.errorResponse;
 
-  await seedHvacDefaultWorkflows(access.supabase, access.workspaceId);
+  await seedIndustryDefaultWorkflows(access.supabase, access.workspaceId);
 
   const { data: workflows, error } = await access.supabase
     .from("automation_workflows")

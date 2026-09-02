@@ -1,12 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AutomationAction, AutomationTriggerType } from "@/types/database";
-import { isFieldServiceWorkspace } from "@/lib/fieldService";
 
-type HvacWorkflowDef = {
+export type IndustryWorkflowDef = {
   name: string;
   description: string;
   trigger_type: AutomationTriggerType;
-  /** Field pipeline stage this workflow listens for. */
   toStageName?: string;
   actions: AutomationAction[];
 };
@@ -26,8 +24,8 @@ function email(subject: string, body: string): AutomationAction {
   };
 }
 
-/** Default HVAC / field-service automations keyed to the seeded pipeline. */
-export const HVAC_DEFAULT_WORKFLOWS: HvacWorkflowDef[] = [
+/** Default HVAC automations — HVAC workspaces only. */
+export const HVAC_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
     name: "HVAC: Qualify new lead",
     description: "When a deal lands in Lead, create a same-day qualify task.",
@@ -161,7 +159,179 @@ export const HVAC_DEFAULT_WORKFLOWS: HvacWorkflowDef[] = [
   },
 ];
 
-export async function seedHvacDefaultWorkflows(
+/**
+ * Handyman Services default automations.
+ * Starts when a new lead is created (Lead stage) and follows the field pipeline.
+ */
+export const HANDYMAN_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Handyman: New lead",
+    description:
+      "When a new lead is created, capture source and reach out to book an estimate.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New handyman lead: {{lead.title}}",
+        "Track lead source. Capture contact name, phone, email, service address, and job type/notes (electrical, plumbing, general, or other). Email or text to set an estimate time. Two-way SMS is not live yet — use email and the contact record until a text provider is connected.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We got your request. Reply with a couple of times that work for an on-site estimate, plus the job address if we do not have it yet.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Handyman: Schedule estimate visit",
+    description:
+      "On Site Visit, put the estimate on the calendar and send confirmation plus a reminder.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule estimate visit: {{lead.title}}",
+        "Confirm date/time, address, contact name and number, lead source, and job type. Add it to the calendar with the address for routing. Send confirmation now and a reminder before the visit.",
+        1
+      ),
+      email(
+        "Your estimate visit is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you down for an on-site estimate. We will come to the address on file. Reply if you need to change the time.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Handyman: Estimate photos",
+    description: "Before sending the estimate, capture existing condition and scope photos.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Upload estimate photos: {{lead.title}}",
+        "On-site: photo existing condition and scope of work. Attach to the estimate, then generate pricing from the job, photos, and materials.",
+        0
+      ),
+      task(
+        "Send estimate for digital accept: {{lead.title}}",
+        "Email the estimate. Track sent / viewed / approved / expired. On approval, convert to a job. Texting the estimate still needs a two-way SMS provider.",
+        0
+      ),
+      email(
+        "Your handyman estimate from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready. Please review and reply to approve, or tell us what to adjust.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Handyman: Job from approved estimate",
+    description:
+      "After Contract Signed, create the job, assign a tech, and check skills/licenses.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Create job and assign tech: {{lead.title}}",
+        "Create the job from the approved estimate. Assign a handyman. Check availability and skill/license for this job type (electrical, plumbing, or general) before dispatch. Flag urgent or unassigned.",
+        1
+      ),
+      email(
+        "You are on the schedule — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thanks for approving the work. We are assigning a tech and will confirm the window.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Handyman: Mileage, materials, and receipts",
+    description:
+      "When the job is In Progress, log mileage, inventory, and expenses.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Log mileage for this job: {{lead.title}}",
+        "Log home base → first job and each job-to-job leg on Mileage. Tie miles to this job. Use the IRS standard mileage rate for the deduction. GPS auto-track is not on yet — enter miles from the map or odometer until then. This feeds job costing and books.",
+        0
+      ),
+      task(
+        "Check materials and stock: {{lead.title}}",
+        "Confirm inventory before/during the job. Tie materials to the job. Watch low-stock alerts.",
+        0
+      ),
+      task(
+        "Capture receipts on site: {{lead.title}}",
+        "Photo/upload materials and supply receipts. Tag by job and customer. Categorize the expense. OCR is not auto-filled — enter the amount from the photo.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Handyman: Punch list and job close",
+    description: "On Punch List, finish leftover items and get sign-off.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Punch list and customer sign-off: {{lead.title}}",
+        "Walk leftover items, finish touch-ups, note property details on the customer, and get sign-off. Watch jobs running long.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Handyman: Invoice, AR, and books",
+    description:
+      "When Closed, invoice labor + materials + billed mileage, then books and follow-up.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice completed job: {{lead.title}}",
+        "Generate the invoice from labor + materials + mileage if billed. Check AR aging. Send reminders if overdue. Review job costing (labor + materials + mileage vs. price). Log vendor bills in Books if still pending.",
+        1
+      ),
+      task(
+        "Update customer property and history: {{lead.title}}",
+        "Save service history and property notes on the contact. Log this visit in communication history.",
+        1
+      ),
+      email(
+        "Thanks — invoice from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>The job is complete. Your invoice is coming next. Thank you for choosing {{workspace.name}}.</p>"
+      ),
+    ],
+  },
+  {
+    name: "Handyman: After contract signed (e-sign)",
+    description: "When an e-sign contract completes, kick off the job.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off handyman job from signed contract",
+        "Create or update the job from the signed estimate/contract, assign a tech, and move the pipeline card to Contract Signed if needed.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Handyman: After invoice sent",
+    description: "When an invoice is sent, follow AR and overdue reminders.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on invoice payment",
+        "Watch open invoices and aging. Send a reminder if overdue. Record payment status. Flag negative reviews if they come in.",
+        3
+      ),
+    ],
+  },
+];
+
+const PACKS: Record<string, IndustryWorkflowDef[]> = {
+  hvac: HVAC_DEFAULT_WORKFLOWS,
+  handyman: HANDYMAN_DEFAULT_WORKFLOWS,
+};
+
+export async function seedIndustryDefaultWorkflows(
   supabase: SupabaseClient,
   workspaceId: string
 ): Promise<number> {
@@ -170,7 +340,9 @@ export async function seedHvacDefaultWorkflows(
     .select("industry_preset")
     .eq("id", workspaceId)
     .maybeSingle();
-  if (!isFieldServiceWorkspace(workspace?.industry_preset)) return 0;
+  const preset = workspace?.industry_preset ?? "";
+  const pack = PACKS[preset];
+  if (!pack) return 0;
 
   const { data: stages } = await supabase
     .from("pipeline_stages")
@@ -188,7 +360,7 @@ export async function seedHvacDefaultWorkflows(
     (existing ?? []).map((w: { name: string }) => w.name)
   );
 
-  const rows = HVAC_DEFAULT_WORKFLOWS.flatMap((def) => {
+  const rows = pack.flatMap((def) => {
     if (names.has(def.name)) return [];
     if (def.toStageName) {
       const toId = byName.get(def.toStageName);
@@ -221,8 +393,11 @@ export async function seedHvacDefaultWorkflows(
   if (rows.length === 0) return 0;
   const { error } = await supabase.from("automation_workflows").insert(rows);
   if (error) {
-    console.error("seedHvacDefaultWorkflows:", error.message);
+    console.error("seedIndustryDefaultWorkflows:", error.message);
     return 0;
   }
   return rows.length;
 }
+
+/** @deprecated Use seedIndustryDefaultWorkflows */
+export const seedHvacDefaultWorkflows = seedIndustryDefaultWorkflows;

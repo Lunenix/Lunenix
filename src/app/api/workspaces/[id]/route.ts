@@ -7,7 +7,7 @@ import {
   isIndustryPreset,
   normalizeIndustryCustomLabel,
 } from "@/lib/workspace";
-import { seedHvacDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
+import { seedIndustryDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
 
 /**
  * PATCH /api/workspaces/[id]
@@ -109,9 +109,9 @@ export async function PATCH(
       console.error("seed_pipeline_stages failed:", e);
     }
     try {
-      await seedHvacDefaultWorkflows(admin, auth.workspaceId);
+      await seedIndustryDefaultWorkflows(admin, auth.workspaceId);
     } catch (e) {
-      console.error("seedHvacDefaultWorkflows failed:", e);
+      console.error("seedIndustryDefaultWorkflows failed:", e);
     }
   }
 

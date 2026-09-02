@@ -93,8 +93,8 @@ export default function AutomationPage() {
         <div>
           <h1 className="text-3xl font-bold">Automation Workflows</h1>
           <p className="text-muted-foreground">
-            Automate follow-up. HVAC and other field-service workspaces get
-            default workflows for each pipeline stage — turn them off anytime.
+            Automate follow-up. HVAC and Handyman workspaces get default
+            workflows from a new lead through invoice — turn them off anytime.
           </p>
         </div>
         <Link href="/automation/new">

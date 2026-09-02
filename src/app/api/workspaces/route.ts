@@ -17,7 +17,7 @@ import {
   getWorkspaceCreateEntitlement,
 } from "@/lib/billing/workspaceSlots";
 import type { WorkspaceWithMembership } from "@/types/database";
-import { seedHvacDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
+import { seedIndustryDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
 
 const LOGO_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -348,9 +348,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await seedHvacDefaultWorkflows(admin, workspace.id);
+    await seedIndustryDefaultWorkflows(admin, workspace.id);
   } catch (e) {
-    console.error("seedHvacDefaultWorkflows failed:", e);
+    console.error("seedIndustryDefaultWorkflows failed:", e);
   }
 
   return NextResponse.json({ workspace: saved }, { status: 201 });
