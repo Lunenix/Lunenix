@@ -3,11 +3,16 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isSuperAdmin } from "@/lib/auth/superAdmin";
 import { grantMissingSuperAdminMemberships } from "@/lib/supabase/grantSuperAdminWorkspaces";
 import {
+  EXTRA_WORKSPACE_PRICE_USD,
   isIndustryPreset,
   isTeamSize,
   seatsForTeamSize,
   trialEndsAt,
 } from "@/lib/workspace";
+import {
+  entitlementJson,
+  getWorkspaceCreateEntitlement,
+} from "@/lib/billing/workspaceSlots";
 import type { WorkspaceWithMembership } from "@/types/database";
 
 const LOGO_TYPES: Record<string, string> = {
@@ -119,7 +124,11 @@ export async function GET() {
         roleById.get(String((ws as { id?: string }).id)) ?? "owner"
       )
     );
-    return NextResponse.json({ workspaces: list });
+    const entitlement = await getWorkspaceCreateEntitlement(admin, user);
+    return NextResponse.json({
+      workspaces: list,
+      ...entitlementJson(entitlement),
+    });
   }
 
   const { data, error } = await supabase
@@ -141,13 +150,21 @@ export async function GET() {
     })
     .filter((w): w is WorkspaceWithMembership => Boolean(w))
     .sort((a, b) => a.name.localeCompare(b.name));
-  return NextResponse.json({ workspaces: list });
+  const entitlement = await getWorkspaceCreateEntitlement(
+    createAdminClient(),
+    user
+  );
+  return NextResponse.json({
+    workspaces: list,
+    ...entitlementJson(entitlement),
+  });
 }
 
 /**
  * POST /api/workspaces
- * Creates a workspace, starts a 21-day trial, and adds the current user as owner.
- * Accepts JSON or multipart (optional logo file).
+ * Creates a workspace and adds the current user as owner.
+ * First owned workspace for regular users starts a 21-day trial.
+ * Extra owned workspaces require a paid slot and are marked paid.
  */
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -159,6 +176,18 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+  const entitlement = await getWorkspaceCreateEntitlement(admin, user);
+  if (!entitlement.canCreate) {
+    return NextResponse.json(
+      {
+        error: `You already have your included workspace. Additional workspaces are $${EXTRA_WORKSPACE_PRICE_USD} each.`,
+        code: "WORKSPACE_SLOT_REQUIRED",
+        ...entitlementJson(entitlement),
+      },
+      { status: 402 }
+    );
+  }
+
   const payload = await readWorkspacePayload(request);
   const { name } = payload;
   if (!name) {
@@ -194,18 +223,19 @@ export async function POST(request: NextRequest) {
       .replace(/^-+|-+$/g, "");
 
   const uniqueSlug = `${slugSource}-${Math.random().toString(36).slice(2, 6)}`;
+  const extraPaid = !entitlement.unlimited && entitlement.ownedCount > 0;
 
   const { data: workspace, error: wErr } = await admin
     .from("workspaces")
     .insert({
       name,
       slug: uniqueSlug,
-      tier: "trial",
+      tier: extraPaid ? "paid" : "trial",
       max_seats: seatsForTeamSize(payload.teamSize),
       industry_preset: payload.industryPreset,
       phone: payload.phone.slice(0, 40),
       team_size: payload.teamSize,
-      trial_ends_at: trialEndsAt(),
+      trial_ends_at: extraPaid ? null : trialEndsAt(),
     })
     .select("*")
     .single();

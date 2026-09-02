@@ -48,6 +48,7 @@ export interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   updated_at: string | null;
+  extra_workspace_slots?: number;
 }
 
 /** Per-user alert channels. Isolated by user_id; not a workspace CRM table. */

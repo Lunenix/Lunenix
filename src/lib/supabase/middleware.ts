@@ -22,6 +22,8 @@ const PUBLIC_PATHS = [
   "/api/email-drafts/run",
   "/api/tasks/reminders/run",
   "/api/telegram/test",
+  // Stripe Checkout webhooks (signed by Stripe, no session cookie).
+  "/api/billing/stripe/webhook",
 ];
 
 function isPublicPath(pathname: string): boolean {

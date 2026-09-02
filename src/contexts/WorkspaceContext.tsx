@@ -17,6 +17,11 @@ interface WorkspaceContextValue {
   setActiveWorkspace: (workspace: WorkspaceWithMembership) => void;
   refreshWorkspaces: () => Promise<WorkspaceWithMembership[]>;
   isLoading: boolean;
+  canCreateWorkspace: boolean;
+  unlimitedWorkspaces: boolean;
+  ownedWorkspaceCount: number;
+  extraWorkspaceSlots: number;
+  extraWorkspacePriceUsd: number;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(
@@ -31,6 +36,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     useState<WorkspaceWithMembership | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [canCreateWorkspace, setCanCreateWorkspace] = useState(false);
+  const [unlimitedWorkspaces, setUnlimitedWorkspaces] = useState(false);
+  const [ownedWorkspaceCount, setOwnedWorkspaceCount] = useState(0);
+  const [extraWorkspaceSlots, setExtraWorkspaceSlots] = useState(0);
+  const [extraWorkspacePriceUsd, setExtraWorkspacePriceUsd] = useState(8);
 
   // Fetch the workspaces the current user belongs to. Returns the list so
   // callers (e.g. after creating/renaming a workspace) can act on it.
@@ -45,6 +55,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
     if (!user) {
       setWorkspaces([]);
+      setCanCreateWorkspace(false);
+      setUnlimitedWorkspaces(false);
+      setOwnedWorkspaceCount(0);
+      setExtraWorkspaceSlots(0);
       return [];
     }
 
@@ -55,6 +69,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) {
       console.error("Failed to load workspaces:", json.error ?? res.status);
       return [];
+    }
+
+    setCanCreateWorkspace(Boolean(json.can_create_workspace));
+    setUnlimitedWorkspaces(Boolean(json.unlimited_workspaces));
+    setOwnedWorkspaceCount(
+      typeof json.owned_workspace_count === "number"
+        ? json.owned_workspace_count
+        : 0
+    );
+    setExtraWorkspaceSlots(
+      typeof json.extra_workspace_slots === "number"
+        ? json.extra_workspace_slots
+        : 0
+    );
+    if (typeof json.extra_workspace_price_usd === "number") {
+      setExtraWorkspacePriceUsd(json.extra_workspace_price_usd);
     }
 
     const list = ((json.workspaces ?? []) as WorkspaceWithMembership[]).sort(
@@ -145,8 +175,24 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setActiveWorkspace,
       refreshWorkspaces,
       isLoading,
+      canCreateWorkspace,
+      unlimitedWorkspaces,
+      ownedWorkspaceCount,
+      extraWorkspaceSlots,
+      extraWorkspacePriceUsd,
     }),
-    [workspaces, activeWorkspace, setActiveWorkspace, refreshWorkspaces, isLoading]
+    [
+      workspaces,
+      activeWorkspace,
+      setActiveWorkspace,
+      refreshWorkspaces,
+      isLoading,
+      canCreateWorkspace,
+      unlimitedWorkspaces,
+      ownedWorkspaceCount,
+      extraWorkspaceSlots,
+      extraWorkspacePriceUsd,
+    ]
   );
 
   return (

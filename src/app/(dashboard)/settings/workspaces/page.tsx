@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,12 +46,49 @@ export default function WorkspaceManagementPage() {
     setActiveWorkspace,
     refreshWorkspaces,
     isLoading,
+    extraWorkspacePriceUsd,
+    unlimitedWorkspaces,
+    canCreateWorkspace,
   } = useWorkspace();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const slot = params.get("workspace_slot");
+    const sessionId = params.get("session_id");
+    if (slot === "cancel") {
+      toast("Checkout canceled", "error");
+      window.history.replaceState({}, "", "/settings/workspaces");
+      return;
+    }
+    if (slot !== "success" || !sessionId) return;
+
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/billing/workspace-slot/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      if (cancelled) return;
+      if (res.ok) {
+        await refreshWorkspaces();
+        toast("Workspace slot added. You can create another company now.", "success");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "Could not confirm payment", "error");
+      }
+      window.history.replaceState({}, "", "/settings/workspaces");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshWorkspaces]);
 
   const canManage = (ws: WorkspaceWithMembership) =>
     ws.membership_role === "owner" || ws.membership_role === "admin";
@@ -113,12 +150,16 @@ export default function WorkspaceManagementPage() {
         <div>
           <h1 className="text-3xl font-bold">Workspace Management</h1>
           <p className="text-muted-foreground">
-            Manage the companies and workspaces you belong to
+            {unlimitedWorkspaces
+              ? "You can create unlimited workspaces."
+              : `You get one owned workspace included. Additional workspaces are $${extraWorkspacePriceUsd} each.`}
           </p>
         </div>
         <Button onClick={() => setShowAddModal(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Company
+          {canCreateWorkspace || unlimitedWorkspaces
+            ? "Add Company"
+            : `Add Company ($${extraWorkspacePriceUsd})`}
         </Button>
       </div>
 
@@ -210,7 +251,9 @@ export default function WorkspaceManagementPage() {
                             ? `Trial until ${new Date(ws.trial_ends_at).toLocaleDateString()}`
                             : ws.tier === "trial"
                               ? "Trial"
-                              : "Free Beta"}
+                              : ws.tier === "paid"
+                                ? "Paid"
+                                : "Free Beta"}
                         </Badge>
                       </TableCell>
 

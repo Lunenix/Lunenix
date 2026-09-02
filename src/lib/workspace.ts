@@ -21,6 +21,15 @@ export const TEAM_SIZE_OPTIONS: {
 
 export const TRIAL_DAYS = 21;
 
+/** Included owned workspaces for non–super-admin users. Extra slots are $8 each. */
+export const INCLUDED_OWNED_WORKSPACES = 1;
+export const EXTRA_WORKSPACE_PRICE_USD = 8;
+export const EXTRA_WORKSPACE_PRICE_CENTS = 800;
+
+export function ownedWorkspaceAllowance(extraSlots: number): number {
+  return INCLUDED_OWNED_WORKSPACES + Math.max(0, extraSlots);
+}
+
 export function seatsForTeamSize(teamSize: string | null | undefined): number {
   return TEAM_SIZE_OPTIONS.find((o) => o.value === teamSize)?.seats ?? 5;
 }

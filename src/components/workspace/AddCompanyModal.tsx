@@ -37,13 +37,27 @@ interface AddCompanyModalProps {
 }
 
 export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
-  const { refreshWorkspaces, setActiveWorkspace } = useWorkspace();
+  const {
+    refreshWorkspaces,
+    setActiveWorkspace,
+    canCreateWorkspace,
+    unlimitedWorkspaces,
+    ownedWorkspaceCount,
+    extraWorkspacePriceUsd,
+    isLoading,
+  } = useWorkspace();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [industryPreset, setIndustryPreset] = useState("general");
   const [teamSize, setTeamSize] = useState("1-5");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
+
+  const needsPaidSlot =
+    !isLoading && !unlimitedWorkspaces && !canCreateWorkspace;
+  const extraPaidCreate =
+    !unlimitedWorkspaces && canCreateWorkspace && ownedWorkspaceCount > 0;
 
   const reset = () => {
     setName("");
@@ -51,6 +65,27 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
     setIndustryPreset("general");
     setTeamSize("1-5");
     setLogoFile(null);
+  };
+
+  const startCheckout = async () => {
+    setCheckingOut(true);
+    try {
+      const res = await fetch("/api/billing/workspace-slot", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Could not start checkout");
+      }
+      if (typeof data.url !== "string") {
+        throw new Error("Checkout did not return a URL");
+      }
+      window.location.assign(data.url);
+    } catch (e) {
+      toast(
+        e instanceof Error ? e.message : "Could not start checkout",
+        "error"
+      );
+      setCheckingOut(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -104,7 +139,12 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
         } as WorkspaceWithMembership);
 
       setActiveWorkspace(match);
-      toast("Workspace created. Your trial is active.", "success");
+      toast(
+        extraPaidCreate
+          ? "Workspace created."
+          : "Workspace created. Your trial is active.",
+        "success"
+      );
       reset();
       onOpenChange(false);
     } catch (e) {
@@ -121,98 +161,129 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Company / Workspace</DialogTitle>
+          <DialogTitle>
+            {needsPaidSlot
+              ? "Add another workspace"
+              : "Add New Company / Workspace"}
+          </DialogTitle>
           <DialogDescription>
-            Each company is a separate workspace. New workspaces include a{" "}
-            {TRIAL_DAYS}-day free trial.
+            {needsPaidSlot
+              ? `Your plan includes one owned workspace. Additional workspaces are $${extraWorkspacePriceUsd} each.`
+              : extraPaidCreate
+                ? "This uses a workspace slot you already purchased."
+                : `Each company is a separate workspace. Your first workspace includes a ${TRIAL_DAYS}-day free trial.`}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-center text-sm font-medium text-green-500">
-            {TRIAL_DAYS}-day free trial
+        {needsPaidSlot ? (
+          <div className="space-y-4 py-2">
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+              Pay ${extraWorkspacePriceUsd} once to unlock one extra owned
+              workspace. You can create it right after checkout.
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={startCheckout} disabled={checkingOut}>
+                {checkingOut && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Pay ${extraWorkspacePriceUsd}
+              </Button>
+            </DialogFooter>
           </div>
+        ) : (
+          <>
+            <div className="space-y-4 py-2">
+              {!extraPaidCreate && (
+                <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-center text-sm font-medium text-green-500">
+                  {TRIAL_DAYS}-day free trial
+                </div>
+              )}
 
-          <div className="space-y-2">
-            <Label htmlFor="company-name">
-              Company Name <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="company-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Acme Events Co."
-              autoFocus
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="company-name">
+                  Company Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="company-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Acme Events Co."
+                  autoFocus
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="company-logo">
-              Logo <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="company-logo"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="company-logo">
+                  Logo <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="company-logo"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="company-phone">
-              Phone <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="company-phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(512) 555-0100"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="company-phone">
+                  Phone <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="company-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(512) 555-0100"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="industry-preset">Industry</Label>
-            <Select value={industryPreset} onValueChange={setIndustryPreset}>
-              <SelectTrigger id="industry-preset">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {INDUSTRY_PRESETS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="industry-preset">Industry</Label>
+                <Select value={industryPreset} onValueChange={setIndustryPreset}>
+                  <SelectTrigger id="industry-preset">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDUSTRY_PRESETS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="team-size">Team size</Label>
-            <Select value={teamSize} onValueChange={setTeamSize}>
-              <SelectTrigger id="team-size">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TEAM_SIZE_OPTIONS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="team-size">Team size</Label>
+                <Select value={teamSize} onValueChange={setTeamSize}>
+                  <SelectTrigger id="team-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEAM_SIZE_OPTIONS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Workspace
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} disabled={submitting || isLoading}>
+                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Workspace
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
