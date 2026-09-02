@@ -113,7 +113,9 @@ export default function EstimateDetailPage() {
         <div>
           <h1 className="text-2xl font-bold">{est.title}</h1>
           <p className="text-sm text-muted-foreground">
-            {ESTIMATE_STATUS_LABELS[est.status]} · {formatCurrency(Number(est.total))}
+            {ESTIMATE_STATUS_LABELS[est.status]}
+            {est.job_type ? ` · ${est.job_type}` : ""} ·{" "}
+            {formatCurrency(Number(est.total))}
           </p>
         </div>
       </div>

@@ -1,4 +1,16 @@
-import { industrySectorId } from "@/lib/industryVerticals";
+import {
+  industryDisplayLabel,
+  industrySectorId,
+} from "@/lib/industryVerticals";
+
+/** Default estimate/job type from the workspace vertical — never hardcode HVAC. */
+export function defaultEstimateJobType(
+  industryPreset?: string | null,
+  customLabel?: string | null
+): string {
+  const label = industryDisplayLabel(industryPreset, customLabel);
+  return label === "—" ? "" : label;
+}
 
 /** Home & Field Services (HVAC, plumbing, electrical, etc.). */
 export function isFieldServiceWorkspace(

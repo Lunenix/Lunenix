@@ -724,6 +724,45 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   electrician: ELECTRICIAN_DEFAULT_WORKFLOWS,
 };
 
+/** Default workflow name prefixes. Each trade pack stays on its own preset. */
+const TRADE_PACK_PREFIXES: { preset: string; prefix: string }[] = [
+  { preset: "hvac", prefix: "HVAC:" },
+  { preset: "handyman", prefix: "Handyman:" },
+  { preset: "plumbing", prefix: "Plumbing:" },
+  { preset: "electrician", prefix: "Electrical:" },
+];
+
+async function pruneForeignIndustryWorkflows(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  preset: string
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from("automation_workflows")
+    .select("id, name")
+    .eq("workspace_id", workspaceId);
+  const field = isFieldServiceWorkspace(preset);
+  const ids = (existing ?? [])
+    .filter((w: { id: string; name: string }) => {
+      const name = w.name ?? "";
+      for (const pack of TRADE_PACK_PREFIXES) {
+        if (name.startsWith(pack.prefix) && preset !== pack.preset) return true;
+      }
+      if (name.startsWith("Field:") && !field) return true;
+      return false;
+    })
+    .map((w: { id: string }) => w.id);
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from("automation_workflows")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .in("id", ids);
+  if (error) {
+    console.error("pruneForeignIndustryWorkflows:", error.message);
+  }
+}
+
 export async function seedIndustryDefaultWorkflows(
   supabase: SupabaseClient,
   workspaceId: string
@@ -734,6 +773,7 @@ export async function seedIndustryDefaultWorkflows(
     .eq("id", workspaceId)
     .maybeSingle();
   const preset = workspace?.industry_preset ?? "";
+  await pruneForeignIndustryWorkflows(supabase, workspaceId, preset);
   const trade = PACKS[preset] ?? [];
   const pack = isFieldServiceWorkspace(preset)
     ? [...trade, ...FIELD_PERMIT_WORKFLOWS]

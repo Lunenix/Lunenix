@@ -1,6 +1,4 @@
--- Default HVAC / field-service automation workflows.
--- Hooks into seed_pipeline_stages when the industry family is field.
--- Safe to re-run: skips workflows that already exist by name.
+-- Default HVAC automation workflows. HVAC workspaces only — not all Home & Field.
 
 CREATE OR REPLACE FUNCTION seed_field_service_workflows(p_workspace_id UUID)
 RETURNS void
@@ -11,8 +9,7 @@ DECLARE
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.workspaces w
-    WHERE w.id = p_workspace_id
-      AND industry_pipeline_family(w.industry_preset) = 'field'
+    WHERE w.id = p_workspace_id AND w.industry_preset = 'hvac'
   ) THEN
     RETURN;
   END IF;
@@ -315,7 +312,7 @@ BEGIN
     pos := pos + 1;
   END LOOP;
 
-  IF family = 'field' THEN
+  IF COALESCE(p_preset, '') = 'hvac' THEN
     PERFORM seed_field_service_workflows(p_workspace_id);
   END IF;
 END;
@@ -323,4 +320,4 @@ $fn$;
 
 SELECT seed_field_service_workflows(id)
 FROM public.workspaces
-WHERE industry_pipeline_family(industry_preset) = 'field';
+WHERE industry_preset = 'hvac';

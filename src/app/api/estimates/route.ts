@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
-import { ESTIMATE_STATUSES, estimateTotals } from "@/lib/fieldService";
+import { ESTIMATE_STATUSES, estimateTotals, defaultEstimateJobType } from "@/lib/fieldService";
 
 export async function GET(request: Request) {
   const auth = await verifyWorkspaceAccess(request);
@@ -31,6 +31,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const { data: workspace } = await auth.supabase
+    .from("workspaces")
+    .select("industry_preset, industry_custom_label")
+    .eq("id", auth.workspaceId)
+    .maybeSingle();
+  const jobTypeFromBody =
+    typeof body.job_type === "string" ? body.job_type.trim() : "";
+  const job_type =
+    jobTypeFromBody ||
+    defaultEstimateJobType(
+      workspace?.industry_preset,
+      workspace?.industry_custom_label
+    ) ||
+    null;
   const items = Array.isArray(body.line_items) ? body.line_items : [];
   const taxRate = Number(body.tax_rate) || 0;
   const totals = estimateTotals(items, taxRate);
@@ -43,7 +57,7 @@ export async function POST(request: NextRequest) {
       lead_id: body.lead_id ?? null,
       visit_task_id: body.visit_task_id ?? null,
       title: String(body.title).trim(),
-      job_type: body.job_type ?? null,
+      job_type,
       notes: body.notes ?? null,
       address: body.address ?? null,
       visit_at: body.visit_at ?? null,

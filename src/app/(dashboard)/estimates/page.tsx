@@ -29,7 +29,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ESTIMATE_STATUS_LABELS } from "@/lib/fieldService";
+import {
+  ESTIMATE_STATUS_LABELS,
+  defaultEstimateJobType,
+} from "@/lib/fieldService";
 import { formatCurrency } from "@/lib/format";
 import {
   contactDisplayName,
@@ -45,7 +48,7 @@ export default function EstimatesPage() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [contactId, setContactId] = useState("");
-  const [jobType, setJobType] = useState("HVAC");
+  const [jobType, setJobType] = useState("");
   const [visitAt, setVisitAt] = useState("");
   const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
@@ -68,6 +71,16 @@ export default function EstimatesPage() {
   useEffect(() => {
     if (activeWorkspace) load();
   }, [activeWorkspace, load]);
+
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    setJobType(
+      defaultEstimateJobType(
+        activeWorkspace.industry_preset,
+        activeWorkspace.industry_custom_label
+      )
+    );
+  }, [activeWorkspace]);
 
   async function createEstimate() {
     if (!activeWorkspace || !title.trim() || !contactId) return;
@@ -98,7 +111,7 @@ export default function EstimatesPage() {
         workspace_id: activeWorkspace.id,
         contact_id: contactId,
         title: title.trim(),
-        job_type: jobType,
+        job_type: jobType.trim() || null,
         address: address || contact?.address || null,
         visit_at: visitAt || null,
         visit_task_id: visitTaskId,
@@ -133,7 +146,19 @@ export default function EstimatesPage() {
             open a job.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button
+          onClick={() => {
+            if (activeWorkspace) {
+              setJobType(
+                defaultEstimateJobType(
+                  activeWorkspace.industry_preset,
+                  activeWorkspace.industry_custom_label
+                )
+              );
+            }
+            setOpen(true);
+          }}
+        >
           <Plus className="mr-2 h-4 w-4" />
           New estimate
         </Button>
@@ -201,7 +226,11 @@ export default function EstimatesPage() {
             </div>
             <div className="space-y-1">
               <Label>Job type</Label>
-              <Input value={jobType} onChange={(e) => setJobType(e.target.value)} />
+              <Input
+                value={jobType}
+                onChange={(e) => setJobType(e.target.value)}
+                placeholder="Matches this workspace’s trade"
+              />
             </div>
             <div className="space-y-1">
               <Label>Visit date & time</Label>
