@@ -24,6 +24,7 @@ export async function PATCH(
     "notes",
     "contact_id",
     "expected_close_date",
+    "source",
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {

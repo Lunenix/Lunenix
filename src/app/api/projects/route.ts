@@ -71,6 +71,10 @@ export async function POST(request: NextRequest) {
     due_date: body.due_date ?? null,
     budget: body.budget ?? null,
     currency: body.currency ?? "USD",
+    assignee_id: body.assignee_id ?? null,
+    address: body.address ?? null,
+    urgent: Boolean(body.urgent),
+    estimate_id: body.estimate_id ?? null,
   };
 
   const { data, error } = await auth.supabase

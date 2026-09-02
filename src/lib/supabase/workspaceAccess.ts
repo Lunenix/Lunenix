@@ -81,6 +81,13 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "forms",
   "email_templates",
   "automation_workflows",
+  "estimates",
+  "inventory_items",
+  "vendor_bills",
+  "job_expenses",
+  "customer_equipment",
+  "technician_profiles",
+  "mileage_logs",
 ]);
 
 /**

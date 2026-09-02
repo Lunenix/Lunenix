@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     notes: body.notes ?? null,
     contact_id: body.contact_id ?? null,
     expected_close_date: body.expected_close_date ?? null,
+    source: typeof body.source === "string" ? body.source.trim() || null : null,
     position: count ?? 0,
   };
 

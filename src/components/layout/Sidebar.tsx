@@ -20,33 +20,53 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
 import { ThemeToggleMenuItem } from "@/components/theme-toggle";
+import { isFieldServiceWorkspace } from "@/lib/fieldService";
 import {
   Bell,
+  BookOpen,
   Building2,
   CalendarDays,
   Check,
   ChevronsUpDown,
   ClipboardList,
+  ClipboardSignature,
   FileSignature,
   FolderKanban,
+  Gauge,
+  HardHat,
   Inbox,
   LayoutDashboard,
   ListChecks,
   LogOut,
   Mail,
+  Package,
   Plus,
   Receipt,
   Settings,
   KanbanSquare,
   Users,
+  Wrench,
   X,
   Zap,
 } from "lucide-react";
 
-const navItems = [
+const coreNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
+];
+
+const fieldNav = [
+  { href: "/field", label: "Field ops", icon: Wrench },
+  { href: "/estimates", label: "Estimates", icon: ClipboardSignature },
+  { href: "/jobs", label: "Jobs", icon: FolderKanban },
+  { href: "/inventory", label: "Inventory", icon: Package },
+  { href: "/books", label: "Books", icon: BookOpen },
+  { href: "/mileage", label: "Mileage", icon: Gauge },
+  { href: "/team", label: "Techs", icon: HardHat },
+];
+
+const restNav = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/tasks", label: "Tasks", icon: ListChecks },
   { href: "/esign", label: "Contracts", icon: FileSignature },
@@ -88,6 +108,14 @@ export function Sidebar({
   const router = useRouter();
   const { workspaces, activeWorkspace, setActiveWorkspace, isLoading } =
     useWorkspace();
+  const fieldService = isFieldServiceWorkspace(
+    activeWorkspace?.industry_preset
+  );
+  const navItems = [
+    ...coreNav,
+    ...(fieldService ? fieldNav : []),
+    ...restNav.filter((item) => !(fieldService && item.href === "/projects")),
+  ];
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
 

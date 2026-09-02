@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ContactSheet } from "@/components/contacts/ContactSheet";
-import { contactDisplayName, type Contact, type Lead } from "@/types/database";
+import { contactDisplayName, type Contact, type CustomerEquipment, type Lead } from "@/types/database";
 import { ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
 
 export default function ContactDetailPage() {
@@ -170,6 +170,15 @@ export default function ContactDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Equipment on file</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EquipmentPanel contactId={contact.id} workspaceId={contact.workspace_id} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -152,6 +152,7 @@ export interface Lead {
   notes: string | null;
   position: number;
   expected_close_date: string | null;
+  source: string | null;
   created_at: string;
   updated_at: string;
   contact?: Contact | null;
@@ -184,6 +185,7 @@ export interface Project {
   workspace_id: string;
   contact_id: string | null;
   lead_id: string | null;
+  estimate_id?: string | null;
   name: string;
   description: string | null;
   status: ProjectStatus;
@@ -191,6 +193,9 @@ export interface Project {
   due_date: string | null;
   budget: number | null;
   currency: string;
+  assignee_id?: string | null;
+  address?: string | null;
+  urgent?: boolean;
   created_at: string;
   updated_at: string;
   // Optional relations / computed fields for list + detail views.
@@ -788,3 +793,131 @@ export const ESIGN_FIELD_LABELS: Record<EsignFieldType, string> = {
   text: "Text",
   name: "Full Name",
 };
+
+export type EstimateStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "approved"
+  | "expired"
+  | "declined";
+
+export interface EstimateLineItem {
+  description: string;
+  quantity?: number;
+  unit_price?: number;
+  amount: number;
+}
+
+export interface Estimate {
+  id: string;
+  workspace_id: string;
+  contact_id: string;
+  lead_id: string | null;
+  visit_task_id: string | null;
+  project_id: string | null;
+  title: string;
+  job_type: string | null;
+  notes: string | null;
+  address: string | null;
+  visit_at: string | null;
+  status: EstimateStatus;
+  valid_until: string | null;
+  line_items: EstimateLineItem[];
+  subtotal: number;
+  tax_rate: number;
+  tax_amount: number;
+  total: number;
+  currency: string;
+  sent_at: string | null;
+  viewed_at: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  contact?: Contact | null;
+  photos?: EstimatePhoto[];
+}
+
+export interface EstimatePhoto {
+  id: string;
+  workspace_id: string;
+  estimate_id: string;
+  file_url: string;
+  caption: string | null;
+  created_at: string;
+}
+
+export interface TechnicianProfile {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  available: boolean;
+  certifications: string | null;
+  license_expires: string | null;
+  notes: string | null;
+}
+
+export interface InventoryItem {
+  id: string;
+  workspace_id: string;
+  name: string;
+  sku: string | null;
+  quantity: number;
+  reorder_at: number;
+  unit: string;
+}
+
+export interface JobExpense {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  category: string;
+  amount: number;
+  vendor: string | null;
+  receipt_url: string | null;
+  notes: string | null;
+  incurred_on: string;
+}
+
+export interface MileageLog {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  user_id: string | null;
+  driven_on: string;
+  miles: number;
+  rate_per_mile: number;
+  amount: number;
+  origin: string | null;
+  destination: string | null;
+  purpose: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+  contact?: Contact | null;
+}
+
+export interface VendorBill {
+  id: string;
+  workspace_id: string;
+  vendor_name: string;
+  amount: number;
+  due_date: string | null;
+  status: "pending" | "paid";
+  paid_at: string | null;
+  notes: string | null;
+}
+
+export interface CustomerEquipment {
+  id: string;
+  workspace_id: string;
+  contact_id: string;
+  name: string;
+  brand: string | null;
+  model: string | null;
+  serial: string | null;
+  installed_on: string | null;
+  notes: string | null;
+}

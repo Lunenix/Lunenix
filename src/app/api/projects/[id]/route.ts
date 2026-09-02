@@ -51,6 +51,10 @@ export async function PATCH(
     "due_date",
     "budget",
     "currency",
+    "assignee_id",
+    "address",
+    "urgent",
+    "estimate_id",
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
