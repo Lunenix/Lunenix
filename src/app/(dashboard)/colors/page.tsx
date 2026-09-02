@@ -25,7 +25,6 @@ import {
   HOA_COLOR_STATUSES,
   HOA_COLOR_STATUS_LABELS,
   type PaintSheen,
-  type HoaColorStatus,
 } from "@/lib/fieldService";
 import {
   contactDisplayName,

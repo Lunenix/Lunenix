@@ -25,7 +25,6 @@ import {
   TREATMENT_STATUSES,
   TREATMENT_STATUS_LABELS,
   type TreatmentMethod,
-  type TreatmentStatus,
 } from "@/lib/fieldService";
 import { contactDisplayName, type PestTreatment, type Project } from "@/types/database";
 import { Loader2 } from "lucide-react";

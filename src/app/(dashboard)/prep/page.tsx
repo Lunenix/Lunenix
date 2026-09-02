@@ -25,7 +25,6 @@ import {
   PREP_STATUSES,
   PREP_STATUS_LABELS,
   type PrepKind,
-  type PrepStatus,
 } from "@/lib/fieldService";
 import type { JobPrepItem, Project } from "@/types/database";
 import { Loader2 } from "lucide-react";
