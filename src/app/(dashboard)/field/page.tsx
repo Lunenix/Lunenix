@@ -74,7 +74,7 @@ export default function FieldOpsPage() {
           Email customers from Estimates. Two-way SMS needs a text provider
           later. Receipt OCR is not auto-filled. Ask Luna for weather before
           dispatch; toggle weather hold on Jobs. Roofing: Claims and Materials.
-          Painting: Colors and Prep.
+          Painting: Colors and Prep. Pest: Treatments, Access, Recurring.
         </p>
       </div>
 
@@ -180,6 +180,12 @@ export default function FieldOpsPage() {
         </Button>
         <Button asChild variant="outline">
           <Link href="/prep">Prep</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/treatments">Treatments</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/access">Access</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/plans">Recurring</Link>

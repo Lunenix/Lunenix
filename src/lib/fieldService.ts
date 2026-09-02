@@ -85,6 +85,9 @@ export const MATERIAL_TYPES = [
   "primer",
   "drywall",
   "compound",
+  "chemical",
+  "bait",
+  "trap",
   "other",
 ] as const;
 export type MaterialType = (typeof MATERIAL_TYPES)[number];
@@ -96,6 +99,9 @@ export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
   primer: "Primer",
   drywall: "Drywall sheets",
   compound: "Joint compound / tape",
+  chemical: "Chemical / product",
+  bait: "Bait",
+  trap: "Trap / station",
   other: "Other",
 };
 
@@ -107,6 +113,8 @@ export const ESTIMATE_PHOTO_KINDS = [
   "surface",
   "swatch",
   "prep",
+  "infestation",
+  "entry_point",
 ] as const;
 export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
 export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
@@ -117,6 +125,8 @@ export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
   surface: "Surface / color",
   swatch: "Swatch",
   prep: "Prep / drywall",
+  infestation: "Infestation",
+  entry_point: "Entry point",
 };
 
 export const ROOFING_LEAD_SOURCES = [
@@ -133,8 +143,21 @@ export const PAINTING_LEAD_SOURCES = [
   "Referral",
 ] as const;
 
+export const PEST_LEAD_SOURCES = [
+  "One-time treatment",
+  "Recurring plan",
+  "Termite",
+  "Mosquito",
+  "Rodent",
+  "Referral",
+] as const;
+
 export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
-  new Set([...ROOFING_LEAD_SOURCES, ...PAINTING_LEAD_SOURCES])
+  new Set([
+    ...ROOFING_LEAD_SOURCES,
+    ...PAINTING_LEAD_SOURCES,
+    ...PEST_LEAD_SOURCES,
+  ])
 );
 
 export const PAINT_SHEENS = [
@@ -219,6 +242,63 @@ export const JOB_WORK_PHASE_LABELS: Record<JobWorkPhase, string> = {
   completed: "Completed",
 };
 
+export const TREATMENT_METHODS = [
+  "spray",
+  "bait",
+  "trap",
+  "granular",
+  "foam",
+  "other",
+] as const;
+export type TreatmentMethod = (typeof TREATMENT_METHODS)[number];
+export const TREATMENT_METHOD_LABELS: Record<TreatmentMethod, string> = {
+  spray: "Spray",
+  bait: "Bait",
+  trap: "Trap",
+  granular: "Granular",
+  foam: "Foam",
+  other: "Other",
+};
+
+export const TREATMENT_STATUSES = [
+  "logged",
+  "guarantee_open",
+  "retreatment_due",
+  "closed",
+] as const;
+export type TreatmentStatus = (typeof TREATMENT_STATUSES)[number];
+export const TREATMENT_STATUS_LABELS: Record<TreatmentStatus, string> = {
+  logged: "Logged",
+  guarantee_open: "Guarantee open",
+  retreatment_due: "Re-treatment due",
+  closed: "Closed",
+};
+
+export const ACCESS_ENTRY_METHODS = [
+  "occupant",
+  "gate",
+  "garage",
+  "lockbox",
+  "other",
+] as const;
+export type AccessEntryMethod = (typeof ACCESS_ENTRY_METHODS)[number];
+export const ACCESS_ENTRY_METHOD_LABELS: Record<AccessEntryMethod, string> = {
+  occupant: "Occupant lets in",
+  gate: "Gate",
+  garage: "Garage",
+  lockbox: "Lockbox",
+  other: "Other",
+};
+
+export function daysUntil(isoDate: string | null | undefined): number | null {
+  if (!isoDate) return null;
+  const d = new Date(`${String(isoDate).slice(0, 10)}T00:00:00`);
+  if (!Number.isFinite(d.getTime())) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.floor((d.getTime() - now.getTime()) / 86400000);
+}
+
 export const ESTIMATE_STATUSES = [
   "draft",
   "sent",
@@ -290,6 +370,7 @@ export const SERVICE_PLAN_FREQUENCIES = [
   "weekly",
   "biweekly",
   "monthly",
+  "quarterly",
   "seasonal",
 ] as const;
 export type ServicePlanFrequency = (typeof SERVICE_PLAN_FREQUENCIES)[number];
@@ -298,6 +379,7 @@ export const SERVICE_PLAN_FREQUENCY_LABELS: Record<ServicePlanFrequency, string>
     weekly: "Weekly",
     biweekly: "Every 2 weeks",
     monthly: "Monthly",
+    quarterly: "Quarterly",
     seasonal: "Seasonal",
   };
 
@@ -311,6 +393,7 @@ export function advanceServiceVisitDate(
   }
   if (frequency === "weekly") d.setDate(d.getDate() + 7);
   else if (frequency === "biweekly") d.setDate(d.getDate() + 14);
+  else if (frequency === "quarterly") d.setMonth(d.getMonth() + 3);
   else d.setMonth(d.getMonth() + 1);
   return d.toISOString().slice(0, 10);
 }
@@ -323,6 +406,7 @@ export function monthlyRecurringAmount(
   const a = Number(amount) || 0;
   if (frequency === "weekly") return Math.round(((a * 52) / 12) * 100) / 100;
   if (frequency === "biweekly") return Math.round(((a * 26) / 12) * 100) / 100;
+  if (frequency === "quarterly") return Math.round((a / 3) * 100) / 100;
   return a;
 }
 

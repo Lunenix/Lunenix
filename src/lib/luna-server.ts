@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, TREATMENT_STATUSES, ACCESS_ENTRY_METHODS } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4624,6 +4624,166 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Logged HOA color approval as ${data.status}.`
+      );
+    }
+
+    if (name === "list_pest_treatments") {
+      const { data, error } = await supabase
+        .from("pest_treatments")
+        .select("product_name, method, target_pest, treated_on, status, retreatment_until")
+        .eq("workspace_id", workspace_id)
+        .order("treated_on", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (t: {
+          product_name: string;
+          method: string;
+          target_pest: string | null;
+          treated_on: string;
+          status: string;
+          retreatment_until: string | null;
+        }) =>
+          `${t.product_name} (${t.method}${t.target_pest ? `, ${t.target_pest}` : ""}): ${t.status} on ${t.treated_on}${t.retreatment_until ? `, guarantee through ${t.retreatment_until}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No pest treatments logged in this workspace.",
+      };
+    }
+
+    if (name === "log_pest_treatment") {
+      const product = argString(args, "product_name");
+      if (!product) return { error: "Need a product name." };
+      const methodRaw = argString(args, "method") || "other";
+      const method = (TREATMENT_METHODS as readonly string[]).includes(methodRaw)
+        ? methodRaw
+        : "other";
+      const treatedOn =
+        argString(args, "treated_on") || new Date().toISOString().slice(0, 10);
+      const guaranteeDays = argNumber(args, "guarantee_days");
+      let retreatmentUntil: string | null = null;
+      if (guaranteeDays && guaranteeDays > 0) {
+        const d = new Date(`${treatedOn.slice(0, 10)}T00:00:00`);
+        d.setDate(d.getDate() + guaranteeDays);
+        retreatmentUntil = d.toISOString().slice(0, 10);
+      }
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("pest_treatments")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          product_name: product.slice(0, 200),
+          epa_number: argString(args, "epa_number"),
+          method,
+          quantity: argString(args, "quantity"),
+          target_pest: argString(args, "target_pest"),
+          treatment_area: argString(args, "treatment_area"),
+          treated_on: treatedOn.slice(0, 10),
+          guarantee_days: guaranteeDays,
+          retreatment_until: retreatmentUntil,
+          status: retreatmentUntil ? "guarantee_open" : "logged",
+          notes: argString(args, "notes"),
+        })
+        .select("product_name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that treatment." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged treatment ${data.product_name} as ${data.status}.`
+      );
+    }
+
+    if (name === "list_property_access") {
+      const { data, error } = await supabase
+        .from("property_access")
+        .select(
+          "entry_method, has_entry_code, pets_notes, child_safety, chemical_sensitive, special_instructions, contact:contacts(first_name, last_name, organization_name, type)"
+        )
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (a: {
+          entry_method: string;
+          has_entry_code: boolean;
+          pets_notes: string | null;
+          child_safety: string | null;
+          chemical_sensitive: string | null;
+          special_instructions: string | null;
+          contact?: { first_name?: string | null; last_name?: string | null; organization_name?: string | null; type?: string } | { first_name?: string | null }[] | null;
+        }) => {
+          const c = Array.isArray(a.contact) ? a.contact[0] : a.contact;
+          const who = c
+            ? [c.first_name, c.last_name].filter(Boolean).join(" ") ||
+              c.organization_name ||
+              "customer"
+            : "customer";
+          return `${who}: ${a.entry_method}${a.has_entry_code ? ", access code on file (not spoken)" : ""}${a.pets_notes ? ", pet notes on file" : ""}${a.child_safety || a.chemical_sensitive ? ", safety notes on file" : ""}`;
+        }
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} Entry codes are not included.`
+          : "No property access notes in this workspace.",
+      };
+    }
+
+    if (name === "log_property_access") {
+      const contact = await requireOneContact(
+        supabase,
+        workspace_id,
+        argString(args, "contact_name")
+      );
+      if ("error" in contact) return contact;
+      const methodRaw = argString(args, "entry_method") || "occupant";
+      const entry_method = (ACCESS_ENTRY_METHODS as readonly string[]).includes(
+        methodRaw
+      )
+        ? methodRaw
+        : "occupant";
+      const { data, error } = await supabase
+        .from("property_access")
+        .insert({
+          workspace_id,
+          contact_id: contact.id,
+          entry_method,
+          has_entry_code: args.has_entry_code === true,
+          pets_notes: argString(args, "pets_notes"),
+          child_safety: argString(args, "child_safety"),
+          chemical_sensitive: argString(args, "chemical_sensitive"),
+          special_instructions: argString(args, "special_instructions"),
+        })
+        .select("entry_method")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not save access notes." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Saved access notes (${data.entry_method}). Codes were not stored from this chat.`
       );
     }
 

@@ -848,7 +848,7 @@ export interface EstimatePhoto {
   estimate_id: string;
   file_url: string;
   caption: string | null;
-  kind?: "photo" | "drone" | "measurement" | "video" | "surface" | "swatch" | "prep";
+  kind?: "photo" | "drone" | "measurement" | "video" | "surface" | "swatch" | "prep" | "infestation" | "entry_point";
   created_at: string;
 }
 
@@ -1021,6 +1021,7 @@ export type ServicePlanFrequency =
   | "weekly"
   | "biweekly"
   | "monthly"
+  | "quarterly"
   | "seasonal";
 
 export interface ServicePlan {
@@ -1032,6 +1033,7 @@ export interface ServicePlan {
   frequency: ServicePlanFrequency;
   seasonal_on: boolean;
   next_visit_on: string;
+  skip_until?: string | null;
   amount: number;
   auto_invoice: boolean;
   is_active: boolean;
@@ -1099,5 +1101,56 @@ export interface HoaColorApproval {
   submitted_on: string | null;
   decided_on: string | null;
   created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface PestTreatment {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  product_name: string;
+  epa_number: string | null;
+  method: string;
+  quantity: string | null;
+  target_pest: string | null;
+  treatment_area: string | null;
+  treated_on: string;
+  guarantee_days: number | null;
+  retreatment_until: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+  contact?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    organization_name: string | null;
+    type: string;
+  } | null;
+}
+
+export interface PropertyAccess {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  entry_method: string;
+  has_entry_code: boolean;
+  entry_code: string | null;
+  pets_notes: string | null;
+  child_safety: string | null;
+  chemical_sensitive: string | null;
+  special_instructions: string | null;
+  notes: string | null;
+  created_at: string;
+  contact?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    organization_name: string | null;
+    type: string;
+  } | null;
   project?: { id: string; name: string } | null;
 }

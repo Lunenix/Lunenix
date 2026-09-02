@@ -204,7 +204,7 @@ export function sanitizePayload<T>(obj: T): T {
   }
 
   const sensitiveKeysPattern =
-    /(token|key|secret|password|hash|card|stripe|ssn|auth|jwt)/i;
+    /(token|key|secret|password|hash|card|stripe|ssn|auth|jwt|lockbox|gate_code|entry_code|alarm_code|access_code)/i;
   const sanitized = { ...obj } as Record<string, unknown>;
 
   for (const key of Object.keys(sanitized)) {

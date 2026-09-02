@@ -20,7 +20,7 @@ export async function generateDueServicePlanVisits(
   const { data: plans, error } = await admin
     .from("service_plans")
     .select(
-      "id, workspace_id, contact_id, project_id, name, frequency, amount, auto_invoice, next_visit_on, seasonal_on, is_active"
+      "id, workspace_id, contact_id, project_id, name, frequency, amount, auto_invoice, next_visit_on, seasonal_on, is_active, skip_until"
     )
     .eq("is_active", true)
     .lte("next_visit_on", today)
@@ -31,8 +31,14 @@ export async function generateDueServicePlanVisits(
   let generated = 0;
   let invoiced = 0;
   for (const raw of plans ?? []) {
-    const plan = raw as PlanRow & { seasonal_on?: boolean };
+    const plan = raw as PlanRow & { seasonal_on?: boolean; skip_until?: string | null };
     if (plan.frequency === "seasonal" && plan.seasonal_on === false) continue;
+    if (
+      plan.skip_until &&
+      String(plan.skip_until).slice(0, 10) >= today
+    ) {
+      continue;
+    }
 
     const visitOn = String(plan.next_visit_on).slice(0, 10);
     const { error: taskErr } = await admin.from("tasks").insert({

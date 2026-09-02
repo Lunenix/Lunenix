@@ -721,6 +721,61 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_pest_treatments",
+    description:
+      "List pest treatments (product, method, pest, guarantee window). Does not return access codes.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_pest_treatment",
+    description:
+      "Log a chemical or treatment for a pest visit (product, EPA number, method, pest, area, guarantee days).",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        product_name: { type: "string" },
+        epa_number: { type: "string" },
+        method: {
+          type: "string",
+          description: "spray, bait, trap, granular, foam, or other",
+        },
+        quantity: { type: "string" },
+        target_pest: { type: "string" },
+        treatment_area: { type: "string" },
+        treated_on: { type: "string", description: "YYYY-MM-DD" },
+        guarantee_days: { type: "number" },
+        project_name: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_property_access",
+    description:
+      "List property access and safety notes. Never returns gate or lockbox codes.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_property_access",
+    description:
+      "Save pet/child/garden safety notes and entry method. Do not collect or store entry codes through this tool.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        contact_name: { type: "string" },
+        entry_method: {
+          type: "string",
+          description: "occupant, gate, garage, lockbox, or other",
+        },
+        has_entry_code: { type: "boolean" },
+        pets_notes: { type: "string" },
+        child_safety: { type: "string" },
+        chemical_sensitive: { type: "string" },
+        special_instructions: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",

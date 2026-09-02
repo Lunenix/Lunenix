@@ -42,6 +42,8 @@ import {
   Package,
   Palette,
   Paintbrush,
+  Bug,
+  KeyRound,
   Plus,
   Receipt,
   Repeat,
@@ -73,6 +75,8 @@ const fieldNav = [
   { href: "/materials", label: "Materials", icon: Truck },
   { href: "/colors", label: "Colors", icon: Palette },
   { href: "/prep", label: "Prep", icon: Paintbrush },
+  { href: "/treatments", label: "Treatments", icon: Bug },
+  { href: "/access", label: "Access", icon: KeyRound },
   { href: "/plans", label: "Recurring", icon: Repeat },
   { href: "/team", label: "Techs", icon: HardHat },
 ];

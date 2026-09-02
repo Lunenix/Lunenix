@@ -95,6 +95,8 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "job_finish_specs",
   "job_prep_items",
   "hoa_color_approvals",
+  "pest_treatments",
+  "property_access",
 ]);
 
 /**

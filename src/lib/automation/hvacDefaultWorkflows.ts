@@ -1220,6 +1220,176 @@ export const PAINTING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * Pest Control default automations.
+ * Recurring plans, chemical logs, access notes. Pest workspaces only.
+ */
+export const PEST_CONTROL_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Pest: New lead",
+    description:
+      "When a new lead is created, capture one-time vs recurring and pest type.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New pest lead: {{lead.title}}",
+        "Set lead source: one-time treatment vs recurring plan, and pest type. Capture name, phone, email, address, property size, and notes. Email to book a visit. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your pest control request. Reply with the address, pest type if you know it, and a couple of times that work for an inspection.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Pest: Schedule visit",
+    description: "On Site Visit, book the inspection and put it on the calendar.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule pest visit: {{lead.title}}",
+        "Confirm date/time, address, contact, source, pest type, and property size. Add to the calendar with the address for routing. Send confirmation and a reminder. Two-way texting is not live yet.",
+        1
+      ),
+      email(
+        "Your pest inspection is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you down for an on-site inspection. Please keep pets and kids clear of the areas we will check. Reply if you need to change the time.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Pest: Photos and estimate",
+    description:
+      "On Estimate Sent, attach inspection photos and send one-time or plan pricing.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Upload inspection photos: {{lead.title}}",
+        "On Estimates, upload infestation evidence, entry points, damage, and problem areas (photo kind infestation or entry point).",
+        0
+      ),
+      task(
+        "Send pest estimate: {{lead.title}}",
+        "Price one-time treatment and/or a recurring plan. Email the estimate. Track sent / viewed / approved / expired. Approval converts to a job. Recurring plans are set on Recurring plans.",
+        0
+      ),
+      email(
+        "Your pest control estimate from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready, including one-time and recurring options if they apply. Please review and reply to approve.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Pest: Job, plan, access, and licenses",
+    description:
+      "After Contract Signed, assign a licensed tech, set the plan, and capture access/safety.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Create visit and assign tech: {{lead.title}}",
+        "Create the job from the approved estimate. Assign a tech. Confirm pesticide applicator license and renewal date on Techs. Set route order on Jobs. GPS auto-optimize is not live — order stops by drive time.",
+        1
+      ),
+      task(
+        "Set recurring service plan: {{lead.title}}",
+        "If this is ongoing service, open Recurring plans. Set monthly, quarterly, or seasonal (mosquito/termite/rodent). Use skip-until for vacation holds. Turn seasonal off in the off-season.",
+        1
+      ),
+      task(
+        "Access and safety notes: {{lead.title}}",
+        "On Access, log entry method, pets, kids, aquariums, gardens, and allergy notes. Gate/lockbox codes stay on Access — do not paste them into Luna chat.",
+        1
+      ),
+      email(
+        "You are on the pest control schedule — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thanks for approving. We will confirm the visit window and any prep (pets inside, kids away from treated areas). If this is a recurring plan, visits will follow the schedule we set.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Pest: Treatment log, stock, and mileage",
+    description:
+      "When In Progress, log chemicals, route miles, and receipts.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Log treatment and guarantee: {{lead.title}}",
+        "On Treatments, log product, EPA number, method, quantity, target pest, and area. Set guarantee days for free re-treatment. Check chemical/bait/trap stock in Inventory. Log mileage for the tax deduction. OCR is not auto-filled. GPS auto-track is not live.",
+        0
+      ),
+      email(
+        "Tech update from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We are on the way or on site for your treatment. Please keep pets and children away from treated areas until we say it is safe. Reply to this email with questions.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Pest: Punch list and callbacks",
+    description: "On Punch List, note leftover entry points and callbacks.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Follow-up and re-treatment window: {{lead.title}}",
+        "Note leftover entry points on the contact. If pests return inside the guarantee, mark the treatment re-treatment due on Treatments. Watch license renewals on Field ops.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Pest: Invoice, books, and reviews",
+    description: "When Closed, invoice the visit or plan and close books.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice visit or recurring cycle: {{lead.title}}",
+        "Invoice the job or let Recurring plans auto-draft. Check AR aging and reminders. Review route profit and recurring revenue on Field ops.",
+        1
+      ),
+      task(
+        "Books, tax set-aside, and history: {{lead.title}}",
+        "Log chemical supplier bills in Books. Field ops shows income vs expenses, mileage, and a 30% tax set-aside hint. Save pest/treatment history on the contact. Flag negative reviews.",
+        1
+      ),
+      email(
+        "Thanks — invoice from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>The visit is complete. Your invoice is coming next. If pests return inside the guarantee window, reply and we will schedule a re-treatment.</p>"
+      ),
+    ],
+  },
+  {
+    name: "Pest: After contract signed (e-sign)",
+    description: "When an e-sign contract completes, kick off the visit and plan.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off pest job from signed contract",
+        "Create or update the job, set a recurring plan if ongoing, and capture access/safety notes (no codes in chat).",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Pest: After invoice sent",
+    description: "When an invoice is sent, follow AR.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on invoice payment",
+        "Watch aging. Flag re-treatment requests, license renewals, or negative reviews.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -1260,6 +1430,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   landscaping_lawn_care: LANDSCAPING_DEFAULT_WORKFLOWS,
   roofing_exterior_repair: ROOFING_DEFAULT_WORKFLOWS,
   painting_drywall: PAINTING_DEFAULT_WORKFLOWS,
+  pest_control: PEST_CONTROL_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -1288,6 +1459,12 @@ async function pruneForeignIndustryWorkflows(
       if (
         preset === "painting_drywall" &&
         name.startsWith("Painting & Drywall:")
+      ) {
+        return true;
+      }
+      if (
+        preset === "pest_control" &&
+        name.startsWith("Pest Control:")
       ) {
         return true;
       }

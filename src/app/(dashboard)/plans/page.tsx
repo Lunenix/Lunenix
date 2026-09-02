@@ -102,9 +102,10 @@ export default function RecurringPlansPage() {
       <div>
         <h1 className="text-3xl font-bold">Recurring plans</h1>
         <p className="text-muted-foreground">
-          Set visit frequency and a seasonal toggle. Due visits create a task
-          (and a draft invoice if auto-bill is on). Two-way texting is not live
-          — confirm by email.
+          Set visit frequency (including quarterly), skip until a date, and a
+          seasonal toggle (mosquito/termite/rodent season). Due visits create a
+          task (and a draft invoice if auto-bill is on). Two-way texting is not
+          live — confirm by email.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -178,6 +179,7 @@ export default function RecurringPlansPage() {
             <TableHead>Customer</TableHead>
             <TableHead>Frequency</TableHead>
             <TableHead>Next visit</TableHead>
+            <TableHead>Skip until</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Flags</TableHead>
           </TableRow>
@@ -185,7 +187,7 @@ export default function RecurringPlansPage() {
         <TableBody>
           {rows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground">
+              <TableCell colSpan={7} className="text-muted-foreground">
                 No recurring plans yet. Add weekly or seasonal service after a
                 contract is signed.
               </TableCell>
@@ -204,6 +206,18 @@ export default function RecurringPlansPage() {
                 {r.next_visit_on
                   ? new Date(r.next_visit_on).toLocaleDateString()
                   : "—"}
+              </TableCell>
+              <TableCell>
+                <Input
+                  type="date"
+                  className="h-8 w-36"
+                  defaultValue={r.skip_until ?? ""}
+                  key={`${r.id}-skip-${r.skip_until ?? "x"}`}
+                  title="Pause visit generation until this date"
+                  onBlur={(e) =>
+                    patch(r.id, { skip_until: e.target.value || null })
+                  }
+                />
               </TableCell>
               <TableCell>{formatCurrency(Number(r.amount))}</TableCell>
               <TableCell className="space-x-2 text-sm">

@@ -6,6 +6,7 @@ import {
   isOpenClaimStatus,
   isOpenMaterialOrderStatus,
   isOpenHoaColorStatus,
+  daysUntil,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -36,6 +37,8 @@ export async function GET(request: Request) {
     materials,
     finishSpecs,
     hoaRows,
+    treatments,
+    techs,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -71,7 +74,7 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("service_plans")
-      .select("name, frequency, amount, is_active, seasonal_on, next_visit_on")
+      .select("name, frequency, amount, is_active, seasonal_on, next_visit_on, skip_until")
       .eq("workspace_id", workspaceId),
     supabase
       .from("insurance_claims")
@@ -89,6 +92,14 @@ export async function GET(request: Request) {
       .from("hoa_color_approvals")
       .select("id, status, scheme_notes")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("pest_treatments")
+      .select("id, product_name, status, retreatment_until, target_pest")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("technician_profiles")
+      .select("id, certifications, license_expires")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -104,6 +115,8 @@ export async function GET(request: Request) {
   const materialRows = materials.data ?? [];
   const specRows = finishSpecs.data ?? [];
   const hoaApprovals = hoaRows.data ?? [];
+  const treatmentRows = treatments.data ?? [];
+  const techRows = techs.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -116,7 +129,8 @@ export async function GET(request: Request) {
       p.is_active &&
       (p.frequency !== "seasonal" || p.seasonal_on) &&
       p.next_visit_on &&
-      String(p.next_visit_on).slice(0, 10) <= today
+      String(p.next_visit_on).slice(0, 10) <= today &&
+      !(p.skip_until && String(p.skip_until).slice(0, 10) >= today)
   );
 
   const paid = inv
@@ -248,6 +262,25 @@ export async function GET(request: Request) {
           kind: "color_unsigned",
           label: `Color not signed off: ${s.room_or_surface}`,
           href: "/colors",
+        })),
+      ...treatmentRows
+        .filter((t) => String(t.status) === "retreatment_due")
+        .map((t) => ({
+          kind: "retreatment",
+          label: `Re-treatment: ${t.target_pest || t.product_name}`,
+          href: "/treatments",
+        })),
+      ...techRows
+        .filter((t) => {
+          const d = daysUntil(t.license_expires);
+          return d !== null && d <= 30;
+        })
+        .map((t) => ({
+          kind: "license_renewal",
+          label: `Applicator license ${
+            daysUntil(t.license_expires)! < 0 ? "expired" : "renews soon"
+          }${t.certifications ? `: ${t.certifications}` : ""}`,
+          href: "/team",
         })),
     ],
   });
