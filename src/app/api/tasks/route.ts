@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
   if (body.project_id) countQuery = countQuery.eq("project_id", body.project_id);
   const { count } = await countQuery;
 
-  let contactId: string | null = body.contact_id ?? null;
+  const contactId: string | null = body.contact_id ?? null;
   if (contactId) {
     const { data: client } = await auth.supabase
       .from("contacts")
