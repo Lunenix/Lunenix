@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
-import { PERMIT_STATUSES } from "@/lib/fieldService";
+import { PERMIT_KINDS, PERMIT_STATUSES } from "@/lib/fieldService";
 
 export async function GET(request: Request) {
   const auth = await verifyWorkspaceAccess(request);
@@ -40,10 +40,9 @@ export async function POST(request: NextRequest) {
         typeof body.permit_number === "string"
           ? body.permit_number.trim() || null
           : null,
-      kind:
-        body.kind === "hoa" || body.kind === "other" || body.kind === "city"
-          ? body.kind
-          : "city",
+      kind: (PERMIT_KINDS as readonly string[]).includes(body.kind)
+        ? body.kind
+        : "city",
       status,
       pulled_on: body.pulled_on || (status === "pulled" ? new Date().toISOString().slice(0, 10) : null),
       approved_on:

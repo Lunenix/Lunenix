@@ -55,9 +55,8 @@ export const INDUSTRY_SECTORS: IndustrySector[] = [
     label: "Home & Field Services",
     verticals: [
       { value: "cleaning_services", label: "Cleaning Services" },
-      { value: "contractors_construction", label: "Contractors & Construction" },
+      { value: "contractors_construction", label: "General Contractors & Construction" },
       { value: "electrician", label: "Electrician" },
-      { value: "general_contractor", label: "General Contractor" },
       { value: "handyman", label: "Handyman" },
       { value: "hvac", label: "HVAC" },
       { value: "inspection_service", label: "Inspection Service" },
@@ -137,6 +136,7 @@ export const LEGACY_INDUSTRY_PRESET_MAP: Record<string, string> = {
   bridal: "bridal_shop",
   mobile_bar: "mobile_bartending",
   contractor: "contractors_construction",
+  general_contractor: "contractors_construction",
   creative: "graphic_designer",
   general: CUSTOM_INDUSTRY_PRESET,
 };

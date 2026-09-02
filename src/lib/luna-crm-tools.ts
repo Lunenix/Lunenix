@@ -958,6 +958,139 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_construction_change_orders",
+    description:
+      "List construction change orders (title, status, cost impact). Does not return payment cards.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_construction_change_order",
+    description:
+      "Log a change order. Extra work should wait until status is approved.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        status: {
+          type: "string",
+          description: "draft, sent, approved, or rejected",
+        },
+        cost_impact: { type: "number" },
+        notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_construction_subs",
+    description:
+      "List subcontractors (name, trade, COI date). Does not return license numbers.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_construction_sub",
+    description:
+      "Add a subcontractor. Do not store license or policy numbers.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        trade: {
+          type: "string",
+          description:
+            "electrical, plumbing, hvac, concrete, framing, roofing, or other",
+        },
+        phone: { type: "string" },
+        email: { type: "string" },
+        coi_expires: { type: "string", description: "YYYY-MM-DD" },
+        rate_notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_construction_phases",
+    description: "List project phases (kind, status, delay cause).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_construction_phase",
+    description: "Add a construction phase on a job.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          description:
+            "demo, foundation, framing, rough_in, drywall, or finish",
+        },
+        status: {
+          type: "string",
+          description: "planned, in_progress, delayed, or complete",
+        },
+        delay_cause: {
+          type: "string",
+          description: "weather, permit, material, sub_no_show, or other",
+        },
+        percent_complete: { type: "number" },
+        starts_on: { type: "string", description: "YYYY-MM-DD" },
+        ends_on: { type: "string", description: "YYYY-MM-DD" },
+        project_name: { type: "string" },
+        sub_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_construction_daily_logs",
+    description: "List daily job-site logs (date, weather, work completed).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_construction_daily_log",
+    description: "Log a daily job-site entry (not a payroll timesheet).",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        logged_on: { type: "string", description: "YYYY-MM-DD" },
+        weather: { type: "string" },
+        crew_notes: { type: "string" },
+        work_completed: { type: "string" },
+        issues: { type: "string" },
+        safety_notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_construction_draws",
+    description:
+      "List deposit/progress/retainage draws and lien waiver status. Does not return cards.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_construction_draw",
+    description:
+      "Log a draw. Deposit is an amount only. Do not collect card numbers.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          description: "deposit, progress, or retainage",
+        },
+        status: { type: "string", description: "draft, sent, or paid" },
+        amount: { type: "number" },
+        percent_complete: { type: "number" },
+        due_on: { type: "string", description: "YYYY-MM-DD" },
+        lien_waiver: {
+          type: "string",
+          description: "needed, received, or not_required",
+        },
+        project_name: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",

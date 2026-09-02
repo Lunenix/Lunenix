@@ -61,6 +61,11 @@ import {
   Warehouse,
   CalendarRange,
   Cog,
+  FilePen,
+  UsersRound,
+  ChartGantt,
+  Notebook,
+  Landmark,
 } from "lucide-react";
 
 const coreNav = [
@@ -77,6 +82,11 @@ const fieldNav = [
   { href: "/books", label: "Books", icon: BookOpen },
   { href: "/mileage", label: "Mileage", icon: MapPin },
   { href: "/permits", label: "Permits", icon: ClipboardList },
+  { href: "/change-orders", label: "Change orders", icon: FilePen },
+  { href: "/subs", label: "Subs", icon: UsersRound },
+  { href: "/phases", label: "Phases", icon: ChartGantt },
+  { href: "/daily-logs", label: "Daily logs", icon: Notebook },
+  { href: "/draws", label: "Draws", icon: Landmark },
   { href: "/claims", label: "Claims", icon: Shield },
   { href: "/materials", label: "Materials", icon: Truck },
   { href: "/colors", label: "Colors", icon: Palette },

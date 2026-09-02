@@ -1290,3 +1290,78 @@ export interface RentalMaintenance {
   created_at: string;
   asset?: { id: string; name: string } | null;
 }
+
+export interface ConstructionChangeOrder {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  title: string;
+  status: string;
+  cost_impact: number;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface ConstructionSub {
+  id: string;
+  workspace_id: string;
+  name: string;
+  trade: string;
+  phone: string | null;
+  email: string | null;
+  coi_expires: string | null;
+  license_expires: string | null;
+  rate_notes: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ConstructionPhase {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  sub_id: string | null;
+  kind: string;
+  status: string;
+  percent_complete: number;
+  delay_cause: string | null;
+  depends_on: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+  sub?: { id: string; name: string } | null;
+}
+
+export interface ConstructionDailyLog {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  logged_on: string;
+  weather: string | null;
+  crew_notes: string | null;
+  work_completed: string | null;
+  issues: string | null;
+  safety_notes: string | null;
+  photo_url: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface ConstructionDraw {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  kind: string;
+  status: string;
+  amount: number;
+  percent_complete: number;
+  due_on: string | null;
+  lien_waiver: string;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}

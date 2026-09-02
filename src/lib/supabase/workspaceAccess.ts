@@ -104,6 +104,11 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "rental_reservations",
   "rental_condition_logs",
   "rental_maintenance",
+  "construction_change_orders",
+  "construction_subs",
+  "construction_phases",
+  "construction_daily_logs",
+  "construction_draws",
 ]);
 
 /**

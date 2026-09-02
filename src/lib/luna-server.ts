@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES, CHANGE_ORDER_STATUSES, SUB_TRADES, PHASE_KINDS, PHASE_STATUSES, DELAY_CAUSES, DRAW_KINDS, DRAW_STATUSES, LIEN_WAIVER_STATUSES } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -5253,6 +5253,357 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Logged maintenance ${data.title} as ${data.status}.`
+      );
+    }
+
+    if (name === "list_construction_change_orders") {
+      const { data, error } = await supabase
+        .from("construction_change_orders")
+        .select("title, status, cost_impact")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (c: { title: string; status: string; cost_impact: number }) =>
+          `${c.title}: ${c.status} (impact ${c.cost_impact})`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No change orders in this workspace.",
+      };
+    }
+
+    if (name === "log_construction_change_order") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a change-order title." };
+      const stRaw = argString(args, "status") || "draft";
+      const status = (CHANGE_ORDER_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "draft";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("construction_change_orders")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          title: title.slice(0, 200),
+          status,
+          cost_impact: Number(args.cost_impact) || 0,
+          notes: argString(args, "notes"),
+        })
+        .select("title, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that change order." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged change order ${data.title} as ${data.status}. Extra work waits on approval.`
+      );
+    }
+
+    if (name === "list_construction_subs") {
+      const { data, error } = await supabase
+        .from("construction_subs")
+        .select("name, trade, coi_expires")
+        .eq("workspace_id", workspace_id)
+        .order("name")
+        .limit(40);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (s: { name: string; trade: string; coi_expires: string | null }) =>
+          `${s.name} (${s.trade})${s.coi_expires ? `, COI ${s.coi_expires}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} License numbers are not spoken.`
+          : "No subcontractors in this workspace.",
+      };
+    }
+
+    if (name === "log_construction_sub") {
+      const subName = argString(args, "name");
+      if (!subName) return { error: "Need a subcontractor name." };
+      const tradeRaw = argString(args, "trade") || "other";
+      const trade = (SUB_TRADES as readonly string[]).includes(tradeRaw)
+        ? tradeRaw
+        : "other";
+      const { data, error } = await supabase
+        .from("construction_subs")
+        .insert({
+          workspace_id,
+          name: subName.slice(0, 200),
+          trade,
+          phone: argString(args, "phone"),
+          email: argString(args, "email"),
+          coi_expires: argString(args, "coi_expires"),
+          rate_notes: argString(args, "rate_notes"),
+        })
+        .select("name, trade")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not save that sub." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged sub ${data.name} (${data.trade}). Do not store license numbers here.`
+      );
+    }
+
+    if (name === "list_construction_phases") {
+      const { data, error } = await supabase
+        .from("construction_phases")
+        .select("kind, status, delay_cause")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (p: {
+          kind: string;
+          status: string;
+          delay_cause: string | null;
+        }) =>
+          `${p.kind}: ${p.status}${p.delay_cause ? ` (${p.delay_cause})` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No construction phases in this workspace.",
+      };
+    }
+
+    if (name === "log_construction_phase") {
+      const kindRaw = argString(args, "kind") || "finish";
+      const kind = (PHASE_KINDS as readonly string[]).includes(kindRaw)
+        ? kindRaw
+        : "finish";
+      const stRaw = argString(args, "status") || "planned";
+      const status = (PHASE_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "planned";
+      const delayRaw = argString(args, "delay_cause");
+      const delay_cause =
+        delayRaw && (DELAY_CAUSES as readonly string[]).includes(delayRaw)
+          ? delayRaw
+          : null;
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      let subId: string | null = null;
+      const subRef = argString(args, "sub_name");
+      if (subRef) {
+        const { data: found } = await supabase
+          .from("construction_subs")
+          .select("id, name")
+          .eq("workspace_id", workspace_id)
+          .ilike("name", `%${subRef}%`)
+          .limit(5);
+        if (!found?.length) {
+          return { error: "I could not find that sub in this workspace." };
+        }
+        if (found.length > 1) {
+          return {
+            error: `Which sub: ${found.map((s: { name: string }) => s.name).join(", ")}?`,
+          };
+        }
+        subId = found[0].id;
+      }
+      const { data, error } = await supabase
+        .from("construction_phases")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          sub_id: subId,
+          kind,
+          status,
+          delay_cause,
+          percent_complete: Number(args.percent_complete) || 0,
+          starts_on: argString(args, "starts_on"),
+          ends_on: argString(args, "ends_on"),
+        })
+        .select("kind, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that phase." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.kind} phase as ${data.status}.`
+      );
+    }
+
+    if (name === "list_construction_daily_logs") {
+      const { data, error } = await supabase
+        .from("construction_daily_logs")
+        .select("logged_on, weather, work_completed")
+        .eq("workspace_id", workspace_id)
+        .order("logged_on", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (l: {
+          logged_on: string;
+          weather: string | null;
+          work_completed: string | null;
+        }) =>
+          `${l.logged_on}${l.weather ? ` ${l.weather}` : ""}${
+            l.work_completed ? `: ${l.work_completed}` : ""
+          }`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No daily logs in this workspace.",
+      };
+    }
+
+    if (name === "log_construction_daily_log") {
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("construction_daily_logs")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          logged_on:
+            argString(args, "logged_on") ||
+            new Date().toISOString().slice(0, 10),
+          weather: argString(args, "weather"),
+          crew_notes: argString(args, "crew_notes"),
+          work_completed: argString(args, "work_completed"),
+          issues: argString(args, "issues"),
+          safety_notes: argString(args, "safety_notes"),
+        })
+        .select("logged_on")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that day." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged job site notes for ${data.logged_on}.`
+      );
+    }
+
+    if (name === "list_construction_draws") {
+      const { data, error } = await supabase
+        .from("construction_draws")
+        .select("kind, status, amount, lien_waiver")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (d: {
+          kind: string;
+          status: string;
+          amount: number;
+          lien_waiver: string;
+        }) => `${d.kind}: ${d.status} (${d.amount}, waiver ${d.lien_waiver})`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} Card numbers are not stored.`
+          : "No draws in this workspace.",
+      };
+    }
+
+    if (name === "log_construction_draw") {
+      const kindRaw = argString(args, "kind") || "progress";
+      const kind = (DRAW_KINDS as readonly string[]).includes(kindRaw)
+        ? kindRaw
+        : "progress";
+      const stRaw = argString(args, "status") || "draft";
+      const status = (DRAW_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "draft";
+      const lienRaw = argString(args, "lien_waiver") || "needed";
+      const lien_waiver = (LIEN_WAIVER_STATUSES as readonly string[]).includes(
+        lienRaw
+      )
+        ? lienRaw
+        : "needed";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("construction_draws")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          kind,
+          status,
+          amount: Number(args.amount) || 0,
+          percent_complete: Number(args.percent_complete) || 0,
+          due_on: argString(args, "due_on"),
+          lien_waiver,
+          notes: argString(args, "notes"),
+        })
+        .select("kind, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that draw." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.kind} draw as ${data.status}. Amount only — no cards.`
       );
     }
 

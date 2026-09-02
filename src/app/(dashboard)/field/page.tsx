@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { isConstructionWorkspace } from "@/lib/fieldService";
 
 type Overview = {
   estimates: { draft: number; sent: number; approved: number };
@@ -76,14 +77,16 @@ export default function FieldOpsPage() {
       <div>
         <h1 className="text-3xl font-bold">Field operations</h1>
         <p className="text-muted-foreground">
-          Lead → visit → photos → estimate → job / recurring plan → invoice.
-          Rental workspaces track assets on Fleet and Rentals instead of jobs
-          as the core loop. Email customers from Estimates. Two-way SMS needs a
-          text provider later. Receipt OCR is not auto-filled. Ask Luna for
-          weather before dispatch; toggle weather hold on Jobs. Roofing: Claims
-          and Materials. Painting: Colors and Prep. Pest: Treatments, Access,
-          Recurring. Inspection: Findings, Reports, Add-ons. Rental: Fleet,
-          Rentals, Maintenance.
+          {isConstructionWorkspace(activeWorkspace.industry_preset)
+            ? "Lead → site visit → photos → bid → contract → permits/phases/subs → daily logs and draws → punch → close. Change orders need approval before extra work."
+            : "Lead → visit → photos → estimate → job / recurring plan → invoice. Rental workspaces track assets on Fleet and Rentals instead of jobs as the core loop."}{" "}
+          Email customers from Estimates. Two-way SMS needs a text provider
+          later. Receipt OCR is not auto-filled. Ask Luna for weather before
+          dispatch; toggle weather hold on Jobs. Roofing: Claims and Materials.
+          Painting: Colors and Prep. Pest: Treatments, Access, Recurring.
+          Inspection: Findings, Reports, Add-ons. Rental: Fleet, Rentals,
+          Maintenance. General contractors: Change orders, Subs, Phases, Daily
+          logs, Draws, plus Permits and Materials.
         </p>
       </div>
 
@@ -219,6 +222,21 @@ export default function FieldOpsPage() {
         </Button>
         <Button asChild variant="outline">
           <Link href="/maintenance">Maintenance</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/change-orders">Change orders</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/subs">Subs</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/phases">Phases</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/daily-logs">Daily logs</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/draws">Draws</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/plans">Recurring</Link>

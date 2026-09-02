@@ -1,6 +1,7 @@
 import {
   industryDisplayLabel,
   industrySectorId,
+  resolveIndustryPreset,
 } from "@/lib/industryVerticals";
 
 /** Default estimate/job type from the workspace vertical — never hardcode HVAC. */
@@ -24,7 +25,13 @@ export function isRoofingWorkspace(industryPreset?: string | null): boolean {
 }
 
 export function isRentalWorkspace(industryPreset?: string | null): boolean {
-  return industryPreset === "rental_company";
+  return resolveIndustryPreset(industryPreset) === "rental_company";
+}
+
+export function isConstructionWorkspace(
+  industryPreset?: string | null
+): boolean {
+  return resolveIndustryPreset(industryPreset) === "contractors_construction";
 }
 
 export const CLAIM_STATUSES = [
@@ -92,6 +99,9 @@ export const MATERIAL_TYPES = [
   "chemical",
   "bait",
   "trap",
+  "lumber",
+  "concrete",
+  "fixture",
   "other",
 ] as const;
 export type MaterialType = (typeof MATERIAL_TYPES)[number];
@@ -106,6 +116,9 @@ export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
   chemical: "Chemical / product",
   bait: "Bait",
   trap: "Trap / station",
+  lumber: "Lumber",
+  concrete: "Concrete",
+  fixture: "Fixture / finish",
   other: "Other",
 };
 
@@ -122,6 +135,9 @@ export const ESTIMATE_PHOTO_KINDS = [
   "finding",
   "thermal",
   "moisture",
+  "progress",
+  "existing",
+  "concealed",
 ] as const;
 export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
 export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
@@ -137,6 +153,9 @@ export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
   finding: "Finding",
   thermal: "Thermal",
   moisture: "Moisture",
+  progress: "Progress",
+  existing: "Existing conditions",
+  concealed: "Before covering",
 };
 
 export const ROOFING_LEAD_SOURCES = [
@@ -176,6 +195,15 @@ export const RENTAL_LEAD_SOURCES = [
   "Contractor account",
 ] as const;
 
+export const CONSTRUCTION_LEAD_SOURCES = [
+  "Referral",
+  "Bid invite",
+  "Repeat client",
+  "Remodel",
+  "Addition",
+  "New build",
+] as const;
+
 export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
   new Set([
     ...ROOFING_LEAD_SOURCES,
@@ -183,6 +211,7 @@ export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
     ...PEST_LEAD_SOURCES,
     ...INSPECTION_LEAD_SOURCES,
     ...RENTAL_LEAD_SOURCES,
+    ...CONSTRUCTION_LEAD_SOURCES,
   ])
 );
 
@@ -531,6 +560,122 @@ export function lateFeeAmount(
   return Math.round(lateDays * (Number(dailyRate) || 0) * 100) / 100;
 }
 
+export const CHANGE_ORDER_STATUSES = [
+  "draft",
+  "sent",
+  "approved",
+  "rejected",
+] as const;
+export type ChangeOrderStatus = (typeof CHANGE_ORDER_STATUSES)[number];
+export const CHANGE_ORDER_STATUS_LABELS: Record<ChangeOrderStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+export function isOpenChangeOrderStatus(status: string): boolean {
+  return ["draft", "sent"].includes(status);
+}
+
+export const SUB_TRADES = [
+  "electrical",
+  "plumbing",
+  "hvac",
+  "concrete",
+  "framing",
+  "roofing",
+  "other",
+] as const;
+export type SubTrade = (typeof SUB_TRADES)[number];
+export const SUB_TRADE_LABELS: Record<SubTrade, string> = {
+  electrical: "Electrical",
+  plumbing: "Plumbing",
+  hvac: "HVAC",
+  concrete: "Concrete",
+  framing: "Framing",
+  roofing: "Roofing",
+  other: "Other",
+};
+
+export const PHASE_KINDS = [
+  "demo",
+  "foundation",
+  "framing",
+  "rough_in",
+  "drywall",
+  "finish",
+] as const;
+export type PhaseKind = (typeof PHASE_KINDS)[number];
+export const PHASE_KIND_LABELS: Record<PhaseKind, string> = {
+  demo: "Demo",
+  foundation: "Foundation",
+  framing: "Framing",
+  rough_in: "Rough-in",
+  drywall: "Drywall",
+  finish: "Finish",
+};
+
+export const PHASE_STATUSES = [
+  "planned",
+  "in_progress",
+  "delayed",
+  "complete",
+] as const;
+export type PhaseStatus = (typeof PHASE_STATUSES)[number];
+export const PHASE_STATUS_LABELS: Record<PhaseStatus, string> = {
+  planned: "Planned",
+  in_progress: "In progress",
+  delayed: "Delayed",
+  complete: "Complete",
+};
+
+export const DELAY_CAUSES = [
+  "weather",
+  "permit",
+  "material",
+  "sub_no_show",
+  "other",
+] as const;
+export type DelayCause = (typeof DELAY_CAUSES)[number];
+export const DELAY_CAUSE_LABELS: Record<DelayCause, string> = {
+  weather: "Weather",
+  permit: "Permit delay",
+  material: "Material delay",
+  sub_no_show: "Sub no-show",
+  other: "Other",
+};
+
+export const DRAW_KINDS = ["deposit", "progress", "retainage"] as const;
+export type DrawKind = (typeof DRAW_KINDS)[number];
+export const DRAW_KIND_LABELS: Record<DrawKind, string> = {
+  deposit: "Deposit",
+  progress: "Progress / phase draw",
+  retainage: "Final / retainage",
+};
+
+export const DRAW_STATUSES = ["draft", "sent", "paid"] as const;
+export type DrawStatus = (typeof DRAW_STATUSES)[number];
+export const DRAW_STATUS_LABELS: Record<DrawStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  paid: "Paid",
+};
+
+export const LIEN_WAIVER_STATUSES = [
+  "needed",
+  "received",
+  "not_required",
+] as const;
+export type LienWaiverStatus = (typeof LIEN_WAIVER_STATUSES)[number];
+export const LIEN_WAIVER_STATUS_LABELS: Record<LienWaiverStatus, string> = {
+  needed: "Waiver needed",
+  received: "Waiver received",
+  not_required: "Not required",
+};
+export function isOpenDrawStatus(status: string): boolean {
+  return status === "sent";
+}
+
 export const ACCESS_ENTRY_METHODS = [
   "occupant",
   "gate",
@@ -615,11 +760,23 @@ export function isOpenPermitStatus(status: string): boolean {
   );
 }
 
-export const PERMIT_KINDS = ["city", "hoa", "other"] as const;
+export const PERMIT_KINDS = [
+  "city",
+  "hoa",
+  "building",
+  "electrical",
+  "plumbing",
+  "mechanical",
+  "other",
+] as const;
 export type PermitKind = (typeof PERMIT_KINDS)[number];
 export const PERMIT_KIND_LABELS: Record<PermitKind, string> = {
   city: "City / county",
   hoa: "HOA",
+  building: "Building",
+  electrical: "Electrical",
+  plumbing: "Plumbing",
+  mechanical: "Mechanical",
   other: "Other",
 };
 

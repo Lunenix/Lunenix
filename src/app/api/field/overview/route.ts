@@ -10,6 +10,8 @@ import {
   isPendingInspectionReport,
   isOpenAddonStatus,
   isOpenReservationStatus,
+  isOpenChangeOrderStatus,
+  isOpenDrawStatus,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -47,6 +49,10 @@ export async function GET(request: Request) {
     rentalAssets,
     rentalReservations,
     rentalMaint,
+    changeOrders,
+    constructionSubs,
+    constructionPhases,
+    constructionDraws,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -128,6 +134,22 @@ export async function GET(request: Request) {
       .from("rental_maintenance")
       .select("id, title, status, due_on")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("construction_change_orders")
+      .select("id, title, status, cost_impact")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("construction_subs")
+      .select("id, name, coi_expires, license_expires")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("construction_phases")
+      .select("id, kind, status, delay_cause")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("construction_draws")
+      .select("id, kind, status, amount, due_on, lien_waiver")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -150,6 +172,10 @@ export async function GET(request: Request) {
   const fleetRows = rentalAssets.data ?? [];
   const rentalRows = rentalReservations.data ?? [];
   const maintRows = rentalMaint.data ?? [];
+  const changeRows = changeOrders.data ?? [];
+  const subRows = constructionSubs.data ?? [];
+  const phaseRows = constructionPhases.data ?? [];
+  const drawRows = constructionDraws.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -441,6 +467,49 @@ export async function GET(request: Request) {
           kind: "low_availability",
           label: `No units available: ${cat}`,
           href: "/fleet",
+        })),
+      ...changeRows
+        .filter((c) => isOpenChangeOrderStatus(String(c.status)))
+        .map((c) => ({
+          kind: "change_order",
+          label: `Change order ${c.status}: ${c.title}`,
+          href: "/change-orders",
+        })),
+      ...subRows
+        .filter((s) => {
+          const d = daysUntil(s.coi_expires);
+          return d !== null && d <= 30;
+        })
+        .map((s) => ({
+          kind: "coi_expiring",
+          label: `Sub COI ${
+            daysUntil(s.coi_expires)! < 0 ? "expired" : "expires soon"
+          }: ${s.name}`,
+          href: "/subs",
+        })),
+      ...phaseRows
+        .filter((p) => String(p.status) === "delayed")
+        .map((p) => ({
+          kind: "phase_delayed",
+          label: `Phase delayed${p.delay_cause ? ` (${p.delay_cause})` : ""}: ${p.kind}`,
+          href: "/phases",
+        })),
+      ...drawRows
+        .filter((d) => isOpenDrawStatus(String(d.status)))
+        .map((d) => ({
+          kind: "draw_open",
+          label: `Draw sent: ${d.kind}`,
+          href: "/draws",
+        })),
+      ...drawRows
+        .filter(
+          (d) =>
+            String(d.status) !== "paid" && String(d.lien_waiver) === "needed"
+        )
+        .map((d) => ({
+          kind: "lien_waiver",
+          label: `Lien waiver needed: ${d.kind}`,
+          href: "/draws",
         })),
     ],
   });

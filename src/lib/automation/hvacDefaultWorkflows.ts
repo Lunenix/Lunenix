@@ -1682,6 +1682,148 @@ export const RENTAL_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * General Contractors & Construction default automations.
+ * Change orders, subs, phases, draws. contractors_construction only.
+ */
+export const CONSTRUCTION_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Build: New lead",
+    description:
+      "When a new lead is created, capture referral vs bid invite vs repeat vs project type.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New construction lead: {{lead.title}}",
+        "Set lead source: referral, bid invite, repeat client, remodel, addition, or new build. Capture name, phone, email, address, scope, and budget range. Email to book a site visit. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your project inquiry. Reply with the address, a few visit times, and a short scope or budget range.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Build: Schedule site visit",
+    description:
+      "On Site Visit, book the consultation on the calendar with the address.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule site visit: {{lead.title}}",
+        "Confirm date/time, address, source, scope, budget range. Add to the calendar with the address. Send confirmation and a reminder. Two-way texting is not live. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Your site visit is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you on the calendar for a site visit. Reply to this email if the time or address changes.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Build: Bid and estimate",
+    description:
+      "On Estimate Sent, send a line-item bid (labor, materials, subs, margin).",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Send bid: {{lead.title}}",
+        "On Estimates, build labor/materials/subs line items and margin. Upload existing-condition photos (kind existing or measurement). Email the bid. Approval creates the job.",
+        0
+      ),
+      email(
+        "Your bid from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your bid is ready. Please review the line items and reply to approve. We will send a contract next.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Build: Contract, permits, and phases",
+    description:
+      "After Contract Signed, e-sign the contract, log permits, and set the phase schedule.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Contract and kickoff: {{lead.title}}",
+        "Send the e-sign contract (scope, payment schedule, timeline). On Permits, log building/electrical/plumbing/mechanical as needed. On Phases, set demo through finish. On Draws, log the deposit. Check sub COIs on Subs. Do not paste license numbers into Luna.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Build: Active job",
+    description:
+      "When In Progress, run daily logs, subs, materials, and change orders.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Run the job: {{lead.title}}",
+        "On Daily logs, record weather, crew, work completed, and safety. Upload progress and before-covering photos on Estimates. Assign subs per phase. Order materials by phase. Change orders must be approved before extra work. OCR is not auto-filled. GPS auto-track is not live.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Build: Punch and inspections",
+    description:
+      "On Punch List, finish inspections and punch/warranty items.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Punch list and final inspections: {{lead.title}}",
+        "On Permits, confirm inspections passed. Walk punch items on the job. Keep warranty notes on the contact. Collect remaining lien waivers on Draws.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Build: Final draw, books, and margin",
+    description: "When Closed, collect retainage, books, and project margin.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Close-out draw and books: {{lead.title}}",
+        "Invoice retainage. Confirm lien waivers. Pay sub bills in Books. Compare budget vs actual and approved change-order impact on Field ops. Flag negative reviews.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Build: After contract signed (e-sign)",
+    description:
+      "When an e-sign contract completes, kick off permits and phases.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off job from signed contract",
+        "Create or update the job, log permits, set phases, assign crew/subs, and send the deposit draw.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Build: After invoice sent",
+    description:
+      "When an invoice or draw is sent, follow AR and lien waivers.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on draw / invoice",
+        "Watch aging. Confirm lien waiver status on Draws. Flag delayed permits, expired sub COIs, or jobs behind schedule.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -1725,6 +1867,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   pest_control: PEST_CONTROL_DEFAULT_WORKFLOWS,
   inspection_service: INSPECTION_DEFAULT_WORKFLOWS,
   rental_company: RENTAL_DEFAULT_WORKFLOWS,
+  contractors_construction: CONSTRUCTION_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -1771,6 +1914,22 @@ async function pruneForeignIndustryWorkflows(
       if (
         preset === "rental_company" &&
         name.startsWith("Rental Company:")
+      ) {
+        return true;
+      }
+      if (
+        preset === "contractors_construction" &&
+        (name.startsWith("Contractors & Construction:") ||
+          name.startsWith("General Contractor:") ||
+          name.startsWith("General Contractors & Construction:"))
+      ) {
+        return true;
+      }
+      if (
+        preset !== "contractors_construction" &&
+        (name.startsWith("General Contractor:") ||
+          name.startsWith("Contractors & Construction:") ||
+          name.startsWith("General Contractors & Construction:"))
       ) {
         return true;
       }
