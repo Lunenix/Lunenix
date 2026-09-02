@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
 import { buildTemplateContext } from "@/lib/email/buildTemplateContext";
 import { resolveTemplate } from "@/lib/email/smartFields";
 import { getAppBaseUrl } from "@/lib/esign/helpers";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 
 // nodemailer (SMTP path) needs the Node runtime.
 export const runtime = "nodejs";
@@ -34,15 +34,6 @@ interface Attachment {
  * Returns: { resolved: {subject, body}, warnings: [...], sent?, scheduled?, error? }
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await request.json();
   const {
     workspace_id,
@@ -91,6 +82,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const authed = await requireWorkspaceMember(workspace_id);
+  if ("error" in authed) return authed.error;
+  const { supabase, user, workspaceId } = authed;
+
   // Sending user's display name for {{user.name}}
   const { data: profile } = await supabase
     .from("profiles")
@@ -100,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   const baseUrl = getAppBaseUrl(request);
   const context = await buildTemplateContext({
-    workspaceId: workspace_id,
+    workspaceId,
     contactId: contact_id,
     projectId: project_id,
     invoiceId: invoice_id,
@@ -120,7 +115,7 @@ export async function POST(request: NextRequest) {
     const { data: settings } = await supabase
       .from("email_settings")
       .select("signature_html")
-      .eq("workspace_id", workspace_id)
+      .eq("workspace_id", workspaceId)
       .maybeSingle();
     if (settings?.signature_html) {
       finalBody = `${finalBody}<br><br>${settings.signature_html}`;
@@ -145,7 +140,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const { error: insErr } = await supabase.from("scheduled_emails").insert({
-      workspace_id,
+      workspace_id: workspaceId,
       contact_id,
       project_id,
       template_id,
@@ -170,7 +165,7 @@ export async function POST(request: NextRequest) {
 
   // Send now.
   const result = await sendServerEmail({
-    workspaceId: workspace_id,
+    workspaceId,
     to: recipient_email as string,
     toName: recipient_name,
     contactId: contact_id,

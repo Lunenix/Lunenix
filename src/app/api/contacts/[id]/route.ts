@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 
 /**
  * PATCH /api/contacts/[id]
- * Updates a contact. RLS enforces workspace membership.
+ * Updates a contact. Membership + workspace_id filter.
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authed = await requireWorkspaceRecord("contacts", params.id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const body = await request.json();
   const allowed = [
@@ -37,7 +33,8 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("contacts")
     .update(update)
-    .eq("id", params.id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .select("*")
     .single();
 
@@ -54,15 +51,15 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authed = await requireWorkspaceRecord("contacts", params.id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
-  const { error } = await supabase.from("contacts").delete().eq("id", params.id);
+  const { error } = await supabase
+    .from("contacts")
+    .delete()
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

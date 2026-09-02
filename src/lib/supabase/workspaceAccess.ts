@@ -71,6 +71,78 @@ export async function requireWorkspaceMember(
   return { supabase, user, workspaceId: id };
 }
 
+const WORKSPACE_SCOPED_TABLES = new Set([
+  "contacts",
+  "tasks",
+  "projects",
+  "invoices",
+  "contracts",
+  "leads",
+  "forms",
+  "email_templates",
+  "automation_workflows",
+]);
+
+/**
+ * Load a tenant row by id, then require membership on its workspace_id.
+ * Always pair later writes with `.eq("workspace_id", workspaceId)`.
+ */
+export async function requireWorkspaceRecord(
+  table: string,
+  recordId: string | null | undefined
+): Promise<(Authed & { recordId: string }) | { error: NextResponse }> {
+  if (!WORKSPACE_SCOPED_TABLES.has(table)) {
+    return {
+      error: NextResponse.json({ error: "Invalid resource" }, { status: 400 }),
+    };
+  }
+  const id = typeof recordId === "string" ? recordId.trim() : "";
+  if (!id) {
+    return {
+      error: NextResponse.json({ error: "Record id is required" }, { status: 400 }),
+    };
+  }
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+
+  const { data } = await supabase
+    .from(table)
+    .select("workspace_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  let workspaceId =
+    data && typeof data.workspace_id === "string" ? data.workspace_id : null;
+
+  if (!workspaceId && isSuperAdmin(user)) {
+    const { data: row } = await createAdminClient()
+      .from(table)
+      .select("workspace_id")
+      .eq("id", id)
+      .maybeSingle();
+    workspaceId =
+      row && typeof row.workspace_id === "string" ? row.workspace_id : null;
+  }
+
+  if (!workspaceId) {
+    return {
+      error: NextResponse.json({ error: "Not found" }, { status: 404 }),
+    };
+  }
+
+  const member = await requireWorkspaceMember(workspaceId);
+  if ("error" in member) return member;
+  return { ...member, recordId: id };
+}
+
 export type WorkspaceAuthed = Authed;
 
 /**

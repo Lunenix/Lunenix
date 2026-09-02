@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import type { EmailTemplate } from "@/types/database";
+import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/email-templates/[id]
@@ -10,21 +10,16 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("email_templates", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const { data: template, error } = await supabase
     .from("email_templates")
     .select("*")
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   if (error) {
@@ -43,16 +38,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("email_templates", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
   const body = await request.json();
 
   const updates: Partial<EmailTemplate> = {};
@@ -64,7 +53,8 @@ export async function PATCH(
   const { data: template, error } = await supabase
     .from("email_templates")
     .update(updates)
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .select()
     .single();
 
@@ -84,22 +74,17 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("email_templates", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   // System default templates are used by automations and cannot be deleted.
   const { data: existing } = await supabase
     .from("email_templates")
     .select("is_system_default")
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   if (existing?.is_system_default) {
@@ -112,7 +97,8 @@ export async function DELETE(
   const { error } = await supabase
     .from("email_templates")
     .delete()
-    .eq("id", id);
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId);
 
   if (error) {
     console.error("Error deleting email template:", error);

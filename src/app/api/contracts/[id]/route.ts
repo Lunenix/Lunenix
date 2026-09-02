@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
+import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/contracts/[id]
@@ -10,16 +10,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("contracts", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const { data: contract, error } = await supabase
     .from("contracts")
@@ -30,7 +24,8 @@ export async function GET(
       project:projects(id, name)
     `
     )
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   if (error) {
@@ -52,23 +47,18 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("contracts", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, user, workspaceId, recordId } = authed;
   const body = await req.json();
   
   // Fetch old contract to detect status change
   const { data: oldContract } = await supabase
     .from("contracts")
     .select("status, workspace_id")
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   // Build update object with only provided fields
@@ -91,7 +81,8 @@ export async function PATCH(
   const { data: contract, error } = await supabase
     .from("contracts")
     .update(updates)
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .select()
     .single();
 
@@ -106,13 +97,17 @@ export async function PATCH(
   // Trigger automation workflows if contract was just signed
   if (contract && oldContract && body.status !== undefined && 
       oldContract.status !== "signed" && contract.status === "signed") {
-    executeWorkflowsForTrigger("contract_signed", {
-      contract_id: contract.id,
-      contract,
-      contact_id: contract.contact_id,
-      project_id: contract.project_id,
-      user_id: user.id,
-    }, contract.workspace_id).catch((err) => {
+    executeWorkflowsForTrigger(
+      "contract_signed",
+      {
+        contract_id: contract.id,
+        contract,
+        contact_id: contract.contact_id,
+        project_id: contract.project_id,
+        user_id: user.id,
+      },
+      workspaceId
+    ).catch((err) => {
       console.error("Error executing contract_signed workflows:", err);
     });
   }
@@ -128,18 +123,16 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("contracts", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
-  const { error } = await supabase.from("contracts").delete().eq("id", id);
+  const { error } = await supabase
+    .from("contracts")
+    .delete()
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId);
 
   if (error) {
     console.error("Error deleting contract:", error);

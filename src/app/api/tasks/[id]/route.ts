@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
+import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 
 /**
  * PATCH /api/tasks/[id]
@@ -11,13 +11,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authed = await requireWorkspaceRecord("tasks", params.id);
+  if ("error" in authed) return authed.error;
+  const { supabase, user, workspaceId, recordId } = authed;
 
   const body = await request.json();
   const allowed = [
@@ -52,14 +48,13 @@ export async function PATCH(
     update.reminder_sent_at = null;
   }
 
-  // Fetch old task to detect completion
   const { data: oldTask } = await supabase
     .from("tasks")
     .select("status, workspace_id")
-    .eq("id", params.id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
-  // Keep completed_at in sync with status changes.
   if ("status" in body) {
     update.completed_at = body.status === "done" ? new Date().toISOString() : null;
   }
@@ -69,7 +64,7 @@ export async function PATCH(
       .from("contacts")
       .select("id")
       .eq("id", update.contact_id)
-      .eq("workspace_id", oldTask?.workspace_id)
+      .eq("workspace_id", workspaceId)
       .maybeSingle();
     if (!client?.id) {
       return NextResponse.json(
@@ -82,7 +77,8 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("tasks")
     .update(update)
-    .eq("id", params.id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .select(
       "*, project:projects(id, name), contact:contacts(id, type, first_name, last_name, organization_name, email)"
     )
@@ -91,20 +87,28 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  
-  // Trigger automation workflows if task was just completed
-  if (data && oldTask && "status" in update && 
-      oldTask.status !== "done" && data.status === "done") {
-    executeWorkflowsForTrigger("task_completed", {
-      task_id: data.id,
-      task: data,
-      project_id: data.project_id,
-      user_id: user.id,
-    }, data.workspace_id).catch((err) => {
+
+  if (
+    data &&
+    oldTask &&
+    "status" in update &&
+    oldTask.status !== "done" &&
+    data.status === "done"
+  ) {
+    executeWorkflowsForTrigger(
+      "task_completed",
+      {
+        task_id: data.id,
+        task: data,
+        project_id: data.project_id,
+        user_id: user.id,
+      },
+      workspaceId
+    ).catch((err) => {
       console.error("Error executing task_completed workflows:", err);
     });
   }
-  
+
   return NextResponse.json({ task: data });
 }
 
@@ -115,15 +119,15 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authed = await requireWorkspaceRecord("tasks", params.id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
-  const { error } = await supabase.from("tasks").delete().eq("id", params.id);
+  const { error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

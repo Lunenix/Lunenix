@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/forms/[id]
@@ -9,21 +9,16 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("forms", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const { data: form, error } = await supabase
     .from("forms")
     .select("*")
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   if (error) {
@@ -45,16 +40,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("forms", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
   const body = await req.json();
 
   // Build update object with only provided fields
@@ -74,7 +63,8 @@ export async function PATCH(
   const { data: form, error } = await supabase
     .from("forms")
     .update(updates)
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .select()
     .single();
 
@@ -97,46 +87,16 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
-
-  const { data: existing, error: loadError } = await supabase
-    .from("forms")
-    .select("id, workspace_id")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (loadError || !existing) {
-    return NextResponse.json({ error: "Form not found" }, { status: 404 });
-  }
-
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("user_id")
-    .eq("workspace_id", existing.workspace_id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!membership) {
-    return NextResponse.json(
-      { error: "You are not a member of this workspace" },
-      { status: 403 }
-    );
-  }
+  const authed = await requireWorkspaceRecord("forms", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const { error } = await supabase
     .from("forms")
     .delete()
-    .eq("id", id)
-    .eq("workspace_id", existing.workspace_id);
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId);
 
   if (error) {
     console.error("Error deleting form:", error);

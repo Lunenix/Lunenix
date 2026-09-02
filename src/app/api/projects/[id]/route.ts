@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/projects/[id]
@@ -9,18 +9,15 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authed = await requireWorkspaceRecord("projects", params.id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const { data, error } = await supabase
     .from("projects")
     .select("*, contact:contacts(*)")
-    .eq("id", params.id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
 
   if (error) {
@@ -34,19 +31,14 @@ export async function GET(
 
 /**
  * PATCH /api/projects/[id]
- * Updates a project. RLS enforces workspace membership.
  */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authed = await requireWorkspaceRecord("projects", params.id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const body = await request.json();
   const allowed = [
@@ -68,7 +60,8 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("projects")
     .update(update)
-    .eq("id", params.id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .select("*, contact:contacts(*)")
     .single();
 
@@ -85,15 +78,15 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authed = await requireWorkspaceRecord("projects", params.id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
-  const { error } = await supabase.from("projects").delete().eq("id", params.id);
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

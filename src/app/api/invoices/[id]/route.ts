@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
+import { requireWorkspaceRecord } from "@/lib/supabase/workspaceAccess";
 
 /**
  * GET /api/invoices/[id]
@@ -10,16 +10,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("invoices", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
   const { data: invoice, error } = await supabase
     .from("invoices")
@@ -31,7 +25,8 @@ export async function GET(
       project:projects(id, name)
     `
     )
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   if (error) {
@@ -53,23 +48,18 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("invoices", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, user, workspaceId, recordId } = authed;
   const body = await req.json();
   
   // Fetch old invoice to detect status change
   const { data: oldInvoice } = await supabase
     .from("invoices")
     .select("status, workspace_id")
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .single();
 
   // Build update object with only provided fields
@@ -116,7 +106,8 @@ export async function PATCH(
   const { data: invoice, error } = await supabase
     .from("invoices")
     .update(updates)
-    .eq("id", id)
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
     .select()
     .single();
 
@@ -131,13 +122,17 @@ export async function PATCH(
   // Trigger automation workflows if invoice was just sent
   if (invoice && oldInvoice && body.status !== undefined && 
       oldInvoice.status !== "sent" && invoice.status === "sent") {
-    executeWorkflowsForTrigger("invoice_sent", {
-      invoice_id: invoice.id,
-      invoice,
-      contact_id: invoice.contact_id,
-      project_id: invoice.project_id,
-      user_id: user.id,
-    }, invoice.workspace_id).catch((err) => {
+    executeWorkflowsForTrigger(
+      "invoice_sent",
+      {
+        invoice_id: invoice.id,
+        invoice,
+        contact_id: invoice.contact_id,
+        project_id: invoice.project_id,
+        user_id: user.id,
+      },
+      workspaceId
+    ).catch((err) => {
       console.error("Error executing invoice_sent workflows:", err);
     });
   }
@@ -153,18 +148,16 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id } = await params;
+  const authed = await requireWorkspaceRecord("invoices", id);
+  if ("error" in authed) return authed.error;
+  const { supabase, workspaceId, recordId } = authed;
 
-  const { error } = await supabase.from("invoices").delete().eq("id", id);
+  const { error } = await supabase
+    .from("invoices")
+    .delete()
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId);
 
   if (error) {
     console.error("Error deleting invoice:", error);

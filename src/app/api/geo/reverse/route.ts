@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireSuperAdmin } from "@/lib/auth/requireSuperAdmin";
 
 /**
  * Reverse-geocode lat/lng via Open-Meteo (no API key).
@@ -8,13 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gated = await requireSuperAdmin();
+  if ("error" in gated) return gated.error;
 
   const lat = Number(req.nextUrl.searchParams.get("lat"));
   const lon = Number(req.nextUrl.searchParams.get("lon"));

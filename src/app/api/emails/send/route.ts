@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import type { EmailLog } from "@/types/database";
 import { Resend } from "resend";
 
@@ -19,17 +19,12 @@ const DEFAULT_FROM_NAME = "Lunenix";
  * - Bulk: { workspace_id, emails: [{ contact_id?, recipient_email, recipient_name?, subject, body }] }
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await request.json();
   const { workspace_id, emails } = body;
+
+  const authed = await requireWorkspaceMember(workspace_id);
+  if ("error" in authed) return authed.error;
+  const { supabase, user, workspaceId } = authed;
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -40,18 +35,17 @@ export async function POST(request: NextRequest) {
   }
   const resend = new Resend(apiKey);
 
-  if (!workspace_id) {
+  if (!workspaceId) {
     return NextResponse.json(
       { error: "workspace_id is required" },
       { status: 400 }
     );
   }
 
-  // Fetch workspace email settings (from_email, from_name, reply_to)
   const { data: settings } = await supabase
     .from("email_settings")
     .select("*")
-    .eq("workspace_id", workspace_id)
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
 
   // Use workspace settings if configured, otherwise use platform defaults
@@ -78,7 +72,7 @@ export async function POST(request: NextRequest) {
           const { data: log } = await supabase
             .from("email_logs")
             .insert({
-              workspace_id,
+              workspace_id: workspaceId,
               contact_id: email.contact_id || null,
               template_id: email.template_id || null,
               recipient_email: email.recipient_email,
@@ -99,7 +93,7 @@ export async function POST(request: NextRequest) {
           const { data: log } = await supabase
             .from("email_logs")
             .insert({
-              workspace_id,
+              workspace_id: workspaceId,
               contact_id: email.contact_id || null,
               template_id: email.template_id || null,
               recipient_email: email.recipient_email,
@@ -168,7 +162,7 @@ export async function POST(request: NextRequest) {
   const { data: log, error } = await supabase
     .from("email_logs")
     .insert({
-      workspace_id,
+      workspace_id: workspaceId,
       contact_id: contact_id || null,
       template_id: template_id || null,
       recipient_email,

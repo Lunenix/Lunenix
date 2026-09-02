@@ -29,3 +29,6 @@ export async function requireSuperAdmin(): Promise<
   }
   return { user };
 }
+
+/** Same as requireSuperAdmin. Prefer this name in new Luna routes. */
+export const verifySuperAdmin = requireSuperAdmin;
