@@ -200,6 +200,8 @@ export interface Project {
   weather_hold?: boolean;
   weather_hold_reason?: string | null;
   work_phase?: string | null;
+  inspection_phase?: string | null;
+  closing_on?: string | null;
   created_at: string;
   updated_at: string;
   // Optional relations / computed fields for list + detail views.
@@ -848,7 +850,7 @@ export interface EstimatePhoto {
   estimate_id: string;
   file_url: string;
   caption: string | null;
-  kind?: "photo" | "drone" | "measurement" | "video" | "surface" | "swatch" | "prep" | "infestation" | "entry_point";
+  kind?: "photo" | "drone" | "measurement" | "video" | "surface" | "swatch" | "prep" | "infestation" | "entry_point" | "finding" | "thermal" | "moisture";
   created_at: string;
 }
 
@@ -922,6 +924,8 @@ export interface TechnicianProfile {
   available: boolean;
   certifications: string | null;
   license_expires: string | null;
+  eo_expires?: string | null;
+  ce_due_on?: string | null;
   notes: string | null;
 }
 
@@ -933,6 +937,7 @@ export interface InventoryItem {
   quantity: number;
   reorder_at: number;
   unit: string;
+  calibrated_on?: string | null;
 }
 
 export interface JobExpense {
@@ -1138,5 +1143,70 @@ export interface PropertyAccess {
     Contact,
     "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
   > | null;
+  project?: { id: string; name: string } | null;
+}
+
+export interface InspectionFinding {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  system: string;
+  title: string;
+  notes: string | null;
+  severity: string;
+  moisture_reading: string | null;
+  thermal_notes: string | null;
+  photo_url: string | null;
+  status: string;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+  contact?: Pick<
+    Contact,
+    "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
+  > | null;
+}
+
+export interface InspectionReport {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  title: string;
+  summary: string | null;
+  agent_name: string | null;
+  seller_agent_name: string | null;
+  property_type: string | null;
+  property_size: string | null;
+  closing_on: string | null;
+  due_at: string | null;
+  walkthrough_at: string | null;
+  share_token: string;
+  status: string;
+  ready_at: string | null;
+  sent_at: string | null;
+  viewed_at: string | null;
+  downloaded_at: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+  contact?: Pick<
+    Contact,
+    "id" | "first_name" | "last_name" | "organization_name" | "type" | "email"
+  > | null;
+}
+
+export interface InspectionAddon {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  kind: string;
+  status: string;
+  specialist_name: string | null;
+  result_summary: string | null;
+  due_on: string | null;
+  notes: string | null;
+  created_at: string;
   project?: { id: string; name: string } | null;
 }

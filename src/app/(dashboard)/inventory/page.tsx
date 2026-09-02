@@ -54,7 +54,8 @@ export default function InventoryPage() {
       <div>
         <h1 className="text-3xl font-bold">Inventory</h1>
         <p className="text-muted-foreground">
-          Stock check before a job. Low-stock rows are highlighted.
+          Stock check before a job. Low-stock rows are highlighted. Set
+          calibrated-on for meters and cameras.
         </p>
       </div>
       <div className="flex gap-2">
@@ -83,6 +84,7 @@ export default function InventoryPage() {
             <TableHead>Part</TableHead>
             <TableHead>Qty</TableHead>
             <TableHead>Reorder at</TableHead>
+            <TableHead>Calibrated</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -96,6 +98,24 @@ export default function InventoryPage() {
               <TableCell>{i.name}</TableCell>
               <TableCell>{i.quantity}</TableCell>
               <TableCell>{i.reorder_at}</TableCell>
+              <TableCell>
+                <input
+                  className="rounded border bg-background px-2 py-1 text-sm"
+                  type="date"
+                  defaultValue={i.calibrated_on ?? ""}
+                  key={`${i.id}-cal-${i.calibrated_on ?? "x"}`}
+                  onBlur={async (e) => {
+                    await fetch(`/api/inventory/${i.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        calibrated_on: e.target.value || null,
+                      }),
+                    });
+                    load();
+                  }}
+                />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -7,6 +7,8 @@ import {
   isOpenMaterialOrderStatus,
   isOpenHoaColorStatus,
   daysUntil,
+  isPendingInspectionReport,
+  isOpenAddonStatus,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -39,6 +41,8 @@ export async function GET(request: Request) {
     hoaRows,
     treatments,
     techs,
+    inspReports,
+    addons,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -46,7 +50,7 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("projects")
-      .select("id, name, status, urgent, due_date, budget, assignee_id, weather_hold")
+      .select("id, name, status, urgent, due_date, budget, assignee_id, weather_hold, inspection_phase, closing_on")
       .eq("workspace_id", workspaceId),
     supabase
       .from("invoices")
@@ -62,7 +66,7 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("inventory_items")
-      .select("id, name, quantity, reorder_at")
+      .select("id, name, quantity, reorder_at, calibrated_on")
       .eq("workspace_id", workspaceId),
     supabase
       .from("mileage_logs")
@@ -98,7 +102,15 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("technician_profiles")
-      .select("id, certifications, license_expires")
+      .select("id, certifications, license_expires, eo_expires, ce_due_on")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("inspection_reports")
+      .select("id, title, status, due_at")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("inspection_addons")
+      .select("id, kind, status, specialist_name")
       .eq("workspace_id", workspaceId),
   ]);
 
@@ -117,6 +129,8 @@ export async function GET(request: Request) {
   const hoaApprovals = hoaRows.data ?? [];
   const treatmentRows = treatments.data ?? [];
   const techRows = techs.data ?? [];
+  const reportRows = inspReports.data ?? [];
+  const addonRows = addons.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -277,10 +291,60 @@ export async function GET(request: Request) {
         })
         .map((t) => ({
           kind: "license_renewal",
-          label: `Applicator license ${
+          label: `License ${
             daysUntil(t.license_expires)! < 0 ? "expired" : "renews soon"
           }${t.certifications ? `: ${t.certifications}` : ""}`,
           href: "/team",
+        })),
+      ...techRows
+        .filter((t) => {
+          const d = daysUntil(t.eo_expires);
+          return d !== null && d <= 30;
+        })
+        .map((t) => ({
+          kind: "eo_renewal",
+          label: `E&O ${daysUntil(t.eo_expires)! < 0 ? "expired" : "renews soon"}`,
+          href: "/team",
+        })),
+      ...techRows
+        .filter((t) => {
+          const d = daysUntil(t.ce_due_on);
+          return d !== null && d <= 30;
+        })
+        .map((t) => ({
+          kind: "ce_due",
+          label: `CE ${daysUntil(t.ce_due_on)! < 0 ? "overdue" : "due soon"}`,
+          href: "/team",
+        })),
+      ...reportRows
+        .filter((r) => {
+          if (!isPendingInspectionReport(String(r.status)) || !r.due_at)
+            return false;
+          return String(r.due_at).slice(0, 10) < today;
+        })
+        .map((r) => ({
+          kind: "report_overdue",
+          label: `Report past due: ${r.title}`,
+          href: "/reports",
+        })),
+      ...addonRows
+        .filter((a) => isOpenAddonStatus(String(a.status)))
+        .map((a) => ({
+          kind: "addon_open",
+          label: `Add-on ${a.status.replace("_", " ")}: ${a.kind}${
+            a.specialist_name ? ` (${a.specialist_name})` : ""
+          }`,
+          href: "/addons",
+        })),
+      ...stock
+        .filter((s) => {
+          const d = daysUntil(s.calibrated_on);
+          return d !== null && d <= -365;
+        })
+        .map((s) => ({
+          kind: "calibration",
+          label: `Calibration overdue: ${s.name}`,
+          href: "/inventory",
         })),
     ],
   });

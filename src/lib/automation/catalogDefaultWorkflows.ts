@@ -38,6 +38,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "roofing_exterior_repair") return "Roofing:";
   if (resolved === "painting_drywall") return "Painting:";
   if (resolved === "pest_control") return "Pest:";
+  if (resolved === "inspection_service") return "Inspection:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;
@@ -838,5 +839,6 @@ export function fieldPresetUsesSharedPermits(preset: string): boolean {
   const resolved = resolveIndustryPreset(preset) ?? preset;
   if (industrySectorId(resolved) !== "home_field") return false;
   if (resolved === "cleaning_services") return false;
+  if (resolved === "inspection_service") return false;
   return true;
 }

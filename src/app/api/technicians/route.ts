@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
         available: body.available !== false,
         certifications: body.certifications ?? null,
         license_expires: body.license_expires ?? null,
+        eo_expires: body.eo_expires ?? null,
+        ce_due_on: body.ce_due_on ?? null,
         notes: body.notes ?? null,
       },
       { onConflict: "workspace_id,user_id" }

@@ -16,6 +16,8 @@ import { PROJECT_STATUS_LABELS, type Project } from "@/types/database";
 import {
   JOB_WORK_PHASES,
   JOB_WORK_PHASE_LABELS,
+  INSPECTION_PHASES,
+  INSPECTION_PHASE_LABELS,
 } from "@/lib/fieldService";
 import { Loader2 } from "lucide-react";
 
@@ -50,8 +52,9 @@ export default function JobsPage() {
         <h1 className="text-3xl font-bold">Jobs</h1>
         <p className="text-muted-foreground">
           Jobs are workspace projects. Approve an estimate to create one.
-          Assign a tech, set route order, paint phase (prep → priming → painting),
-          weather hold for exterior, and mark urgent on the job.
+          Assign a tech, set route order, paint phase, inspection phase
+          (scheduled → report pending → delivered), closing date, weather hold,
+          and mark urgent for rush/same-day.
         </p>
       </div>
       <Table>
@@ -62,6 +65,8 @@ export default function JobsPage() {
             <TableHead>Status</TableHead>
             <TableHead>Due</TableHead>
             <TableHead>Phase</TableHead>
+            <TableHead>Inspection</TableHead>
+            <TableHead>Close</TableHead>
             <TableHead>Weather</TableHead>
             <TableHead>Flags</TableHead>
           </TableRow>
@@ -123,6 +128,47 @@ export default function JobsPage() {
                     </option>
                   ))}
                 </select>
+              </TableCell>
+              <TableCell>
+                <select
+                  className="rounded border bg-background px-2 py-1 text-sm"
+                  value={j.inspection_phase ?? ""}
+                  onChange={async (e) => {
+                    await fetch(`/api/projects/${j.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        inspection_phase: e.target.value || null,
+                      }),
+                    });
+                    load();
+                  }}
+                >
+                  <option value="">—</option>
+                  {INSPECTION_PHASES.map((p) => (
+                    <option key={p} value={p}>
+                      {INSPECTION_PHASE_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+              </TableCell>
+              <TableCell>
+                <input
+                  className="rounded border bg-background px-2 py-1 text-sm"
+                  type="date"
+                  defaultValue={j.closing_on ?? ""}
+                  key={`${j.id}-close-${j.closing_on ?? "x"}`}
+                  onBlur={async (e) => {
+                    await fetch(`/api/projects/${j.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        closing_on: e.target.value || null,
+                      }),
+                    });
+                    load();
+                  }}
+                />
               </TableCell>
               <TableCell>
                 <label className="flex items-center gap-2 text-sm">

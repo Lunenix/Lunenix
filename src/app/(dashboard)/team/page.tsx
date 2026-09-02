@@ -12,6 +12,8 @@ export default function TeamFieldPage() {
   const [techs, setTechs] = useState<TechnicianProfile[]>([]);
   const [certs, setCerts] = useState("");
   const [expires, setExpires] = useState("");
+  const [eoExpires, setEoExpires] = useState("");
+  const [ceDue, setCeDue] = useState("");
   const [available, setAvailable] = useState(true);
 
   const load = useCallback(async () => {
@@ -36,6 +38,8 @@ export default function TeamFieldPage() {
         workspace_id: activeWorkspace.id,
         certifications: certs,
         license_expires: expires || null,
+        eo_expires: eoExpires || null,
+        ce_due_on: ceDue || null,
         available,
       }),
     });
@@ -47,8 +51,8 @@ export default function TeamFieldPage() {
       <div>
         <h1 className="text-3xl font-bold">Techs</h1>
         <p className="text-muted-foreground">
-          Availability, pesticide/herbicide or other certs, and license dates
-          before dispatch. Assign the tech on the job (project) record.
+          Availability, licenses, E&O, and CE dates before dispatch. Do not
+          paste license numbers into Luna chat. Assign the inspector on the job.
         </p>
       </div>
       <div className="max-w-md space-y-3">
@@ -68,6 +72,22 @@ export default function TeamFieldPage() {
             onChange={(e) => setExpires(e.target.value)}
           />
         </div>
+        <div className="space-y-1">
+          <Label>E&O expires</Label>
+          <Input
+            type="date"
+            value={eoExpires}
+            onChange={(e) => setEoExpires(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label>CE due</Label>
+          <Input
+            type="date"
+            value={ceDue}
+            onChange={(e) => setCeDue(e.target.value)}
+          />
+        </div>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -83,7 +103,9 @@ export default function TeamFieldPage() {
           <li key={t.id}>
             {t.available ? "Available" : "Unavailable"}
             {t.certifications ? ` · ${t.certifications}` : ""}
-            {t.license_expires ? ` · exp ${t.license_expires}` : ""}
+            {t.license_expires ? ` · lic exp ${t.license_expires}` : ""}
+            {t.eo_expires ? ` · E&O exp ${t.eo_expires}` : ""}
+            {t.ce_due_on ? ` · CE ${t.ce_due_on}` : ""}
           </li>
         ))}
       </ul>

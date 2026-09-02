@@ -31,6 +31,7 @@ import {
   ClipboardList,
   ClipboardSignature,
   FileSignature,
+  FileText,
   FolderKanban,
   HardHat,
   Inbox,
@@ -55,6 +56,8 @@ import {
   Wrench,
   X,
   Zap,
+  ClipboardCheck,
+  Layers,
 } from "lucide-react";
 
 const coreNav = [
@@ -77,6 +80,9 @@ const fieldNav = [
   { href: "/prep", label: "Prep", icon: Paintbrush },
   { href: "/treatments", label: "Treatments", icon: Bug },
   { href: "/access", label: "Access", icon: KeyRound },
+  { href: "/findings", label: "Findings", icon: ClipboardCheck },
+  { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/addons", label: "Add-ons", icon: Layers },
   { href: "/plans", label: "Recurring", icon: Repeat },
   { href: "/team", label: "Techs", icon: HardHat },
 ];

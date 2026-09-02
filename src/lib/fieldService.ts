@@ -115,6 +115,9 @@ export const ESTIMATE_PHOTO_KINDS = [
   "prep",
   "infestation",
   "entry_point",
+  "finding",
+  "thermal",
+  "moisture",
 ] as const;
 export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
 export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
@@ -127,6 +130,9 @@ export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
   prep: "Prep / drywall",
   infestation: "Infestation",
   entry_point: "Entry point",
+  finding: "Finding",
+  thermal: "Thermal",
+  moisture: "Moisture",
 };
 
 export const ROOFING_LEAD_SOURCES = [
@@ -152,11 +158,19 @@ export const PEST_LEAD_SOURCES = [
   "Referral",
 ] as const;
 
+export const INSPECTION_LEAD_SOURCES = [
+  "Buyer",
+  "Seller / pre-listing",
+  "Realtor referral",
+  "Investor",
+] as const;
+
 export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
   new Set([
     ...ROOFING_LEAD_SOURCES,
     ...PAINTING_LEAD_SOURCES,
     ...PEST_LEAD_SOURCES,
+    ...INSPECTION_LEAD_SOURCES,
   ])
 );
 
@@ -273,6 +287,124 @@ export const TREATMENT_STATUS_LABELS: Record<TreatmentStatus, string> = {
   retreatment_due: "Re-treatment due",
   closed: "Closed",
 };
+
+export const INSPECTION_PHASES = [
+  "scheduled",
+  "in_progress",
+  "report_pending",
+  "delivered",
+] as const;
+export type InspectionPhase = (typeof INSPECTION_PHASES)[number];
+export const INSPECTION_PHASE_LABELS: Record<InspectionPhase, string> = {
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  report_pending: "Report pending",
+  delivered: "Delivered",
+};
+
+export const FINDING_SYSTEMS = [
+  "roof",
+  "hvac",
+  "electrical",
+  "plumbing",
+  "foundation",
+  "appliances",
+  "interior",
+  "exterior",
+  "other",
+] as const;
+export type FindingSystem = (typeof FINDING_SYSTEMS)[number];
+export const FINDING_SYSTEM_LABELS: Record<FindingSystem, string> = {
+  roof: "Roof",
+  hvac: "HVAC",
+  electrical: "Electrical",
+  plumbing: "Plumbing",
+  foundation: "Foundation",
+  appliances: "Appliances",
+  interior: "Interior",
+  exterior: "Exterior",
+  other: "Other",
+};
+
+export const FINDING_SEVERITIES = [
+  "safety",
+  "major",
+  "minor",
+  "cosmetic",
+  "info",
+] as const;
+export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
+export const FINDING_SEVERITY_LABELS: Record<FindingSeverity, string> = {
+  safety: "Safety",
+  major: "Major",
+  minor: "Minor",
+  cosmetic: "Cosmetic",
+  info: "Info",
+};
+
+export const FINDING_STATUSES = ["open", "noted", "included_in_report"] as const;
+export type FindingStatus = (typeof FINDING_STATUSES)[number];
+export const FINDING_STATUS_LABELS: Record<FindingStatus, string> = {
+  open: "Open",
+  noted: "Noted",
+  included_in_report: "In report",
+};
+
+export const REPORT_STATUSES = [
+  "draft",
+  "ready",
+  "sent",
+  "viewed",
+  "downloaded",
+] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  draft: "Draft",
+  ready: "Ready",
+  sent: "Sent",
+  viewed: "Viewed",
+  downloaded: "Downloaded",
+};
+export function isPendingInspectionReport(status: string): boolean {
+  return ["draft", "ready", "sent"].includes(status);
+}
+
+export const ADDON_KINDS = [
+  "radon",
+  "mold",
+  "termite_wdo",
+  "sewer",
+  "pool",
+  "other",
+] as const;
+export type AddonKind = (typeof ADDON_KINDS)[number];
+export const ADDON_KIND_LABELS: Record<AddonKind, string> = {
+  radon: "Radon",
+  mold: "Mold",
+  termite_wdo: "Termite / WDO",
+  sewer: "Sewer scope",
+  pool: "Pool",
+  other: "Other",
+};
+
+export const ADDON_STATUSES = [
+  "ordered",
+  "scheduled",
+  "in_progress",
+  "complete",
+  "cancelled",
+] as const;
+export type AddonStatus = (typeof ADDON_STATUSES)[number];
+export const ADDON_STATUS_LABELS: Record<AddonStatus, string> = {
+  ordered: "Ordered",
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  complete: "Complete",
+  cancelled: "Cancelled",
+};
+export function isOpenAddonStatus(status: string): boolean {
+  return ["ordered", "scheduled", "in_progress"].includes(status);
+}
 
 export const ACCESS_ENTRY_METHODS = [
   "occupant",

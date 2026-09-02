@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4789,6 +4789,220 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Saved access notes (${data.entry_method}). Codes were not stored from this chat.`
+      );
+    }
+
+    if (name === "list_inspection_findings") {
+      const { data, error } = await supabase
+        .from("inspection_findings")
+        .select("system, title, severity, status")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (f: {
+          system: string;
+          title: string;
+          severity: string;
+          status: string;
+        }) => `${f.severity} ${f.system}: ${f.title} (${f.status})`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No inspection findings in this workspace.",
+      };
+    }
+
+    if (name === "log_inspection_finding") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a finding title." };
+      const systemRaw = argString(args, "system") || "other";
+      const system = (FINDING_SYSTEMS as readonly string[]).includes(systemRaw)
+        ? systemRaw
+        : "other";
+      const sevRaw = argString(args, "severity") || "info";
+      const severity = (FINDING_SEVERITIES as readonly string[]).includes(sevRaw)
+        ? sevRaw
+        : "info";
+      const stRaw = argString(args, "status") || "open";
+      const status = (FINDING_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "open";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("inspection_findings")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          title: title.slice(0, 200),
+          system,
+          severity,
+          status,
+          notes: argString(args, "notes"),
+          moisture_reading: argString(args, "moisture_reading"),
+          thermal_notes: argString(args, "thermal_notes"),
+        })
+        .select("title, severity")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that finding." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.severity} finding: ${data.title}.`
+      );
+    }
+
+    if (name === "list_inspection_reports") {
+      const { data, error } = await supabase
+        .from("inspection_reports")
+        .select("title, status, due_at")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (r: { title: string; status: string; due_at: string | null }) =>
+          `${r.title}: ${r.status}${r.due_at ? `, due ${r.due_at}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} Share links are not spoken.`
+          : "No inspection reports in this workspace.",
+      };
+    }
+
+    if (name === "log_inspection_report") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a report title." };
+      const stRaw = argString(args, "status") || "draft";
+      const status = (REPORT_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "draft";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("inspection_reports")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          title: title.slice(0, 200),
+          summary: argString(args, "summary"),
+          agent_name: argString(args, "agent_name"),
+          seller_agent_name: argString(args, "seller_agent_name"),
+          property_type: argString(args, "property_type"),
+          property_size: argString(args, "property_size"),
+          closing_on: argString(args, "closing_on"),
+          due_at: argString(args, "due_at"),
+          status,
+        })
+        .select("title, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that report." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged report ${data.title} as ${data.status}. The share link is on Reports, not spoken.`
+      );
+    }
+
+    if (name === "list_inspection_addons") {
+      const { data, error } = await supabase
+        .from("inspection_addons")
+        .select("kind, status, specialist_name")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (a: {
+          kind: string;
+          status: string;
+          specialist_name: string | null;
+        }) =>
+          `${a.kind}: ${a.status}${a.specialist_name ? ` (${a.specialist_name})` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No inspection add-ons in this workspace.",
+      };
+    }
+
+    if (name === "log_inspection_addon") {
+      const kindRaw = argString(args, "kind") || "other";
+      const kind = (ADDON_KINDS as readonly string[]).includes(kindRaw)
+        ? kindRaw
+        : "other";
+      const stRaw = argString(args, "status") || "ordered";
+      const status = (ADDON_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "ordered";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("inspection_addons")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          kind,
+          status,
+          specialist_name: argString(args, "specialist_name"),
+          result_summary: argString(args, "result_summary"),
+          due_on: argString(args, "due_on"),
+          notes: argString(args, "notes"),
+        })
+        .select("kind, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that add-on." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.kind} add-on as ${data.status}.`
       );
     }
 

@@ -1390,6 +1390,159 @@ export const PEST_CONTROL_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * Inspection Services default automations.
+ * Findings, reports, add-ons. Inspection workspaces only.
+ */
+export const INSPECTION_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Inspection: New lead",
+    description:
+      "When a new lead is created, capture buyer vs seller vs realtor vs investor.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New inspection lead: {{lead.title}}",
+        "Set lead source: buyer, seller/pre-listing, realtor referral, or investor. Capture buyer, listing agent, and seller agent names/phones, address, property type/size, and closing date if known. Email to book. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your inspection request. Reply with the property address, a few times that work, and the closing date if you have it. Turnaround is often tight near closing.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Inspection: Schedule visit",
+    description:
+      "On Site Visit, book the inspection on the calendar with the address.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule inspection: {{lead.title}}",
+        "Confirm date/time, address, buyer + agents, source, property type/size, closing date. Add to the calendar with the address. Send confirmation and a reminder. Mark urgent on Jobs if same-day or closing is close. Two-way texting is not live. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Your inspection is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you on the calendar. Reply to this email if the time or access changes. We will confirm again before we arrive.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Inspection: Agreement and fee",
+    description: "On Estimate Sent, send the inspection agreement and fee.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Send inspection agreement: {{lead.title}}",
+        "Email the estimate/agreement. Many inspectors collect payment at scheduling or before the report is released. Track sent / viewed / approved. Add-ons (radon, mold, WDO, sewer, pool) go on Add-ons.",
+        0
+      ),
+      email(
+        "Your inspection agreement from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your inspection agreement is ready. Please review and reply to approve. We can add radon, mold, WDO, sewer, or pool if you need them.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Inspection: Assign inspector and add-ons",
+    description:
+      "After Contract Signed, assign a licensed inspector and log specialty add-ons.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Assign inspector and check license: {{lead.title}}",
+        "Create the job. Assign an inspector. Confirm state license, E&O, and CE dates on Techs. Set inspection phase scheduled. Set closing date and rush if needed. Do not paste license numbers into Luna chat.",
+        0
+      ),
+      task(
+        "Log specialty add-ons: {{lead.title}}",
+        "On Add-ons, log radon, mold, termite/WDO, sewer scope, or pool if ordered. Coordinate the specialist. Separate results stay on the same job.",
+        1
+      ),
+      email(
+        "You are on the inspection schedule — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thanks for approving. We will confirm the visit window and any add-on specialists. Payment is often due before the report is released.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Inspection: On-site findings",
+    description:
+      "When In Progress, run the system checklist and capture photos.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Log room and system findings: {{lead.title}}",
+        "On Findings, log roof, HVAC, electrical, plumbing, foundation, and appliances with severity (safety, major, minor, cosmetic). Type notes — voice-to-text is not live. Moisture/thermal fields are on the finding. Upload photos on Estimates (kind finding, thermal, or moisture). Check meter calibration on Inventory. Log mileage. OCR is not auto-filled. GPS auto-track is not live.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Inspection: Report pending",
+    description:
+      "On Punch List, assemble the report and notify client and agent.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Build and send inspection report: {{lead.title}}",
+        "On Reports, build the summary from findings, set due date (often the closing window), mark ready, and email the share link. Track viewed/downloaded. Offer a phone/video walkthrough. Confirm payment before release if that is your policy. Set job phase report pending then delivered.",
+        0
+      ),
+      email(
+        "Your inspection report is ready — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your report is ready to review. We will send the share link next. You can print it to PDF. Reply if you want a walkthrough of the findings.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Inspection: Invoice, books, and reviews",
+    description: "When Closed, confirm payment, books, and a review request.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice and books: {{lead.title}}",
+        "Confirm same-day or completion invoice is paid. Check AR aging. Log specialist bills in Books. Mileage is on Mileage. Field ops shows profit and a 30% tax set-aside hint. Save property history on the contact for re-inspections. Flag negative reviews.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Inspection: After contract signed (e-sign)",
+    description: "When an e-sign agreement completes, assign the inspector.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off inspection from signed agreement",
+        "Create or update the job, assign an inspector, log add-ons, and put the visit on the calendar.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Inspection: After invoice sent",
+    description:
+      "When an invoice is sent, follow AR — often before report release.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on inspection payment",
+        "Watch aging. Many offices hold the report until paid. Flag reports past due, license/E&O/CE renewals, or negative reviews.",
+        2
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -1431,6 +1584,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   roofing_exterior_repair: ROOFING_DEFAULT_WORKFLOWS,
   painting_drywall: PAINTING_DEFAULT_WORKFLOWS,
   pest_control: PEST_CONTROL_DEFAULT_WORKFLOWS,
+  inspection_service: INSPECTION_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -1465,6 +1619,12 @@ async function pruneForeignIndustryWorkflows(
       if (
         preset === "pest_control" &&
         name.startsWith("Pest Control:")
+      ) {
+        return true;
+      }
+      if (
+        preset === "inspection_service" &&
+        name.startsWith("Inspection Services:")
       ) {
         return true;
       }

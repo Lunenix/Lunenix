@@ -776,6 +776,98 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_inspection_findings",
+    description:
+      "List inspection findings (system, severity, title). Does not return share links.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_inspection_finding",
+    description:
+      "Log a home inspection finding (roof, HVAC, electrical, plumbing, foundation, appliances) with severity.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        system: {
+          type: "string",
+          description:
+            "roof, hvac, electrical, plumbing, foundation, appliances, interior, exterior, or other",
+        },
+        severity: {
+          type: "string",
+          description: "safety, major, minor, cosmetic, or info",
+        },
+        status: {
+          type: "string",
+          description: "open, noted, or included_in_report",
+        },
+        notes: { type: "string" },
+        moisture_reading: { type: "string" },
+        thermal_notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_inspection_reports",
+    description:
+      "List inspection reports (title, status, due date). Does not return share tokens.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_inspection_report",
+    description:
+      "Create an inspection report record. Do not read or speak share tokens.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        summary: { type: "string" },
+        status: {
+          type: "string",
+          description: "draft, ready, sent, viewed, or downloaded",
+        },
+        agent_name: { type: "string" },
+        seller_agent_name: { type: "string" },
+        property_type: { type: "string" },
+        property_size: { type: "string" },
+        closing_on: { type: "string", description: "YYYY-MM-DD" },
+        due_at: { type: "string", description: "YYYY-MM-DD" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_inspection_addons",
+    description:
+      "List specialty inspection add-ons (radon, mold, termite/WDO, sewer, pool).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_inspection_addon",
+    description: "Log a specialty add-on and specialist coordination for a job.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          description: "radon, mold, termite_wdo, sewer, pool, or other",
+        },
+        status: {
+          type: "string",
+          description:
+            "ordered, scheduled, in_progress, complete, or cancelled",
+        },
+        specialist_name: { type: "string" },
+        result_summary: { type: "string" },
+        due_on: { type: "string", description: "YYYY-MM-DD" },
+        notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",

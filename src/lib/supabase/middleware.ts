@@ -15,6 +15,9 @@ const PUBLIC_PATHS = [
   // Public e-signature signing pages + their API (tokenized, no auth).
   "/sign",
   "/api/sign",
+  // Public inspection report links (tokenized, no auth).
+  "/r",
+  "/api/inspection-reports/share",
   // Cron jobs (protected by CRON_SECRET, not a session cookie).
   "/api/esign/reminders/run",
   "/api/emails/scheduled/run",

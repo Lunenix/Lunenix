@@ -59,6 +59,8 @@ export async function PATCH(
     "weather_hold",
     "weather_hold_reason",
     "work_phase",
+    "inspection_phase",
+    "closing_on",
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
