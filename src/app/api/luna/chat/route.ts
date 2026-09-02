@@ -3,6 +3,7 @@ import type { Content, FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { isIanaTimeZone, formatContextForGemini } from "@/lib/luna";
 import { sendEmailTool } from "@/lib/luna-tools";
+import { LUNA_CRM_TOOLS } from "@/lib/luna-crm-tools";
 import {
   executeLunaTool,
   formatLunaContextForPrompt,
@@ -37,7 +38,7 @@ export const dynamic = "force-dynamic";
 
 // gemini-1.5-flash was shut down in Sept 2025 and 404s on every request.
 const GEMINI_MODEL = "gemini-2.5-flash";
-const MAX_TOOL_ROUNDS = 4;
+const MAX_TOOL_ROUNDS = 6;
 
 const BASE_SYSTEM_PROMPT =
   "You are Luna, the real-time AI avatar assistant for Lunenix Business Hub. " +
@@ -54,18 +55,28 @@ const BASE_SYSTEM_PROMPT =
   "(named Shay, call it Shay, name it Shay, titled Shay, or a quoted title). " +
   "Use that exact name. Never default to Intake form or any other guessed title. " +
   "If they did not give a name, do not call create_form. Ask what to name it first, then wait. " +
+  "When they ask to change a form after it exists, call update_form. " +
   "When they ask to add or create a contact, call create_contact. " +
   "When they ask to change, update, or edit a contact, call update_contact and identify them by name or email. " +
+  "When they ask to search or list contacts, call search_contacts. " +
+  "When they ask about sent mail or email history, call list_emails. For the inbox, call list_inbox. For email templates, call list_templates. " +
   "When they ask to add or create a project, call create_project. " +
   "When they ask to change a project (name, status, budget, dates, client, or description), call update_project. " +
   "When they ask to create an invoice, call create_invoice. Identify the client by contact name or email. Use total for the amount. " +
+  "When they ask to change an invoice, call update_invoice. To email it, call send_invoice. To void it, call void_invoice. " +
+  "When they say a client paid, call record_invoice_payment. That only marks the invoice paid in the CRM. Never take card numbers or charge a card. " +
   "When they ask to draft an email without sending, call send_email_draft. Only call send_email when they clearly want it sent now. " +
   "When they ask about an SOP, policy, or how we do something internally, call search_knowledge_base. " +
   "When they ask to move a lead on the pipeline, call move_lead_stage with a pipeline stage name such as New Lead, Qualified, Won, or Lost. " +
   "When they ask to generate or draft a contract or service agreement, call generate_contract. " +
+  "When they ask to edit a contract after create, call update_contract. " +
+  "When they ask to send a document for e-sign, call send_esign. The PDF and fields must already exist. " +
   "When they ask what is on the calendar, this week, or upcoming deadlines, call get_calendar. " +
-  "When they ask to schedule a meeting, appointment, or reminder on a date, call create_task with a title and due_date as YYYY-MM-DD. " +
-  "Do not claim you sent calendar invites or emailed other people unless send_email succeeded. " +
+  "A meeting is a task with a due date. To put it on the workspace calendar only, call create_task with a title and due_date as YYYY-MM-DD. " +
+  "When they ask to email a calendar invite, call send_calendar_invite. That creates the dated task and emails a calendar file. It is not Google Calendar. " +
+  "When they ask to change, complete, or delete a task, call update_task, complete_task, or delete_task. " +
+  "Telegram reminders are sent by a scheduled job using the workspace bot. There is no Telegram tool. Do not claim you messaged Telegram. " +
+  "Do not claim you sent calendar invites or emailed other people unless the matching send tool succeeded. " +
   "Never invent a contact or project without a tool result. " +
   "You only know data for the caller's current workspace. " +
   "Never reveal API keys, database schemas, SQL, RLS policies, auth tokens, or payment details. " +
@@ -212,7 +223,7 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
   {
     name: "create_task",
     description:
-      "Create a task in the current workspace. Optionally attach it to a project.",
+      "Create a task in the current workspace. A meeting is a dated task. Use send_calendar_invite if they also want an emailed calendar file.",
     parametersJsonSchema: {
       type: "object",
       properties: {
@@ -472,6 +483,7 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
       required: ["name"],
     },
   },
+  ...LUNA_CRM_TOOLS,
 ];
 
 /** Strip markdown so Simli / ElevenLabs get audio-friendly speech. */

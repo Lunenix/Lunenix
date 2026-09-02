@@ -9,9 +9,12 @@ import {
   type WorkspaceContextPayload,
 } from "@/lib/luna";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
+import { sendEsignEmail } from "@/lib/esign/sendEmail";
+import { generateSignToken, getAppBaseUrl } from "@/lib/esign/helpers";
 import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
+import { createAdminClient } from "@/lib/supabase/server";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,6 +29,21 @@ const PROJECT_STATUSES = new Set([
 ]);
 const TASK_STATUSES = new Set(["todo", "in_progress", "done"]);
 const TASK_PRIORITIES = new Set(["low", "medium", "high", "urgent"]);
+const FORM_STATUSES = new Set(["draft", "active", "archived"]);
+const CONTRACT_STATUSES = new Set([
+  "draft",
+  "sent",
+  "active",
+  "completed",
+  "cancelled",
+]);
+const INVOICE_STATUSES = new Set([
+  "draft",
+  "sent",
+  "paid",
+  "overdue",
+  "cancelled",
+]);
 const WORKFLOW_TRIGGERS = new Set([
   "form_submission",
   "lead_stage_change",
@@ -359,6 +377,239 @@ async function requireOneProject(
     };
   }
   return matches[0];
+}
+
+function labelsToFormFields(raw: string) {
+  const labels = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+  return labels.map((label, i) => {
+    const lower = label.toLowerCase();
+    const type =
+      lower.includes("email")
+        ? "email"
+        : lower.includes("phone")
+          ? "phone"
+          : lower.length > 24
+            ? "textarea"
+            : "text";
+    return {
+      id: `f${i + 1}`,
+      type,
+      label,
+      required: i < 2,
+    };
+  });
+}
+
+async function findTitleMatches(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  table: string,
+  nameColumn: string,
+  needle: string | null
+): Promise<Array<{ id: string; label: string }>> {
+  if (!needle) return [];
+  const q = sanitizeIlikeQuery(needle);
+  if (!q) return [];
+  const { data } = await supabase
+    .from(table)
+    .select(`id, ${nameColumn}`)
+    .eq("workspace_id", workspaceId)
+    .limit(40);
+  const lower = q.toLowerCase();
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const mapped = rows
+    .map((row) => ({
+      id: String(row.id),
+      label: String(row[nameColumn] ?? ""),
+    }))
+    .filter((row) => row.label);
+  const exact = mapped.filter((r) => r.label.toLowerCase() === lower);
+  if (exact.length) return exact;
+  return mapped.filter((r) => r.label.toLowerCase().includes(lower));
+}
+
+function pickUniqueOrAsk(
+  matches: Array<{ id: string; label: string }>,
+  empty: string
+): { id: string; label: string } | { error: string } {
+  if (!matches.length) return { error: empty };
+  if (matches.length > 1) {
+    return {
+      error: `Several matches. Say which one: ${matches
+        .slice(0, 4)
+        .map((m) => m.label)
+        .join(", ")}.`,
+    };
+  }
+  return matches[0];
+}
+
+async function requireOneTask(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  title: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  return pickUniqueOrAsk(
+    await findTitleMatches(supabase, workspaceId, "tasks", "title", title),
+    "I could not find that task in this workspace."
+  );
+}
+
+async function requireOneForm(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  name: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  return pickUniqueOrAsk(
+    await findTitleMatches(supabase, workspaceId, "forms", "name", name),
+    "I could not find that form in this workspace."
+  );
+}
+
+async function requireOneContract(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  name: string | null
+): Promise<{ id: string; label: string } | { error: string }> {
+  if (!name) {
+    return { error: "Need the contract name or number." };
+  }
+  const byName = await findTitleMatches(
+    supabase,
+    workspaceId,
+    "contracts",
+    "name",
+    name
+  );
+  if (byName.length) return pickUniqueOrAsk(byName, "");
+  const byNumber = await findTitleMatches(
+    supabase,
+    workspaceId,
+    "contracts",
+    "contract_number",
+    name
+  );
+  return pickUniqueOrAsk(
+    byNumber,
+    "I could not find that contract in this workspace."
+  );
+}
+
+async function requireOneInvoice(
+  supabase: LunaSupabaseClient,
+  workspaceId: string,
+  invoiceNumber: string | null,
+  contactRef: string | null
+): Promise<
+  | {
+      id: string;
+      invoice_number: string;
+      total: number;
+      status: string;
+      contact_id: string;
+    }
+  | { error: string }
+> {
+  const numberQ = invoiceNumber ? sanitizeIlikeQuery(invoiceNumber) : "";
+  if (numberQ) {
+    const matches = await findTitleMatches(
+      supabase,
+      workspaceId,
+      "invoices",
+      "invoice_number",
+      numberQ
+    );
+    const picked = pickUniqueOrAsk(
+      matches,
+      "I could not find that invoice in this workspace."
+    );
+    if ("error" in picked) return picked;
+    const { data } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, total, status, contact_id")
+      .eq("id", picked.id)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!data?.id) {
+      return { error: "I could not find that invoice in this workspace." };
+    }
+    return {
+      id: data.id,
+      invoice_number: String(data.invoice_number),
+      total: Number(data.total) || 0,
+      status: String(data.status),
+      contact_id: String(data.contact_id),
+    };
+  }
+  if (contactRef) {
+    const contact = await requireOneContact(supabase, workspaceId, contactRef);
+    if ("error" in contact) return contact;
+    const { data } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, total, status, contact_id")
+      .eq("workspace_id", workspaceId)
+      .eq("contact_id", contact.id)
+      .order("updated_at", { ascending: false })
+      .limit(8);
+    const rows = (data ?? []) as Array<{
+      id: string;
+      invoice_number: string;
+      total: number;
+      status: string;
+      contact_id: string;
+    }>;
+    if (!rows.length) {
+      return { error: `No invoices for ${contact.label} in this workspace.` };
+    }
+    if (rows.length > 1) {
+      return {
+        error: `Several invoices for ${contact.label}. Say the number: ${rows
+          .slice(0, 5)
+          .map((r) => r.invoice_number)
+          .join(", ")}.`,
+      };
+    }
+    return rows[0];
+  }
+  return { error: "Need an invoice number or the client name." };
+}
+
+function icsDateValue(ymd: string): string {
+  return ymd.replace(/-/g, "");
+}
+
+function nextIcsDate(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + 1));
+  return dt.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+function buildMeetingIcs(title: string, ymd: string, description: string): string {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  const summary = title.replace(/[\r\n]+/g, " ").slice(0, 120);
+  const desc = description.replace(/[\r\n]+/g, " ").slice(0, 400);
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Lunenix//Luna//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `UID:luna-${Date.now()}@lunenix`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${icsDateValue(ymd)}`,
+    `DTEND;VALUE=DATE:${nextIcsDate(ymd)}`,
+    `SUMMARY:${summary}`,
+    desc ? `DESCRIPTION:${desc}` : null,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ]
+    .filter(Boolean)
+    .join("\r\n");
 }
 
 export async function getLunaWorkspaceContext(
@@ -1618,28 +1869,9 @@ export async function executeLunaTool(
             "Do not create the form yet. Ask the user what to name it. Never guess a title like Intake form.",
         };
       }
-      const labels = (argString(args, "fields") ?? "Name, Email")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 12);
-      const fields = labels.map((label, i) => {
-        const lower = label.toLowerCase();
-        const type =
-          lower.includes("email")
-            ? "email"
-            : lower.includes("phone")
-              ? "phone"
-              : lower.length > 24
-                ? "textarea"
-                : "text";
-        return {
-          id: `f${i + 1}`,
-          type,
-          label,
-          required: i < 2,
-        };
-      });
+      const fields = labelsToFormFields(
+        argString(args, "fields") ?? "Name, Email"
+      );
       const { data, error } = await supabase
         .from("forms")
         .insert({
@@ -2067,6 +2299,702 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `${data.name} is now ${data.is_active ? "on" : "off"}.`
+      );
+    }
+
+    if (name === "update_task") {
+      const found = await requireOneTask(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["title", "task_title", "lookup"])
+      );
+      if ("error" in found) return found;
+      const updates: Record<string, unknown> = {};
+      const newTitle = argStringAny(args, ["new_title", "name"]);
+      if (newTitle) updates.title = newTitle;
+      if (argString(args, "description") !== null) {
+        updates.description = argString(args, "description");
+      }
+      const statusArg = argString(args, "status");
+      const status =
+        statusArg === "pending"
+          ? "todo"
+          : statusArg && TASK_STATUSES.has(statusArg)
+            ? statusArg
+            : null;
+      if (status) {
+        updates.status = status;
+        updates.completed_at =
+          status === "done" ? new Date().toISOString() : null;
+      }
+      const priorityArg = argString(args, "priority");
+      const priority =
+        priorityArg === "normal"
+          ? "medium"
+          : priorityArg && TASK_PRIORITIES.has(priorityArg)
+            ? priorityArg
+            : null;
+      if (priority) updates.priority = priority;
+      const dueDate = asIsoDate(argStringAny(args, ["due_date", "dueDate"]));
+      if (dueDate) updates.due_date = dueDate;
+      const reminderArg = parseReminderMinutes(
+        args.reminder_minutes_before ?? args.reminderMinutesBefore
+      );
+      if (!reminderArg.ok) return { error: reminderArg.error };
+      if (reminderArg.value !== null) {
+        updates.reminder_minutes_before = reminderArg.value;
+        updates.reminder_sent_at = null;
+      }
+      let projectId = argStringAny(args, ["project_id", "projectId"]);
+      if (!projectId && argString(args, "project_name")) {
+        projectId = await findProjectId(
+          supabase,
+          workspace_id,
+          argString(args, "project_name")
+        );
+      }
+      if (projectId) {
+        const { data: project } = await supabase
+          .from("projects")
+          .select("id")
+          .eq("id", projectId)
+          .eq("workspace_id", workspace_id)
+          .maybeSingle();
+        if (!project) {
+          return { error: "That project is not in this workspace." };
+        }
+        updates.project_id = projectId;
+      }
+      if (!Object.keys(updates).length) {
+        return { error: "Say what to change on that task." };
+      }
+      const { data, error } = await supabase
+        .from("tasks")
+        .update(updates)
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("title, status, due_date")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not update that task." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Updated task ${data.title}. It is ${data.status}.`
+      );
+    }
+
+    if (name === "complete_task") {
+      const found = await requireOneTask(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["title", "task_title", "lookup"])
+      );
+      if ("error" in found) return found;
+      const { data, error } = await supabase
+        .from("tasks")
+        .update({
+          status: "done",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("title")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not complete that task." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Marked ${data.title} complete.`
+      );
+    }
+
+    if (name === "delete_task") {
+      const found = await requireOneTask(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["title", "task_title", "lookup"])
+      );
+      if ("error" in found) return found;
+      const { error } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id);
+      if (error) {
+        return { error: error.message ?? "Could not delete that task." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Deleted task ${found.label}.`
+      );
+    }
+
+    if (name === "update_invoice") {
+      const found = await requireOneInvoice(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["invoice_number", "lookup"]),
+        argString(args, "contact_name")
+      );
+      if ("error" in found) return found;
+      const updates: Record<string, unknown> = {};
+      if (argString(args, "notes") !== null) {
+        updates.notes = argString(args, "notes");
+      }
+      const dueDate = asIsoDate(argStringAny(args, ["due_date", "dueDate"]));
+      if (dueDate) updates.due_date = dueDate;
+      const amount = argNumber(args, "amount") ?? argNumber(args, "total");
+      if (amount !== null) {
+        if (amount <= 0) return { error: "Need a billing amount greater than zero." };
+        updates.total = amount;
+        updates.subtotal = amount;
+        updates.line_items = [
+          {
+            description: "Services",
+            quantity: 1,
+            unit_price: amount,
+            amount,
+          },
+        ];
+      }
+      const currency = argString(args, "currency");
+      if (currency) updates.currency = currency;
+      let status = argString(args, "status");
+      if (status === "void") status = "cancelled";
+      if (status) {
+        if (!INVOICE_STATUSES.has(status)) {
+          return {
+            error:
+              "Invoice status must be draft, sent, paid, overdue, or cancelled.",
+          };
+        }
+        updates.status = status;
+        if (status === "paid") updates.paid_at = new Date().toISOString();
+      }
+      if (!Object.keys(updates).length) {
+        return { error: "Say what to change on that invoice." };
+      }
+      const { data, error } = await supabase
+        .from("invoices")
+        .update(updates)
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("invoice_number, status, total")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not update that invoice." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Updated invoice ${data.invoice_number}. It is ${data.status}.`
+      );
+    }
+
+    if (name === "send_invoice") {
+      const found = await requireOneInvoice(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["invoice_number", "lookup"]),
+        argString(args, "contact_name")
+      );
+      if ("error" in found) return found;
+      const { data: contact } = await supabase
+        .from("contacts")
+        .select("id, email, first_name, last_name, organization_name")
+        .eq("id", found.contact_id)
+        .eq("workspace_id", workspace_id)
+        .maybeSingle();
+      const to = typeof contact?.email === "string" ? contact.email : null;
+      if (!to || !looksLikeEmail(to)) {
+        return {
+          error:
+            "That invoice's contact has no email on file. Add an email, then ask me to send it.",
+        };
+      }
+      const label = contactSpokenLabel(contact ?? {});
+      const total = Number(found.total).toFixed(2);
+      const result = await sendServerEmail({
+        workspaceId: workspace_id,
+        to,
+        toName: label,
+        contactId: found.contact_id,
+        subject: `Invoice ${found.invoice_number}`,
+        html: `<p>Please find invoice ${found.invoice_number} for $${total}.</p>`,
+      });
+      if (!result.success) {
+        return { error: result.error ?? "Could not email that invoice." };
+      }
+      const { error: statusError } = await supabase
+        .from("invoices")
+        .update({ status: "sent" })
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id);
+      if (statusError) {
+        return { error: statusError.message };
+      }
+      executeWorkflowsForTrigger(
+        "invoice_sent",
+        {
+          invoice_id: found.id,
+          contact_id: found.contact_id,
+          user_id,
+        },
+        workspace_id
+      ).catch(() => undefined);
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Sent invoice ${found.invoice_number} to ${label}.`
+      );
+    }
+
+    if (name === "void_invoice") {
+      const found = await requireOneInvoice(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["invoice_number", "lookup"]),
+        argString(args, "contact_name")
+      );
+      if ("error" in found) return found;
+      const { data, error } = await supabase
+        .from("invoices")
+        .update({ status: "cancelled" })
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("invoice_number")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not void that invoice." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Voided invoice ${data.invoice_number}.`
+      );
+    }
+
+    if (name === "record_invoice_payment") {
+      const found = await requireOneInvoice(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["invoice_number", "lookup"]),
+        argString(args, "contact_name")
+      );
+      if ("error" in found) return found;
+      const { data, error } = await supabase
+        .from("invoices")
+        .update({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+        })
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("invoice_number, total")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not record that payment." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Recorded payment for invoice ${data.invoice_number}, $${Number(data.total).toFixed(2)}. No card was charged.`
+      );
+    }
+
+    if (name === "update_form") {
+      const found = await requireOneForm(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["form_name", "name", "lookup"])
+      );
+      if ("error" in found) return found;
+      const updates: Record<string, unknown> = {};
+      const newName = argString(args, "new_name");
+      if (newName) updates.name = newName;
+      if (argString(args, "description") !== null) {
+        updates.description = argString(args, "description");
+      }
+      const status = argString(args, "status");
+      if (status) {
+        if (!FORM_STATUSES.has(status)) {
+          return { error: "Form status must be draft, active, or archived." };
+        }
+        updates.status = status;
+      }
+      const fieldLabels = argString(args, "fields");
+      if (fieldLabels) updates.fields = labelsToFormFields(fieldLabels);
+      if (!Object.keys(updates).length) {
+        return { error: "Say what to change on that form." };
+      }
+      const { data, error } = await supabase
+        .from("forms")
+        .update(updates)
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not update that form." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Updated form ${data.name}. It is ${data.status}.`
+      );
+    }
+
+    if (name === "update_contract") {
+      const found = await requireOneContract(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["contract_name", "name", "lookup"])
+      );
+      if ("error" in found) return found;
+      const updates: Record<string, unknown> = {};
+      const newName = argString(args, "new_name");
+      if (newName) updates.name = newName;
+      if (argString(args, "description") !== null) {
+        updates.description = argString(args, "description");
+      }
+      if (argString(args, "terms") !== null) {
+        updates.terms = argString(args, "terms");
+      }
+      const value = argNumber(args, "value");
+      if (value !== null) updates.value = value;
+      const currency = argString(args, "currency");
+      if (currency) updates.currency = currency;
+      const status = argString(args, "status");
+      if (status) {
+        if (!CONTRACT_STATUSES.has(status)) {
+          return {
+            error:
+              "Contract status must be draft, sent, active, completed, or cancelled.",
+          };
+        }
+        updates.status = status;
+      }
+      const start = asIsoDate(argString(args, "start_date"));
+      const end = asIsoDate(argString(args, "end_date"));
+      if (start) updates.start_date = start;
+      if (end) updates.end_date = end;
+      const contactRef = argString(args, "contact_name");
+      if (contactRef) {
+        const contact = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactRef
+        );
+        if ("error" in contact) return contact;
+        updates.contact_id = contact.id;
+      }
+      if (!Object.keys(updates).length) {
+        return { error: "Say what to change on that contract." };
+      }
+      const { data, error } = await supabase
+        .from("contracts")
+        .update(updates)
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .select("name, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not update that contract." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Updated contract ${data.name}. It is ${data.status}.`
+      );
+    }
+
+    if (name === "send_esign") {
+      const docName = argStringAny(args, ["document_name", "name"]);
+      if (!docName) return { error: "Need the e-sign document name." };
+      const matches = await findTitleMatches(
+        supabase,
+        workspace_id,
+        "esign_documents",
+        "name",
+        docName
+      );
+      const picked = pickUniqueOrAsk(
+        matches,
+        "I could not find that e-sign document in this workspace."
+      );
+      if ("error" in picked) return picked;
+      const { data: doc } = await supabase
+        .from("esign_documents")
+        .select(
+          "id, name, original_file_path, sign_token, signer_name, signer_email, contact_id"
+        )
+        .eq("id", picked.id)
+        .eq("workspace_id", workspace_id)
+        .maybeSingle();
+      if (!doc?.id) {
+        return { error: "I could not find that e-sign document in this workspace." };
+      }
+      if (!doc.original_file_path) {
+        return {
+          error:
+            "That document has no PDF yet. Upload the file in e-sign, then ask me to send it.",
+        };
+      }
+      const { count } = await supabase
+        .from("esign_fields")
+        .select("id", { count: "exact", head: true })
+        .eq("document_id", doc.id);
+      if (!count) {
+        return {
+          error:
+            "Add at least one signature field in e-sign before I can send it.",
+        };
+      }
+      const signerEmail =
+        argString(args, "signer_email") ||
+        (typeof doc.signer_email === "string" ? doc.signer_email : null);
+      if (!signerEmail || !looksLikeEmail(signerEmail)) {
+        return { error: "Need a signer email on the document or in your request." };
+      }
+      const signerName =
+        argString(args, "signer_name") ||
+        (typeof doc.signer_name === "string" ? doc.signer_name : null);
+      const token =
+        (typeof doc.sign_token === "string" && doc.sign_token) ||
+        generateSignToken();
+      const admin = createAdminClient();
+      const { error: updateError } = await admin
+        .from("esign_documents")
+        .update({
+          status: "sent",
+          sign_token: token,
+          signer_name: signerName,
+          signer_email: signerEmail,
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", doc.id)
+        .eq("workspace_id", workspace_id);
+      if (updateError) {
+        return { error: "Could not mark that document as sent." };
+      }
+      await admin.from("esign_events").insert({
+        document_id: doc.id,
+        event_type: "sent",
+        metadata: { to: signerEmail, by: "luna" },
+      });
+      const signUrl = `${getAppBaseUrl()}/sign/${token}`;
+      const html = `<p>${signerName ? `Hi ${signerName},` : "Hello,"}</p><p>Please review and sign <strong>${String(doc.name)}</strong>.</p><p><a href="${signUrl}">Review and sign</a></p>`;
+      const emailResult = await sendEsignEmail({
+        workspaceId: workspace_id,
+        to: signerEmail,
+        toName: signerName,
+        contactId: typeof doc.contact_id === "string" ? doc.contact_id : null,
+        subject: `Please sign: ${String(doc.name)}`,
+        html,
+      });
+      if (!emailResult.success) {
+        return {
+          error: emailResult.error ?? "Could not email the signing link.",
+        };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Sent the signing email for ${String(doc.name)}.`
+      );
+    }
+
+    if (name === "search_contacts") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      let q = supabase
+        .from("contacts")
+        .select("first_name, last_name, organization_name, email, type")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (query) {
+        q = q.or(
+          `first_name.ilike.%${query}%,last_name.ilike.%${query}%,organization_name.ilike.%${query}%,email.ilike.%${query}%`
+        );
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<Record<string, unknown>>;
+      if (!rows.length) {
+        return { ok: true, summary: "No contacts matched in this workspace." };
+      }
+      const spoken = rows
+        .map((row) => contactSpokenLabel(row))
+        .join(", ");
+      return {
+        ok: true,
+        summary: `Contacts: ${spoken}.`,
+      };
+    }
+
+    if (name === "list_emails") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      let q = supabase
+        .from("email_logs")
+        .select("recipient_email, subject, status, sent_at")
+        .eq("workspace_id", workspace_id)
+        .order("sent_at", { ascending: false })
+        .limit(8);
+      if (query) {
+        q = q.or(
+          `subject.ilike.%${query}%,recipient_email.ilike.%${query}%`
+        );
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        recipient_email: string;
+        subject: string;
+        status: string;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No outbound emails in this workspace yet." };
+      }
+      const spoken = rows
+        .map((r) => `${r.subject} to ${r.recipient_email}, ${r.status}`)
+        .join(". ");
+      return { ok: true, summary: `Recent sent mail: ${spoken}.` };
+    }
+
+    if (name === "list_inbox") {
+      const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
+      let q = supabase
+        .from("inbound_emails")
+        .select("from_email, from_name, subject, received_at")
+        .eq("workspace_id", workspace_id)
+        .order("received_at", { ascending: false })
+        .limit(8);
+      if (query) {
+        q = q.or(
+          `subject.ilike.%${query}%,from_email.ilike.%${query}%,from_name.ilike.%${query}%`
+        );
+      }
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{
+        from_email: string;
+        from_name: string | null;
+        subject: string | null;
+      }>;
+      if (!rows.length) {
+        return { ok: true, summary: "The inbox is empty in this workspace." };
+      }
+      const spoken = rows
+        .map(
+          (r) =>
+            `${r.subject || "no subject"} from ${r.from_name || r.from_email}`
+        )
+        .join(". ");
+      return { ok: true, summary: `Inbox: ${spoken}.` };
+    }
+
+    if (name === "list_templates") {
+      const { data, error } = await supabase
+        .from("email_templates")
+        .select("name, subject")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", { ascending: false })
+        .limit(12);
+      if (error) return { error: error.message };
+      const rows = (data ?? []) as Array<{ name: string; subject: string }>;
+      if (!rows.length) {
+        return { ok: true, summary: "No email templates in this workspace yet." };
+      }
+      const spoken = rows.map((r) => r.name).join(", ");
+      return { ok: true, summary: `Templates: ${spoken}.` };
+    }
+
+    if (name === "send_calendar_invite") {
+      const title = argString(args, "title");
+      const dueDate = asIsoDate(argStringAny(args, ["due_date", "dueDate"]));
+      if (!title || !dueDate) {
+        return { error: "Need a meeting title and a date as year-month-day." };
+      }
+      let to = argStringAny(args, ["to", "contact_email"]);
+      let contactId: string | null = null;
+      const contactRef =
+        argString(args, "contact_name") ??
+        (to && !looksLikeEmail(to) ? to : null);
+      if (contactRef && (!to || !looksLikeEmail(to))) {
+        const found = await requireOneContact(supabase, workspace_id, contactRef);
+        if ("error" in found) return found;
+        contactId = found.id;
+        const { data: contact } = await supabase
+          .from("contacts")
+          .select("email")
+          .eq("id", found.id)
+          .eq("workspace_id", workspace_id)
+          .maybeSingle();
+        to = typeof contact?.email === "string" ? contact.email : null;
+      }
+      if (!to || !looksLikeEmail(to)) {
+        return {
+          error:
+            "Need a contact with an email, or an email address, to send the calendar file.",
+        };
+      }
+      const description = argString(args, "description") ?? "";
+      const { data: task, error: taskError } = await supabase
+        .from("tasks")
+        .insert({
+          workspace_id,
+          title,
+          description: description || `Meeting on ${dueDate}`,
+          status: "todo",
+          priority: "medium",
+          assignee_id: user_id,
+          due_date: dueDate,
+          position: 0,
+        })
+        .select("title, due_date")
+        .maybeSingle();
+      if (taskError || !task) {
+        return { error: taskError?.message ?? "Could not create the meeting task." };
+      }
+      const ics = buildMeetingIcs(title, dueDate, description);
+      const result = await sendServerEmail({
+        workspaceId: workspace_id,
+        to,
+        contactId,
+        subject: `Invite: ${title}`,
+        html: `<p>You are invited to ${title} on ${dueDate}. A calendar file is attached. This is a Lunenix task date, not a Google Calendar event.</p>`,
+        attachments: [
+          {
+            filename: "invite.ics",
+            content: Buffer.from(ics, "utf8").toString("base64"),
+          },
+        ],
+      });
+      if (!result.success) {
+        return {
+          error: `I created the meeting task ${task.title} on ${dueDate}, but the invite email failed. ${result.error ?? ""}`.trim(),
+        };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Scheduled ${task.title} on ${dueDate} and emailed a calendar invite to ${to}.`
       );
     }
 
