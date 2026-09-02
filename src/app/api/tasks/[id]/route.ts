@@ -30,10 +30,14 @@ export async function PATCH(
     "reminder_minutes_before",
     "position",
     "project_id",
+    "contact_id",
   ];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
+  }
+  if ("contact_id" in update && !update.contact_id) {
+    update.contact_id = null;
   }
 
   if ("reminder_minutes_before" in body) {
@@ -60,11 +64,28 @@ export async function PATCH(
     update.completed_at = body.status === "done" ? new Date().toISOString() : null;
   }
 
+  if ("contact_id" in update && update.contact_id) {
+    const { data: client } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("id", update.contact_id)
+      .eq("workspace_id", oldTask?.workspace_id)
+      .maybeSingle();
+    if (!client?.id) {
+      return NextResponse.json(
+        { error: "That contact is not in this workspace." },
+        { status: 400 }
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from("tasks")
     .update(update)
     .eq("id", params.id)
-    .select("*, project:projects(id, name)")
+    .select(
+      "*, project:projects(id, name), contact:contacts(id, type, first_name, last_name, organization_name, email)"
+    )
     .single();
 
   if (error) {

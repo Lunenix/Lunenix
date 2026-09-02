@@ -201,6 +201,7 @@ export interface Task {
   id: string;
   workspace_id: string;
   project_id: string | null;
+  contact_id: string | null;
   title: string;
   description: string | null;
   status: TaskStatus;
@@ -215,6 +216,10 @@ export interface Task {
   updated_at: string;
   // Optional relation for cross-workspace task views.
   project?: Pick<Project, "id" | "name"> | null;
+  contact?: Pick<
+    Contact,
+    "id" | "type" | "first_name" | "last_name" | "organization_name" | "email"
+  > | null;
 }
 
 // Labels + badge styling helpers shared across project/task UIs.

@@ -71,6 +71,7 @@ const TASK_CONTEXT_KEYS = [
   "priority",
   "due_date",
   "project_id",
+  "contact_id",
 ] as const;
 
 export type LunaWorkspaceContext = {
@@ -781,7 +782,7 @@ export async function getLunaWorkspaceContext(
       .limit(40),
     supabase
       .from("tasks")
-      .select("id, title, status, priority, due_date, project_id")
+      .select("id, title, status, priority, due_date, project_id, contact_id")
       .eq("workspace_id", workspace_id)
       .order("updated_at", { ascending: false })
       .limit(40),
@@ -2038,11 +2039,25 @@ export async function executeLunaTool(
         return { error: "A due date is required to set a reminder." };
       }
 
+      let contactId: string | null = null;
+      const contactHint =
+        argString(args, "contact_name") ?? argString(args, "contact_email");
+      if (contactHint) {
+        const found = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactHint
+        );
+        if ("error" in found) return found;
+        contactId = found.id;
+      }
+
       const { data, error } = await supabase
         .from("tasks")
         .insert({
           workspace_id,
           project_id: projectId,
+          contact_id: contactId,
           title,
           description: argString(args, "description"),
           status,
@@ -2572,6 +2587,17 @@ export async function executeLunaTool(
           return { error: "That project is not in this workspace." };
         }
         updates.project_id = projectId;
+      }
+      const contactHint =
+        argString(args, "contact_name") ?? argString(args, "contact_email");
+      if (contactHint) {
+        const found = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactHint
+        );
+        if ("error" in found) return found;
+        updates.contact_id = found.id;
       }
       if (!Object.keys(updates).length) {
         return { error: "Say what to change on that task." };
@@ -3191,6 +3217,7 @@ export async function executeLunaTool(
           priority: "medium",
           assignee_id: user_id,
           due_date: dueDate,
+          contact_id: contactId,
           position: 0,
         })
         .select("title, due_date")

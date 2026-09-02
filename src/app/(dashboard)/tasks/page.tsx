@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { TaskList } from "@/components/tasks/TaskList";
 import { cn } from "@/lib/utils";
 import { type Task, type TaskStatus } from "@/types/database";
-import { ListChecks, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 type Filter = "all" | TaskStatus;
 
@@ -64,7 +64,8 @@ export default function TasksPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
         <p className="text-sm text-muted-foreground">
-          Every task across {activeWorkspace.name}
+          Every task across {activeWorkspace.name}. Add one here and optionally
+          assign a client.
         </p>
       </div>
 
@@ -85,16 +86,6 @@ export default function TasksPage() {
       {loading ? (
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : tasks.length === 0 ? (
-        <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-dashed border-border text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <ListChecks className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="font-medium">No tasks yet</p>
-          <p className="text-sm text-muted-foreground">
-            Tasks you add to projects show up here.
-          </p>
         </div>
       ) : (
         <TaskList

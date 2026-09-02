@@ -14,6 +14,7 @@ import {
 import { TaskSheet } from "@/components/tasks/TaskSheet";
 import { cn } from "@/lib/utils";
 import {
+  contactDisplayName,
   TASK_PRIORITY_LABELS,
   type Task,
   type TaskPriority,
@@ -140,11 +141,16 @@ export function TaskList({
               >
                 {task.title}
               </p>
-              {showProject && task.project?.name && (
+              {(showProject && task.project?.name) || task.contact ? (
                 <p className="truncate text-xs text-muted-foreground">
-                  {task.project.name}
+                  {[
+                    showProject ? task.project?.name : null,
+                    task.contact ? contactDisplayName(task.contact) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
-              )}
+              ) : null}
             </div>
 
             {task.status === "in_progress" && (
@@ -216,17 +222,33 @@ export function TaskList({
             <Plus className="h-4 w-4" />
           )}
         </Button>
+        <Button
+          onClick={() => {
+            setEditing(null);
+            setSheetOpen(true);
+          }}
+        >
+          New task
+        </Button>
       </div>
 
       <TaskSheet
         open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        onOpenChange={(next) => {
+          setSheetOpen(next);
+          if (!next) setEditing(null);
+        }}
         workspaceId={workspaceId}
         projectId={projectId}
         task={editing}
-        onSaved={(saved) =>
-          onChange(tasks.map((t) => (t.id === saved.id ? saved : t)))
-        }
+        onSaved={(saved) => {
+          const exists = tasks.some((t) => t.id === saved.id);
+          onChange(
+            exists
+              ? tasks.map((t) => (t.id === saved.id ? saved : t))
+              : [...tasks, saved]
+          );
+        }}
       />
     </div>
   );

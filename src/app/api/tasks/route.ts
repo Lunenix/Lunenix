@@ -45,7 +45,9 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from("tasks")
-    .select("*, project:projects(id, name)")
+    .select(
+      "*, project:projects(id, name), contact:contacts(id, type, first_name, last_name, organization_name, email)"
+    )
     .eq("workspace_id", workspaceId)
     .order("position", { ascending: true })
     .order("created_at", { ascending: true });
@@ -92,10 +94,27 @@ export async function POST(request: NextRequest) {
   if (body.project_id) countQuery = countQuery.eq("project_id", body.project_id);
   const { count } = await countQuery;
 
+  let contactId: string | null = body.contact_id ?? null;
+  if (contactId) {
+    const { data: client } = await auth.supabase
+      .from("contacts")
+      .select("id")
+      .eq("id", contactId)
+      .eq("workspace_id", auth.workspaceId)
+      .maybeSingle();
+    if (!client?.id) {
+      return NextResponse.json(
+        { error: "That contact is not in this workspace." },
+        { status: 400 }
+      );
+    }
+  }
+
   const status = body.status ?? "todo";
   const payload = {
     workspace_id: auth.workspaceId,
     project_id: body.project_id ?? null,
+    contact_id: contactId,
     title,
     description: body.description ?? null,
     status,
@@ -111,7 +130,9 @@ export async function POST(request: NextRequest) {
   const { data, error } = await auth.supabase
     .from("tasks")
     .insert(payload)
-    .select("*, project:projects(id, name)")
+    .select(
+      "*, project:projects(id, name), contact:contacts(id, type, first_name, last_name, organization_name, email)"
+    )
     .single();
 
   if (error) {

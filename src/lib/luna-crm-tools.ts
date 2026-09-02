@@ -24,6 +24,8 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
         },
         due_date: { type: "string", description: "YYYY-MM-DD" },
         project_name: { type: "string" },
+        contact_name: { type: "string", description: "Client contact name" },
+        contact_email: { type: "string" },
         reminder_minutes_before: { type: "number" },
       },
     },
