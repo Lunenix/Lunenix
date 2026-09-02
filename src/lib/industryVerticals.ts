@@ -159,6 +159,18 @@ export function normalizeIndustryCustomLabel(
   return trimmed || null;
 }
 
+export function industrySectorId(
+  preset?: string | null
+): IndustrySectorId | null {
+  const resolved = resolveIndustryPreset(preset);
+  if (!resolved) return null;
+  return (
+    INDUSTRY_SECTORS.find((s) =>
+      s.verticals.some((v) => v.value === resolved)
+    )?.id ?? null
+  );
+}
+
 export function industrySectorLabel(
   preset?: string | null
 ): string | null {
