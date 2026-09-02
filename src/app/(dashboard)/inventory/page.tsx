@@ -55,7 +55,7 @@ export default function InventoryPage() {
         <h1 className="text-3xl font-bold">Inventory</h1>
         <p className="text-muted-foreground">
           Stock check before a job. Low-stock rows are highlighted. Set
-          calibrated-on for meters and cameras.
+          calibrated-on for meters. Set next service for saws, planers, and CNC.
         </p>
       </div>
       <div className="flex gap-2">
@@ -85,6 +85,7 @@ export default function InventoryPage() {
             <TableHead>Qty</TableHead>
             <TableHead>Reorder at</TableHead>
             <TableHead>Calibrated</TableHead>
+            <TableHead>Next service</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -110,6 +111,24 @@ export default function InventoryPage() {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         calibrated_on: e.target.value || null,
+                      }),
+                    });
+                    load();
+                  }}
+                />
+              </TableCell>
+              <TableCell>
+                <input
+                  className="rounded border bg-background px-2 py-1 text-sm"
+                  type="date"
+                  defaultValue={i.next_service_on ?? ""}
+                  key={`${i.id}-svc-${i.next_service_on ?? "x"}`}
+                  onBlur={async (e) => {
+                    await fetch(`/api/inventory/${i.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        next_service_on: e.target.value || null,
                       }),
                     });
                     load();

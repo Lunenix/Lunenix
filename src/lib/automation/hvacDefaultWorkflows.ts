@@ -1824,6 +1824,149 @@ export const CONSTRUCTION_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+export const WOODWORKING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Shop: New lead",
+    description:
+      "When a new lead is created, capture furniture vs built-in vs millwork source.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New shop lead: {{lead.title}}",
+        "Set lead source: custom furniture, built-ins, cabinetry, trim/millwork, referral, or portfolio. Capture name, phone, email, address, piece vs built-in vs install, and notes. Email to book a consult. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your inquiry. Reply with a couple of consult times, the address, and whether this is a furniture piece, built-in, cabinetry, or millwork.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Shop: Schedule consult",
+    description:
+      "On Site Visit, book the consult on the calendar with the address.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule consult / site visit: {{lead.title}}",
+        "Confirm date/time, address, source, project type, space dimensions. Add to the calendar with the address. Capture site and inspiration photos (kinds inspiration or measurement). Send confirmation and a reminder. Two-way texting is not live. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Your consult is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you on the calendar for a consult. Reply to this email if the time or address changes. Bring inspiration photos if you have them.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Shop: Quote after design",
+    description:
+      "On Estimate Sent, quote from approved design, selections, and labor.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Send shop quote: {{lead.title}}",
+        "Confirm design approved and wood/finish/hardware signed off. On Estimates, build the quote from design + materials + labor. Email it. Track sent / viewed / approved / expired. Approval creates the job. Two-way SMS is not live.",
+        0
+      ),
+      email(
+        "Your quote from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your quote is ready based on the approved drawings and material selections. Please review and reply to approve.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Shop: Materials and queue",
+    description:
+      "After Contract Signed, order lumber/hardware and put the piece on the shop queue.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Order materials and queue the shop: {{lead.title}}",
+        "On Materials, order lumber and hardware (types lumber, hardware, stain) and track lead time. On Shop, add the piece (stage design approved then material in). Invoice the deposit. Check low stock on Inventory. OCR is not auto-filled.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Shop: Fabrication",
+    description:
+      "When In Progress, run cut/mill/assembly/sanding/finishing and progress photos.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Run the shop: {{lead.title}}",
+        "On Shop, move stages (in fabrication → finishing → ready). Assign craftsman. Upload shop, joinery, and progress photos on Estimates. QC fit and dimensions before finishing. Email “your piece is in the shop.” GPS auto-track is not live.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Shop: Delivery and install",
+    description:
+      "On Punch List, schedule delivery or install and walk punch items.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Deliver or install: {{lead.title}}",
+        "On Shop, set install/pickup date, crew, and site prep (access, stairs, tight spaces). Upload final photos. Walk punch items. Email ready for delivery. Two-way SMS is not live.",
+        0
+      ),
+      email(
+        "Ready for delivery — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your piece is ready. We will confirm delivery or pickup next. Reply if access or stairs need extra planning.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Shop: Invoice and books",
+    description:
+      "When Closed, invoice remaining milestones and check shop margin.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Completion invoice and books: {{lead.title}}",
+        "Invoice remaining (material and completion). Check AR aging. Log lumber/hardware receipts in Books. Compare materials + shop labor + install vs price on Field ops. Flag negative reviews. OCR is not auto-filled.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Shop: After contract signed (e-sign)",
+    description:
+      "When an e-sign contract completes, order materials and queue the shop.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off shop from signed contract",
+        "Create or update the job, order lumber/hardware, add the shop queue row, and send the deposit invoice.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Shop: After invoice sent",
+    description:
+      "When an invoice is sent, follow AR (deposit, material, completion).",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on shop invoice",
+        "Watch aging. Send a reminder if overdue. Flag delayed material, pending design approvals, or jobs behind on the shop queue.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -1868,6 +2011,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   inspection_service: INSPECTION_DEFAULT_WORKFLOWS,
   rental_company: RENTAL_DEFAULT_WORKFLOWS,
   contractors_construction: CONSTRUCTION_DEFAULT_WORKFLOWS,
+  woodworking_custom_carpentry: WOODWORKING_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -1930,6 +2074,12 @@ async function pruneForeignIndustryWorkflows(
         (name.startsWith("General Contractor:") ||
           name.startsWith("Contractors & Construction:") ||
           name.startsWith("General Contractors & Construction:"))
+      ) {
+        return true;
+      }
+      if (
+        preset === "woodworking_custom_carpentry" &&
+        name.startsWith("Woodworking & Custom Carpentry:")
       ) {
         return true;
       }

@@ -12,6 +12,8 @@ import {
   isOpenReservationStatus,
   isOpenChangeOrderStatus,
   isOpenDrawStatus,
+  isPendingShopDesignStatus,
+  isWaitingShopMaterial,
 } from "@/lib/fieldService";
 
 function daysPastDue(due: string | null): number {
@@ -53,6 +55,9 @@ export async function GET(request: Request) {
     constructionSubs,
     constructionPhases,
     constructionDraws,
+    shopDesigns,
+    shopSelections,
+    shopQueue,
   ] = await Promise.all([
     supabase
       .from("estimates")
@@ -76,7 +81,7 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("inventory_items")
-      .select("id, name, quantity, reorder_at, calibrated_on")
+      .select("id, name, quantity, reorder_at, calibrated_on, next_service_on")
       .eq("workspace_id", workspaceId),
     supabase
       .from("mileage_logs")
@@ -150,6 +155,18 @@ export async function GET(request: Request) {
       .from("construction_draws")
       .select("id, kind, status, amount, due_on, lien_waiver")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("shop_designs")
+      .select("id, title, status")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("shop_selections")
+      .select("id, name, kind, signed_off_at")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("shop_queue")
+      .select("id, title, stage, install_on")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const est = estimates.data ?? [];
@@ -176,6 +193,9 @@ export async function GET(request: Request) {
   const subRows = constructionSubs.data ?? [];
   const phaseRows = constructionPhases.data ?? [];
   const drawRows = constructionDraws.data ?? [];
+  const shopDesignRows = shopDesigns.data ?? [];
+  const shopSelectionRows = shopSelections.data ?? [];
+  const shopQueueRows = shopQueue.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const recurring = planRows
     .filter((p) => p.is_active && (p.frequency !== "seasonal" || p.seasonal_on))
@@ -397,6 +417,16 @@ export async function GET(request: Request) {
           label: `Calibration overdue: ${s.name}`,
           href: "/inventory",
         })),
+      ...stock
+        .filter((s) => {
+          const d = daysUntil(s.next_service_on);
+          return d !== null && d <= 0;
+        })
+        .map((s) => ({
+          kind: "shop_service",
+          label: `Equipment service due: ${s.name}`,
+          href: "/inventory",
+        })),
       ...rentalRows
         .filter(
           (r) =>
@@ -510,6 +540,39 @@ export async function GET(request: Request) {
           kind: "lien_waiver",
           label: `Lien waiver needed: ${d.kind}`,
           href: "/draws",
+        })),
+      ...shopDesignRows
+        .filter((d) => isPendingShopDesignStatus(String(d.status)))
+        .map((d) => ({
+          kind: "design_pending",
+          label: `Design ${d.status.replace("_", " ")}: ${d.title}`,
+          href: "/designs",
+        })),
+      ...shopSelectionRows
+        .filter((s) => !s.signed_off_at)
+        .map((s) => ({
+          kind: "selection_signoff",
+          label: `Selection needs sign-off: ${s.name}`,
+          href: "/selections",
+        })),
+      ...shopQueueRows
+        .filter((q) => isWaitingShopMaterial(String(q.stage)))
+        .map((q) => ({
+          kind: "shop_material",
+          label: `Waiting on material: ${q.title}`,
+          href: "/shop",
+        })),
+      ...shopQueueRows
+        .filter(
+          (q) =>
+            q.install_on &&
+            String(q.install_on).slice(0, 10) < today &&
+            !["ready", "install", "pickup"].includes(String(q.stage))
+        )
+        .map((q) => ({
+          kind: "shop_behind",
+          label: `Shop behind schedule: ${q.title}`,
+          href: "/shop",
         })),
     ],
   });

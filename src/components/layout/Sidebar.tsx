@@ -66,6 +66,9 @@ import {
   ChartGantt,
   Notebook,
   Landmark,
+  PencilRuler,
+  TreePine,
+  Hammer,
 } from "lucide-react";
 
 const coreNav = [
@@ -87,6 +90,9 @@ const fieldNav = [
   { href: "/phases", label: "Phases", icon: ChartGantt },
   { href: "/daily-logs", label: "Daily logs", icon: Notebook },
   { href: "/draws", label: "Draws", icon: Landmark },
+  { href: "/designs", label: "Designs", icon: PencilRuler },
+  { href: "/selections", label: "Selections", icon: TreePine },
+  { href: "/shop", label: "Shop", icon: Hammer },
   { href: "/claims", label: "Claims", icon: Shield },
   { href: "/materials", label: "Materials", icon: Truck },
   { href: "/colors", label: "Colors", icon: Palette },

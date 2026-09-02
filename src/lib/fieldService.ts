@@ -34,6 +34,12 @@ export function isConstructionWorkspace(
   return resolveIndustryPreset(industryPreset) === "contractors_construction";
 }
 
+export function isWoodworkingWorkspace(
+  industryPreset?: string | null
+): boolean {
+  return resolveIndustryPreset(industryPreset) === "woodworking_custom_carpentry";
+}
+
 export const CLAIM_STATUSES = [
   "filed",
   "adjuster_scheduled",
@@ -102,6 +108,8 @@ export const MATERIAL_TYPES = [
   "lumber",
   "concrete",
   "fixture",
+  "hardware",
+  "stain",
   "other",
 ] as const;
 export type MaterialType = (typeof MATERIAL_TYPES)[number];
@@ -119,6 +127,8 @@ export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
   lumber: "Lumber",
   concrete: "Concrete",
   fixture: "Fixture / finish",
+  hardware: "Hardware",
+  stain: "Finish / stain",
   other: "Other",
 };
 
@@ -138,6 +148,10 @@ export const ESTIMATE_PHOTO_KINDS = [
   "progress",
   "existing",
   "concealed",
+  "inspiration",
+  "shop",
+  "joinery",
+  "final",
 ] as const;
 export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
 export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
@@ -156,6 +170,10 @@ export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
   progress: "Progress",
   existing: "Existing conditions",
   concealed: "Before covering",
+  inspiration: "Inspiration",
+  shop: "Shop / build",
+  joinery: "Joinery check",
+  final: "Final / install",
 };
 
 export const ROOFING_LEAD_SOURCES = [
@@ -204,6 +222,15 @@ export const CONSTRUCTION_LEAD_SOURCES = [
   "New build",
 ] as const;
 
+export const WOODWORKING_LEAD_SOURCES = [
+  "Custom furniture",
+  "Built-ins",
+  "Cabinetry",
+  "Trim / millwork",
+  "Referral",
+  "Portfolio",
+] as const;
+
 export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
   new Set([
     ...ROOFING_LEAD_SOURCES,
@@ -212,6 +239,7 @@ export const FIELD_LEAD_SOURCE_SUGGESTIONS = Array.from(
     ...INSPECTION_LEAD_SOURCES,
     ...RENTAL_LEAD_SOURCES,
     ...CONSTRUCTION_LEAD_SOURCES,
+    ...WOODWORKING_LEAD_SOURCES,
   ])
 );
 
@@ -675,6 +703,70 @@ export const LIEN_WAIVER_STATUS_LABELS: Record<LienWaiverStatus, string> = {
 export function isOpenDrawStatus(status: string): boolean {
   return status === "sent";
 }
+
+export const SHOP_DESIGN_STATUSES = [
+  "draft",
+  "sent",
+  "revision_requested",
+  "approved",
+] as const;
+export type ShopDesignStatus = (typeof SHOP_DESIGN_STATUSES)[number];
+export const SHOP_DESIGN_STATUS_LABELS: Record<ShopDesignStatus, string> = {
+  draft: "Draft",
+  sent: "Sent for review",
+  revision_requested: "Revisions requested",
+  approved: "Approved",
+};
+export function isPendingShopDesignStatus(status: string): boolean {
+  return ["draft", "sent", "revision_requested"].includes(status);
+}
+
+export const SHOP_SELECTION_KINDS = ["species", "finish", "hardware"] as const;
+export type ShopSelectionKind = (typeof SHOP_SELECTION_KINDS)[number];
+export const SHOP_SELECTION_KIND_LABELS: Record<ShopSelectionKind, string> = {
+  species: "Wood species",
+  finish: "Finish / stain",
+  hardware: "Hardware",
+};
+
+export const SHOP_STAGES = [
+  "design_approved",
+  "material_in",
+  "in_fabrication",
+  "finishing",
+  "ready",
+  "install",
+  "pickup",
+] as const;
+export type ShopStage = (typeof SHOP_STAGES)[number];
+export const SHOP_STAGE_LABELS: Record<ShopStage, string> = {
+  design_approved: "Design approved",
+  material_in: "Waiting on material",
+  in_fabrication: "In fabrication",
+  finishing: "Finishing",
+  ready: "Ready for install / pickup",
+  install: "Install scheduled",
+  pickup: "Pickup",
+};
+export function isWaitingShopMaterial(stage: string): boolean {
+  return stage === "material_in";
+}
+
+export const SHOP_FAB_STEPS = [
+  "cut",
+  "mill",
+  "assembly",
+  "sanding",
+  "finishing",
+] as const;
+export type ShopFabStep = (typeof SHOP_FAB_STEPS)[number];
+export const SHOP_FAB_STEP_LABELS: Record<ShopFabStep, string> = {
+  cut: "Cut list",
+  mill: "Milling",
+  assembly: "Assembly",
+  sanding: "Sanding",
+  finishing: "Finishing",
+};
 
 export const ACCESS_ENTRY_METHODS = [
   "occupant",

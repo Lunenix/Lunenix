@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
-import { isConstructionWorkspace } from "@/lib/fieldService";
+import {
+  isConstructionWorkspace,
+  isWoodworkingWorkspace,
+} from "@/lib/fieldService";
 
 type Overview = {
   estimates: { draft: number; sent: number; approved: number };
@@ -77,7 +80,9 @@ export default function FieldOpsPage() {
       <div>
         <h1 className="text-3xl font-bold">Field operations</h1>
         <p className="text-muted-foreground">
-          {isConstructionWorkspace(activeWorkspace.industry_preset)
+          {isWoodworkingWorkspace(activeWorkspace.industry_preset)
+            ? "Lead → consult/photos → designs and wood/finish/hardware sign-off → quote → materials and shop queue → fab photos → delivery/install → punch → invoice. Approval still creates a job."
+            : isConstructionWorkspace(activeWorkspace.industry_preset)
             ? "Lead → site visit → photos → bid → contract → permits/phases/subs → daily logs and draws → punch → close. Change orders need approval before extra work."
             : "Lead → visit → photos → estimate → job / recurring plan → invoice. Rental workspaces track assets on Fleet and Rentals instead of jobs as the core loop."}{" "}
           Email customers from Estimates. Two-way SMS needs a text provider
@@ -86,7 +91,9 @@ export default function FieldOpsPage() {
           Painting: Colors and Prep. Pest: Treatments, Access, Recurring.
           Inspection: Findings, Reports, Add-ons. Rental: Fleet, Rentals,
           Maintenance. General contractors: Change orders, Subs, Phases, Daily
-          logs, Draws, plus Permits and Materials.
+          logs, Draws, plus Permits and Materials. Woodworking: Designs,
+          Selections, Shop, plus Materials and Inventory for lumber and
+          equipment.
         </p>
       </div>
 
@@ -237,6 +244,15 @@ export default function FieldOpsPage() {
         </Button>
         <Button asChild variant="outline">
           <Link href="/draws">Draws</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/designs">Designs</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/selections">Selections</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/shop">Shop</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/plans">Recurring</Link>

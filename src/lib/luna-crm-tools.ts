@@ -1091,6 +1091,84 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_shop_designs",
+    description:
+      "List shop drawings (title, version, status). Does not return CAD files.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_shop_design",
+    description:
+      "Log a shop drawing. Status is draft, sent, revision requested, or approved.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        status: {
+          type: "string",
+          description: "draft, sent, revision_requested, or approved",
+        },
+        version: { type: "number" },
+        dimensions: { type: "string" },
+        joinery_notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_shop_selections",
+    description:
+      "List wood, finish, and hardware selections and whether they are signed off.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_shop_selection",
+    description: "Log a species, finish, or hardware selection with cost.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        kind: {
+          type: "string",
+          description: "species, finish, or hardware",
+        },
+        cost: { type: "number" },
+        signed_off: { type: "boolean" },
+        project_name: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_shop_queue",
+    description:
+      "List the shop fabrication queue (stage, fab step, craftsman).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_shop_queue_item",
+    description: "Add a piece to the shop queue.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        stage: {
+          type: "string",
+          description:
+            "design_approved, material_in, in_fabrication, finishing, ready, install, or pickup",
+        },
+        fab_step: {
+          type: "string",
+          description: "cut, mill, assembly, sanding, or finishing",
+        },
+        craftsman_name: { type: "string" },
+        install_on: { type: "string", description: "YYYY-MM-DD" },
+        access_notes: { type: "string" },
+        project_name: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_service_plans",
     description:
       "List recurring service plans (mow/maintain frequency, next visit, seasonal toggle).",

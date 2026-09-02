@@ -109,6 +109,9 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "construction_phases",
   "construction_daily_logs",
   "construction_draws",
+  "shop_designs",
+  "shop_selections",
+  "shop_queue",
 ]);
 
 /**

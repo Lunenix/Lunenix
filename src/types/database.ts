@@ -938,6 +938,7 @@ export interface InventoryItem {
   reorder_at: number;
   unit: string;
   calibrated_on?: string | null;
+  next_service_on?: string | null;
 }
 
 export interface JobExpense {
@@ -1361,6 +1362,52 @@ export interface ConstructionDraw {
   percent_complete: number;
   due_on: string | null;
   lien_waiver: string;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface ShopDesign {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  title: string;
+  version: number;
+  status: string;
+  dimensions: string | null;
+  joinery_notes: string | null;
+  drawing_url: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface ShopSelection {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  kind: string;
+  name: string;
+  cost: number;
+  photo_url: string | null;
+  signed_off_at: string | null;
+  notes: string | null;
+  created_at: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface ShopQueueItem {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  contact_id: string | null;
+  title: string;
+  stage: string;
+  fab_step: string | null;
+  craftsman_name: string | null;
+  install_on: string | null;
+  access_notes: string | null;
   notes: string | null;
   created_at: string;
   project?: { id: string; name: string } | null;

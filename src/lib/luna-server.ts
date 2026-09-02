@@ -21,7 +21,7 @@ import { executeWorkflowsForTrigger } from "@/lib/automation/executeWorkflow";
 import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES, CHANGE_ORDER_STATUSES, SUB_TRADES, PHASE_KINDS, PHASE_STATUSES, DELAY_CAUSES, DRAW_KINDS, DRAW_STATUSES, LIEN_WAIVER_STATUSES } from "@/lib/fieldService";
+import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES, CHANGE_ORDER_STATUSES, SUB_TRADES, PHASE_KINDS, PHASE_STATUSES, DELAY_CAUSES, DRAW_KINDS, DRAW_STATUSES, LIEN_WAIVER_STATUSES, SHOP_DESIGN_STATUSES, SHOP_SELECTION_KINDS, SHOP_STAGES, SHOP_FAB_STEPS } from "@/lib/fieldService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -5604,6 +5604,213 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Logged ${data.kind} draw as ${data.status}. Amount only — no cards.`
+      );
+    }
+
+    if (name === "list_shop_designs") {
+      const { data, error } = await supabase
+        .from("shop_designs")
+        .select("title, version, status")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (d: { title: string; version: number; status: string }) =>
+          `${d.title} v${d.version}: ${d.status}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No shop drawings in this workspace.",
+      };
+    }
+
+    if (name === "log_shop_design") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a drawing title." };
+      const stRaw = argString(args, "status") || "draft";
+      const status = (SHOP_DESIGN_STATUSES as readonly string[]).includes(stRaw)
+        ? stRaw
+        : "draft";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("shop_designs")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          title: title.slice(0, 200),
+          status,
+          version: Number(args.version) || 1,
+          dimensions: argString(args, "dimensions"),
+          joinery_notes: argString(args, "joinery_notes"),
+        })
+        .select("title, status")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that drawing." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged drawing ${data.title} as ${data.status}.`
+      );
+    }
+
+    if (name === "list_shop_selections") {
+      const { data, error } = await supabase
+        .from("shop_selections")
+        .select("kind, name, cost, signed_off_at")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (s: {
+          kind: string;
+          name: string;
+          cost: number;
+          signed_off_at: string | null;
+        }) =>
+          `${s.kind} ${s.name}${s.signed_off_at ? " signed off" : " needs sign-off"}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No material selections in this workspace.",
+      };
+    }
+
+    if (name === "log_shop_selection") {
+      const selName = argString(args, "name");
+      if (!selName) return { error: "Need a selection name." };
+      const kindRaw = argString(args, "kind") || "species";
+      const kind = (SHOP_SELECTION_KINDS as readonly string[]).includes(kindRaw)
+        ? kindRaw
+        : "species";
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("shop_selections")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          kind,
+          name: selName.slice(0, 200),
+          cost: Number(args.cost) || 0,
+          signed_off_at: args.signed_off ? new Date().toISOString() : null,
+          notes: argString(args, "notes"),
+        })
+        .select("name, kind")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that selection." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged ${data.kind} selection ${data.name}.`
+      );
+    }
+
+    if (name === "list_shop_queue") {
+      const { data, error } = await supabase
+        .from("shop_queue")
+        .select("title, stage, fab_step, craftsman_name")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (q: {
+          title: string;
+          stage: string;
+          fab_step: string | null;
+          craftsman_name: string | null;
+        }) =>
+          `${q.title}: ${q.stage}${q.fab_step ? ` (${q.fab_step})` : ""}${
+            q.craftsman_name ? `, ${q.craftsman_name}` : ""
+          }`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "Nothing on the shop queue in this workspace.",
+      };
+    }
+
+    if (name === "log_shop_queue_item") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need a piece title." };
+      const stageRaw = argString(args, "stage") || "design_approved";
+      const stage = (SHOP_STAGES as readonly string[]).includes(stageRaw)
+        ? stageRaw
+        : "design_approved";
+      const stepRaw = argString(args, "fab_step");
+      const fab_step =
+        stepRaw && (SHOP_FAB_STEPS as readonly string[]).includes(stepRaw)
+          ? stepRaw
+          : null;
+      let projectId: string | null = null;
+      const projectRef = argString(args, "project_name");
+      if (projectRef) {
+        const project = await requireOneProject(
+          supabase,
+          workspace_id,
+          projectRef,
+          null
+        );
+        if ("error" in project) return project;
+        projectId = project.id;
+      }
+      const { data, error } = await supabase
+        .from("shop_queue")
+        .insert({
+          workspace_id,
+          project_id: projectId,
+          title: title.slice(0, 200),
+          stage,
+          fab_step,
+          craftsman_name: argString(args, "craftsman_name"),
+          install_on: argString(args, "install_on"),
+          access_notes: argString(args, "access_notes"),
+        })
+        .select("title, stage")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not queue that piece." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Queued ${data.title} as ${data.stage}.`
       );
     }
 
