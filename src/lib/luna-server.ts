@@ -150,7 +150,7 @@ async function findContactId(
   nameOrEmail: string | null
 ): Promise<string | null> {
   const matches = await findContactMatches(supabase, workspaceId, nameOrEmail);
-  return matches.length === 1 ? matches[0].id : matches[0]?.id ?? null;
+  return matches.length === 1 ? matches[0].id : null;
 }
 
 async function findPipelineStage(
@@ -196,6 +196,131 @@ async function resolveWorkspaceContactId(
   );
 }
 
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = row[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+      prev = cur;
+    }
+  }
+  return row[b.length];
+}
+
+const NAME_ALIAS_GROUPS: string[][] = [
+  ["jon", "john", "johnny", "jonathan", "jonny"],
+  ["mike", "michael", "mick", "mikey"],
+  ["bob", "robert", "rob", "bobby"],
+  ["bill", "william", "will", "billy", "liam"],
+  ["liz", "elizabeth", "beth", "eliza"],
+  ["kate", "katie", "katherine", "catherine", "cathy"],
+  ["tom", "thomas", "tommy"],
+  ["jim", "james", "jimmy", "jamie"],
+  ["dave", "david"],
+  ["chris", "christopher", "kristopher"],
+  ["matt", "matthew"],
+  ["dan", "daniel", "danny"],
+  ["steve", "steven", "stephen"],
+  ["jen", "jennifer", "jenny"],
+  ["alex", "alexander", "alexandra", "lex"],
+  ["nick", "nicholas", "nico"],
+  ["joe", "joseph", "joey"],
+  ["sam", "samuel", "samantha"],
+  ["ben", "benjamin", "benny"],
+  ["nate", "nathan", "nathaniel"],
+  ["rick", "richard", "dick", "rich"],
+  ["meg", "megan", "meghan"],
+  ["becky", "rebecca", "becca"],
+];
+
+const NAME_ALIAS_MAP: Map<string, Set<string>> = (() => {
+  const map = new Map<string, Set<string>>();
+  for (const group of NAME_ALIAS_GROUPS) {
+    const set = new Set(group);
+    for (const name of group) map.set(name, set);
+  }
+  return map;
+})();
+
+function normalizePersonName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9@.\s'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenSimilarity(needle: string, hay: string): number {
+  if (!needle || !hay) return 0;
+  if (needle === hay) return 1;
+  const aliases = NAME_ALIAS_MAP.get(needle);
+  if (aliases?.has(hay)) return 0.93;
+  if (hay.startsWith(needle) && needle.length >= 3) return 0.88;
+  if (needle.startsWith(hay) && hay.length >= 3) return 0.84;
+  const dist = levenshtein(needle, hay);
+  const maxLen = Math.max(needle.length, hay.length);
+  if (maxLen >= 3 && dist <= 1) return 0.9;
+  if (maxLen >= 5 && dist <= 2) return 0.8;
+  if (hay.includes(needle) && needle.length >= 3) return 0.72;
+  return 0;
+}
+
+function phraseSimilarity(needle: string, haystack: string): number {
+  const n = normalizePersonName(needle);
+  const h = normalizePersonName(haystack);
+  if (!n || !h) return 0;
+  if (n === h) return 1;
+  const nToks = n.split(" ");
+  const hToks = h.split(" ");
+  let sum = 0;
+  for (const nt of nToks) {
+    let best = 0;
+    for (const ht of hToks) best = Math.max(best, tokenSimilarity(nt, ht));
+    sum += best;
+  }
+  return sum / nToks.length;
+}
+
+function rankFuzzyMatches<T extends { id: string; label: string }>(
+  needle: string,
+  rows: T[],
+  extraHay?: (row: T) => string[]
+): T[] {
+  const scored = rows
+    .map((row) => {
+      const fields = [row.label, ...(extraHay ? extraHay(row) : [])];
+      const score = Math.max(
+        ...fields.map((field) => phraseSimilarity(needle, field))
+      );
+      return { row, score };
+    })
+    .filter((item) => item.score >= 0.72)
+    .sort((a, b) => b.score - a.score);
+  if (!scored.length) return [];
+  const top = scored[0].score;
+  const close = scored.filter((item) => top - item.score <= 0.12);
+  if (
+    close.length > 1 &&
+    !(scored.length >= 2 && scored[0].score - scored[1].score >= 0.12)
+  ) {
+    return close.slice(0, 5).map((item) => item.row);
+  }
+  return [scored[0].row];
+}
+
+function askWhichMatch(kind: string, labels: string[]): string {
+  return `A few ${kind} are close to that. Which one did you mean: ${labels
+    .slice(0, 5)
+    .join(", ")}?`;
+}
+
 async function findContactMatches(
   supabase: LunaSupabaseClient,
   workspaceId: string,
@@ -218,26 +343,23 @@ async function findContactMatches(
     .from("contacts")
     .select("id, first_name, last_name, organization_name, email")
     .eq("workspace_id", workspaceId)
-    .limit(40);
-  const needle = nameOrEmail.toLowerCase().trim();
-  return (data ?? [])
-    .filter((row: Record<string, unknown>) => {
-      const full = [row.first_name, row.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const org =
-        typeof row.organization_name === "string"
-          ? row.organization_name.toLowerCase()
-          : "";
-      const email =
-        typeof row.email === "string" ? row.email.toLowerCase() : "";
-      return full.includes(needle) || org.includes(needle) || email.includes(needle);
-    })
-    .map((row: Record<string, unknown>) => ({
-      id: String(row.id),
-      label: contactSpokenLabel(row),
-    }));
+    .limit(80);
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const mapped = rows.map((row) => ({
+    id: String(row.id),
+    label: contactSpokenLabel(row),
+    first: typeof row.first_name === "string" ? row.first_name : "",
+    last: typeof row.last_name === "string" ? row.last_name : "",
+    org: typeof row.organization_name === "string" ? row.organization_name : "",
+    email: typeof row.email === "string" ? row.email : "",
+  }));
+  return rankFuzzyMatches(nameOrEmail, mapped, (row) => [
+    row.first,
+    row.last,
+    [row.first, row.last].filter(Boolean).join(" "),
+    row.org,
+    row.email.split("@")[0] ?? "",
+  ]);
 }
 
 function contactSpokenLabel(row: Record<string, unknown>): string {
@@ -269,11 +391,12 @@ async function findProjectMatches(
     .select("id, name")
     .eq("workspace_id", workspaceId)
     .limit(40);
-  const needle = name.toLowerCase().trim();
   const rows = (data ?? []) as Array<{ id: string; name: string }>;
-  const exact = rows.filter((p) => p.name.toLowerCase() === needle);
-  if (exact.length) return exact;
-  return rows.filter((p) => p.name.toLowerCase().includes(needle));
+  return rankFuzzyMatches(
+    name,
+    rows.map((p) => ({ id: p.id, label: p.name })),
+    (row) => [row.label]
+  ).map((row) => ({ id: row.id, name: row.label }));
 }
 
 function splitPersonName(full: string): { first: string | null; last: string | null } {
@@ -341,10 +464,10 @@ async function requireOneContact(
   }
   if (matches.length > 1) {
     return {
-      error: `Several contacts match. Say which one: ${matches
-        .slice(0, 4)
-        .map((m) => m.label)
-        .join(", ")}.`,
+      error: askWhichMatch(
+        "contacts",
+        matches.map((m) => m.label)
+      ),
     };
   }
   return matches[0];
@@ -371,10 +494,10 @@ async function requireOneProject(
   }
   if (matches.length > 1) {
     return {
-      error: `Several projects match. Say which one: ${matches
-        .slice(0, 4)
-        .map((m) => m.name)
-        .join(", ")}.`,
+      error: askWhichMatch(
+        "projects",
+        matches.map((m) => m.name)
+      ),
     };
   }
   return matches[0];
@@ -420,7 +543,6 @@ async function findTitleMatches(
     .select(`id, ${nameColumn}`)
     .eq("workspace_id", workspaceId)
     .limit(40);
-  const lower = q.toLowerCase();
   const rows = (data ?? []) as Array<Record<string, unknown>>;
   const mapped = rows
     .map((row) => ({
@@ -428,9 +550,7 @@ async function findTitleMatches(
       label: String(row[nameColumn] ?? ""),
     }))
     .filter((row) => row.label);
-  const exact = mapped.filter((r) => r.label.toLowerCase() === lower);
-  if (exact.length) return exact;
-  return mapped.filter((r) => r.label.toLowerCase().includes(lower));
+  return rankFuzzyMatches(q, mapped);
 }
 
 function pickUniqueOrAsk(
@@ -440,10 +560,10 @@ function pickUniqueOrAsk(
   if (!matches.length) return { error: empty };
   if (matches.length > 1) {
     return {
-      error: `Several matches. Say which one: ${matches
-        .slice(0, 4)
-        .map((m) => m.label)
-        .join(", ")}.`,
+      error: askWhichMatch(
+        "matches",
+        matches.map((m) => m.label)
+      ),
     };
   }
   return matches[0];
@@ -1759,11 +1879,18 @@ export async function executeLunaTool(
       const statusArg = argString(args, "status");
       const status =
         statusArg && PROJECT_STATUSES.has(statusArg) ? statusArg : "planning";
-      const contactId = await findContactId(
-        supabase,
-        workspace_id,
-        argString(args, "contact_name") ?? argString(args, "contact_email")
-      );
+      const contactRef =
+        argString(args, "contact_name") ?? argString(args, "contact_email");
+      let contactId: string | null = null;
+      if (contactRef) {
+        const foundContact = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactRef
+        );
+        if ("error" in foundContact) return foundContact;
+        contactId = foundContact.id;
+      }
       const budget = argNumber(args, "budget");
       const { data, error } = await supabase
         .from("projects")
@@ -1818,11 +1945,13 @@ export async function executeLunaTool(
       const contactRef =
         argString(args, "contact_name") || argString(args, "contact_email");
       if (contactRef) {
-        const contactId = await findContactId(supabase, workspace_id, contactRef);
-        if (!contactId) {
-          return { error: "I could not find that contact to attach to the project." };
-        }
-        updates.contact_id = contactId;
+        const foundContact = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactRef
+        );
+        if ("error" in foundContact) return foundContact;
+        updates.contact_id = foundContact.id;
       }
       const startDate = asIsoDate(argString(args, "start_date"));
       const dueDate = asIsoDate(argString(args, "due_date"));
@@ -2026,31 +2155,31 @@ export async function executeLunaTool(
       let to = argStringAny(args, ["to", "to_email", "contact_email"]);
       let contactId: string | null = null;
       if (to && !looksLikeEmail(to)) {
-        contactId = await findContactId(supabase, workspace_id, to);
+        const found = await requireOneContact(supabase, workspace_id, to);
+        if ("error" in found) return found;
+        contactId = found.id;
         to = null;
-        if (contactId) {
-          const { data: namedContact } = await supabase
-            .from("contacts")
-            .select("id, email")
-            .eq("id", contactId)
-            .eq("workspace_id", workspace_id)
-            .maybeSingle();
-          to = typeof namedContact?.email === "string" ? namedContact.email : null;
-        }
+        const { data: namedContact } = await supabase
+          .from("contacts")
+          .select("id, email")
+          .eq("id", contactId)
+          .eq("workspace_id", workspace_id)
+          .maybeSingle();
+        to = typeof namedContact?.email === "string" ? namedContact.email : null;
       }
       const contactRef =
         argString(args, "contact_name") ?? argString(args, "contact_email");
       if (!to && contactRef) {
-        contactId = await findContactId(supabase, workspace_id, contactRef);
-        if (contactId) {
-          const { data: contact } = await supabase
-            .from("contacts")
-            .select("id, email")
-            .eq("id", contactId)
-            .eq("workspace_id", workspace_id)
-            .maybeSingle();
-          to = typeof contact?.email === "string" ? contact.email : null;
-        }
+        const found = await requireOneContact(supabase, workspace_id, contactRef);
+        if ("error" in found) return found;
+        contactId = found.id;
+        const { data: contact } = await supabase
+          .from("contacts")
+          .select("id, email")
+          .eq("id", contactId)
+          .eq("workspace_id", workspace_id)
+          .maybeSingle();
+        to = typeof contact?.email === "string" ? contact.email : null;
       }
       const subject = argString(args, "subject");
       const body = argString(args, "body");
@@ -2900,30 +3029,49 @@ export async function executeLunaTool(
 
     if (name === "search_contacts") {
       const query = sanitizeIlikeQuery(argString(args, "query") ?? "");
-      let q = supabase
+      const { data, error } = await supabase
         .from("contacts")
-        .select("first_name, last_name, organization_name, email, type")
+        .select("id, first_name, last_name, organization_name, email, type")
         .eq("workspace_id", workspace_id)
         .order("updated_at", { ascending: false })
-        .limit(12);
-      if (query) {
-        q = q.or(
-          `first_name.ilike.%${query}%,last_name.ilike.%${query}%,organization_name.ilike.%${query}%,email.ilike.%${query}%`
-        );
-      }
-      const { data, error } = await q;
+        .limit(80);
       if (error) return { error: error.message };
       const rows = (data ?? []) as Array<Record<string, unknown>>;
-      if (!rows.length) {
+      const mapped = rows.map((row) => ({
+        id: String(row.id),
+        label: contactSpokenLabel(row),
+        first: typeof row.first_name === "string" ? row.first_name : "",
+        last: typeof row.last_name === "string" ? row.last_name : "",
+        org:
+          typeof row.organization_name === "string"
+            ? row.organization_name
+            : "",
+        email: typeof row.email === "string" ? row.email : "",
+        row,
+      }));
+      const filtered = query
+        ? rankFuzzyMatches(query, mapped, (item) => [
+            item.first,
+            item.last,
+            [item.first, item.last].filter(Boolean).join(" "),
+            item.org,
+            item.email.split("@")[0] ?? "",
+          ])
+        : mapped.slice(0, 12);
+      if (!filtered.length) {
         return { ok: true, summary: "No contacts matched in this workspace." };
       }
-      const spoken = rows
-        .map((row) => contactSpokenLabel(row))
-        .join(", ");
-      return {
-        ok: true,
-        summary: `Contacts: ${spoken}.`,
-      };
+      if (query && filtered.length > 1) {
+        return {
+          ok: true,
+          summary: askWhichMatch(
+            "contacts",
+            filtered.map((item) => item.label)
+          ),
+        };
+      }
+      const spoken = filtered.map((item) => item.label).join(", ");
+      return { ok: true, summary: `Contacts: ${spoken}.` };
     }
 
     if (name === "list_emails") {
