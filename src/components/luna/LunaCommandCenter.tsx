@@ -54,6 +54,8 @@ function looksLikeLunaEcho(heard: string, spoken: string | null): boolean {
   if (a.length < 10) return false;
   return b.includes(a) || a.includes(b.slice(0, Math.min(a.length, 80)));
 }
+
+const SIMLI_PCM_CHUNK = 6000;
 const PCM_HZ = 16000;
 
 function sendPcmChunks(client: SimliClient, bytes: Uint8Array) {
