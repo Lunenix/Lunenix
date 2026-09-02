@@ -500,10 +500,185 @@ export const PLUMBING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+/**
+ * Electrical default automations.
+ * Starts when a new lead is created. Adds emergency/safety dispatch, permits, and panel history.
+ */
+export const ELECTRICIAN_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Electrical: New lead",
+    description:
+      "When a new lead is created, capture source and whether this is an outage or safety hazard.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Lead",
+    actions: [
+      task(
+        "New electrical lead: {{lead.title}}",
+        "Track lead source. Mark emergency/urgent vs routine (outage, sparking, burning smell, exposed wiring). Capture name, phone, email, service address, and job type/notes (panel, circuit, fixture, EV charger, solar). Email or text to set a visit. Two-way SMS is not live yet — use email and the contact record.",
+        0
+      ),
+      email(
+        "We got your electrical request — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your request. If this is an emergency (no power, sparking, burning smell, or a safety hazard), reply EMERGENCY and we will prioritize dispatch. Otherwise reply with times that work for a visit and confirm the address.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Electrical: Schedule visit",
+    description:
+      "On Site Visit, book diagnostic/estimate time and send confirmation plus a reminder.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Site Visit",
+    actions: [
+      task(
+        "Schedule electrical visit: {{lead.title}}",
+        "Confirm date/time, address, contact, lead source, and emergency vs routine. Put it on the calendar with the address for routing. Send confirmation now and a reminder before the visit. Flag urgent/unassigned if same-day.",
+        1
+      ),
+      email(
+        "Your electrical visit is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have you on the schedule. We will come to the address on file. Reply if you need to change the time, especially if sparking or an outage gets worse.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Electrical: Diagnostic photos and estimate",
+    description:
+      "On Estimate Sent, capture panel/wiring photos and send the estimate.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Estimate Sent",
+    actions: [
+      task(
+        "Upload diagnostic photos: {{lead.title}}",
+        "On-site: photo panel condition, wiring, code violations, and damage. Attach to the estimate, then price labor, parts, and any permit fees.",
+        0
+      ),
+      task(
+        "Send electrical estimate: {{lead.title}}",
+        "Email the estimate. Track sent / viewed / approved / expired. On approval, convert to a job. Texting still needs a two-way SMS provider.",
+        0
+      ),
+      email(
+        "Your electrical estimate from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready, including parts and any permit fees if this work needs a permit (panel upgrade, rewiring, new circuits, EV charger). Reply to approve or tell us what to adjust.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Electrical: Job, dispatch, and permits",
+    description:
+      "After Contract Signed, create the job, prioritize emergency dispatch, and flag permits.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Create job and dispatch tech: {{lead.title}}",
+        "Create the job from the approved estimate. Assign an electrician with emergency dispatch priority if urgent. Check availability and licenses (electrical license, journeyman/master, solar or EV specialty) before dispatch. Flag urgent or unassigned.",
+        1
+      ),
+      task(
+        "Permits and inspections: {{lead.title}}",
+        "Flag if this job needs a permit (panel upgrades, rewiring, new circuits, EV chargers). Track status: applied, approved, inspection scheduled/passed. Store permit docs/photos on the job or contact notes until a permit file field exists.",
+        1
+      ),
+      email(
+        "You are on the electrical schedule — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thanks for approving the work. We are assigning a tech. If a permit or inspection is required, we will keep you posted.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Electrical: Mileage, truck stock, and receipts",
+    description:
+      "When In Progress, log mileage, parts, and supplier receipts.",
+    trigger_type: "lead_stage_change",
+    toStageName: "In Progress",
+    actions: [
+      task(
+        "Log mileage for this job: {{lead.title}}",
+        "Log home base to first job and job-to-job legs on Mileage. Tie miles to this job for costing and the IRS mileage deduction. GPS auto-track is not on yet — enter miles from the map or odometer.",
+        0
+      ),
+      task(
+        "Check truck stock and parts: {{lead.title}}",
+        "Confirm wire, breakers, panels, fixtures, and conduit. Tie parts to the job. Watch low-stock alerts, especially truck stock for emergency calls.",
+        0
+      ),
+      task(
+        "Capture parts receipts: {{lead.title}}",
+        "Photo/upload supplier receipts. Tag by job and customer. Categorize the expense. OCR is not auto-filled — enter the amount from the photo.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Electrical: Inspection and punch list",
+    description:
+      "On Punch List, finish leftover work and track inspection pass.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Punch List",
+    actions: [
+      task(
+        "Punch list and inspection: {{lead.title}}",
+        "Walk leftover items, confirm inspection scheduled/passed if a permit was required, note panel/equipment on the customer, and get sign-off. Watch jobs running long and permit/inspection delays.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Electrical: Invoice, AR, and books",
+    description:
+      "When Closed, invoice labor + parts + billed mileage + permit fees.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Closed",
+    actions: [
+      task(
+        "Invoice completed electrical job: {{lead.title}}",
+        "Generate the invoice from labor + parts + mileage if billed + permit fees. Check AR aging and send reminders if overdue. Review job costing. Log vendor bills in Books if pending.",
+        1
+      ),
+      task(
+        "Update panel and equipment history: {{lead.title}}",
+        "Save service history and panel/equipment notes on the contact (panel size, main breaker, EV circuit). Log this visit in communication history.",
+        1
+      ),
+      email(
+        "Thanks — electrical invoice from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>The work is complete. Your invoice is coming next (including permit fees if they applied). Thank you for choosing {{workspace.name}}.</p>"
+      ),
+    ],
+  },
+  {
+    name: "Electrical: After contract signed (e-sign)",
+    description: "When an e-sign contract completes, kick off the job.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Kick off electrical job from signed contract",
+        "Create or update the job, assign a tech with emergency priority if urgent, start permit tracking if needed, and move the pipeline card to Contract Signed.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Electrical: After invoice sent",
+    description: "When an invoice is sent, follow AR and overdue reminders.",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on invoice payment",
+        "Watch open invoices and aging. Send a reminder if overdue. Record payment. Flag permit/inspection delays or negative reviews if they come in.",
+        3
+      ),
+    ],
+  },
+];
+
 const PACKS: Record<string, IndustryWorkflowDef[]> = {
   hvac: HVAC_DEFAULT_WORKFLOWS,
   handyman: HANDYMAN_DEFAULT_WORKFLOWS,
   plumbing: PLUMBING_DEFAULT_WORKFLOWS,
+  electrician: ELECTRICIAN_DEFAULT_WORKFLOWS,
 };
 
 export async function seedIndustryDefaultWorkflows(
