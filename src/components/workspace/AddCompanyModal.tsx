@@ -153,7 +153,7 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
 
       setActiveWorkspace(match);
       toast(
-        extraPaidCreate
+        unlimitedWorkspaces || extraPaidCreate
           ? "Workspace created."
           : "Workspace created. Your trial is active.",
         "success"
@@ -184,7 +184,9 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
               ? `Your plan includes one owned workspace. Additional workspaces are $${extraWorkspacePriceUsd} each.`
               : extraPaidCreate
                 ? "This uses a workspace slot you already purchased."
-                : `Each company is a separate workspace. Choose its industry now. You can change it later. Your first workspace includes a ${TRIAL_DAYS}-day free trial.`}
+                : unlimitedWorkspaces
+                  ? "Each company is a separate workspace on the admin tier. Choose its industry now. You can change it later."
+                  : `Each company is a separate workspace. Choose its industry now. You can change it later. Your first workspace includes a ${TRIAL_DAYS}-day free trial.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -209,7 +211,7 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
         ) : (
           <>
             <div className="space-y-4 py-2">
-              {!extraPaidCreate && (
+              {!extraPaidCreate && !unlimitedWorkspaces && (
                 <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-center text-sm font-medium text-green-500">
                   {TRIAL_DAYS}-day free trial
                 </div>

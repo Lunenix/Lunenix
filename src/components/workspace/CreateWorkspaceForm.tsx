@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IndustryVerticalFields } from "@/components/workspace/IndustryVerticalFields";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   CUSTOM_INDUSTRY_PRESET,
   TEAM_SIZE_OPTIONS,
@@ -35,10 +36,12 @@ function slugify(value: string) {
 
 interface WorkspaceOnboardingFormProps {
   onCreated?: () => void;
+  adminTier?: boolean;
 }
 
 export function WorkspaceOnboardingForm({
   onCreated,
+  adminTier = false,
 }: WorkspaceOnboardingFormProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -106,15 +109,17 @@ export function WorkspaceOnboardingForm({
           </div>
           <CardTitle className="text-xl">Set up your company</CardTitle>
           <CardDescription>
-            You have {TRIAL_DAYS} days free. Add your company name, logo, phone,
-            industry, and team size. You can change the industry later in
-            Workspace Management.
+            {adminTier
+              ? "This company will be on the admin tier. Add your company name, logo, phone, industry, and team size. You can change the industry later in Workspace Management."
+              : `You have ${TRIAL_DAYS} days free. Add your company name, logo, phone, industry, and team size. You can change the industry later in Workspace Management.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
-            {TRIAL_DAYS}-day free trial included
-          </div>
+          {!adminTier && (
+            <div className="rounded-md border border-green-500/40 bg-green-500/10 px-3 py-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
+              {TRIAL_DAYS}-day free trial included
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="ws-name">Company name</Label>
@@ -190,5 +195,6 @@ export function WorkspaceOnboardingForm({
 }
 
 export function CreateWorkspaceForm() {
-  return <WorkspaceOnboardingForm />;
+  const { unlimitedWorkspaces } = useWorkspace();
+  return <WorkspaceOnboardingForm adminTier={unlimitedWorkspaces} />;
 }

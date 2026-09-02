@@ -5,6 +5,7 @@ import { grantMissingSuperAdminMemberships } from "@/lib/supabase/grantSuperAdmi
 import {
   CUSTOM_INDUSTRY_PRESET,
   EXTRA_WORKSPACE_PRICE_USD,
+  WORKSPACE_TIER_ADMIN,
   isIndustryPreset,
   isTeamSize,
   normalizeIndustryCustomLabel,
@@ -178,6 +179,7 @@ export async function GET() {
  * Creates a workspace and adds the current user as owner.
  * First owned workspace for regular users starts a 21-day trial.
  * Extra owned workspaces require a paid slot and are marked paid.
+ * Super-admin creates are admin-tier with no trial.
  */
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -246,17 +248,23 @@ export async function POST(request: NextRequest) {
       .replace(/^-+|-+$/g, "");
 
   const uniqueSlug = `${slugSource}-${Math.random().toString(36).slice(2, 6)}`;
+  const platformAdmin = isSuperAdmin(user);
   const extraPaid = !entitlement.unlimited && entitlement.ownedCount > 0;
 
   const insertRow: Record<string, unknown> = {
     name,
     slug: uniqueSlug,
-    tier: extraPaid ? "paid" : "trial",
+    tier: platformAdmin
+      ? WORKSPACE_TIER_ADMIN
+      : extraPaid
+        ? "paid"
+        : "trial",
     max_seats: seatsForTeamSize(payload.teamSize),
     industry_preset: payload.industryPreset,
     phone: payload.phone.slice(0, 40),
     team_size: payload.teamSize,
-    trial_ends_at: extraPaid ? null : trialEndsAt(),
+    trial_ends_at:
+      platformAdmin || extraPaid ? null : trialEndsAt(),
   };
   if (industryCustomLabel) {
     insertRow.industry_custom_label = industryCustomLabel;

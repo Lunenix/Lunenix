@@ -16,7 +16,7 @@ import {
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
 import { EditWorkspaceDialog } from "@/components/workspace/EditWorkspaceDialog";
 import { toast } from "@/lib/toast";
-import { industryDisplayLabel } from "@/lib/workspace";
+import { industryDisplayLabel, workspaceTierLabel } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 import type { WorkspaceWithMembership } from "@/types/database";
 import { Check, Loader2, Pencil, Plus } from "lucide-react";
@@ -175,14 +175,14 @@ export default function WorkspaceManagementPage() {
 
                       {/* Tier */}
                       <TableCell>
-                        <Badge className="border-green-500/40 bg-green-500/10 text-green-400">
-                          {ws.tier === "trial" && ws.trial_ends_at
-                            ? `Trial until ${new Date(ws.trial_ends_at).toLocaleDateString()}`
-                            : ws.tier === "trial"
-                              ? "Trial"
-                              : ws.tier === "paid"
-                                ? "Paid"
-                                : "Free Beta"}
+                        <Badge
+                          className={
+                            ws.tier === "admin"
+                              ? "border-purple-500/40 bg-purple-500/10 text-purple-400"
+                              : "border-green-500/40 bg-green-500/10 text-green-400"
+                          }
+                        >
+                          {workspaceTierLabel(ws.tier, ws.trial_ends_at)}
                         </Badge>
                       </TableCell>
 

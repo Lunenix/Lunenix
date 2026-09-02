@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 export default function OnboardingPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [adminTier, setAdminTier] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,6 +29,7 @@ export default function OnboardingPage() {
         router.replace("/dashboard");
         return;
       }
+      setAdminTier(Boolean(json.unlimited_workspaces));
       setReady(true);
     })();
     return () => {
@@ -45,6 +47,7 @@ export default function OnboardingPage() {
 
   return (
     <WorkspaceOnboardingForm
+      adminTier={adminTier}
       onCreated={() => window.location.assign("/dashboard")}
     />
   );

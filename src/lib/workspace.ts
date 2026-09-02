@@ -22,6 +22,9 @@ export const TEAM_SIZE_OPTIONS: {
 
 export const TRIAL_DAYS = 21;
 
+/** Platform owner workspaces. Not a tenant trial or paid slot. */
+export const WORKSPACE_TIER_ADMIN = "admin";
+
 /** Included owned workspaces for non–super-admin users. Extra slots are $8 each. */
 export const INCLUDED_OWNED_WORKSPACES = 1;
 export const EXTRA_WORKSPACE_PRICE_USD = 8;
@@ -43,4 +46,17 @@ export function trialEndsAt(from = new Date()): string {
 
 export function isTeamSize(value: string): boolean {
   return TEAM_SIZE_OPTIONS.some((o) => o.value === value);
+}
+
+export function workspaceTierLabel(
+  tier?: string | null,
+  trialEndsAtIso?: string | null
+): string {
+  if (tier === WORKSPACE_TIER_ADMIN) return "Admin";
+  if (tier === "paid") return "Paid";
+  if (tier === "trial" && trialEndsAtIso) {
+    return `Trial until ${new Date(trialEndsAtIso).toLocaleDateString()}`;
+  }
+  if (tier === "trial") return "Trial";
+  return "Free Beta";
 }
