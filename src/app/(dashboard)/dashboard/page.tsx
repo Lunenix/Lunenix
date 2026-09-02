@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
-  const { activeWorkspace, isLoading } = useWorkspace();
+  const { activeWorkspace, isLoading, unlimitedWorkspaces } = useWorkspace();
   const [counts, setCounts] = useState({
     contacts: 0,
     activeProjects: 0,
@@ -144,7 +144,9 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <DashboardWelcome />
 
-      <LunaCommandCenter workspaceId={activeWorkspace.id} />
+      {unlimitedWorkspaces ? (
+        <LunaCommandCenter workspaceId={activeWorkspace.id} />
+      ) : null}
 
       <WorkspaceActivityFeed workspaceId={activeWorkspace.id} />
 

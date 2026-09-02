@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireSuperAdmin } from "@/lib/auth/requireSuperAdmin";
 
 /**
  * Simli session bootstrap — server-side only.
@@ -18,13 +18,8 @@ export const runtime = "nodejs";
 const SIMLI_BASE = "https://api.simli.ai";
 
 export async function POST() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gated = await requireSuperAdmin();
+  if ("error" in gated) return gated.error;
 
   const apiKey = process.env.SIMLI_API_KEY;
   const faceId = process.env.SIMLI_AVATAR_ID;

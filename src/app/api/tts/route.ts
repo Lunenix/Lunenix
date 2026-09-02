@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireSuperAdmin } from "@/lib/auth/requireSuperAdmin";
 
 /**
  * ElevenLabs text-to-speech proxy — server-side only.
@@ -15,13 +15,8 @@ export const runtime = "nodejs";
 const MAX_CHARS = 1000;
 
 export async function POST(req: NextRequest) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gated = await requireSuperAdmin();
+  if ("error" in gated) return gated.error;
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   const voiceId = process.env.ELEVENLABS_VOICE_ID;

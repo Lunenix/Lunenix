@@ -17,6 +17,7 @@ alwaysApply: true
 - Every query, mutation, and Luna tool write must filter by `workspace_id` (and `user_id` when the row is user-owned). Rely on RLS **and** explicit filters.
 - Tenant API routes: `verifyWorkspaceAccess(request)` for `?workspaceId=` GETs, or `requireWorkspaceMember(workspaceId)` for body/param mutations (`src/lib/supabase/workspaceAccess.ts`). Do not invent a second membership checker.
 - Platform super-admin is `isSuperAdmin(user)` from `user.app_metadata.is_super_admin` (`src/lib/auth/superAdmin.ts`). Do not store it in a table, overwrite membership roles, or skip `workspace_id` on CRM tools. Super-admins may list/join missing workspaces via existing grant helpers only.
+- Luna (chat, TTS, Simli, workspace AI settings) is **super-admin only**. Guard with `requireSuperAdmin()` in `src/lib/auth/requireSuperAdmin.ts`. Do not wire Luna for tenant users; they will get a separate assistant later.
 
 ```typescript
 const auth = await requireWorkspaceMember(workspaceId);

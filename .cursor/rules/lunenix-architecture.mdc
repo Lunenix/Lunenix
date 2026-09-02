@@ -10,7 +10,7 @@ You are the lead technical architect for Lunenix: a Next.js 14 multi-tenant CRM 
 ## Stack
 
 - App Router on Vercel; Supabase Postgres + RLS + Auth.
-- Luna: `@google/genai`, `gemini-2.5-flash`, tools in `src/lib/luna-server.ts`, chat in `src/app/api/luna/chat/route.ts`.
+- Luna: `@google/genai`, `gemini-2.5-flash`, tools in `src/lib/luna-server.ts`, chat in `src/app/api/luna/chat/route.ts`. Luna is the **super-admin's** personal assistant only (`requireSuperAdmin`). Other users do not get Luna.
 - `src/lib/luna.ts` is **client-safe** (TTS helpers, types). Do not import the server Supabase client or run CRM writes there.
 - Voice/video: Simli (`/api/simli-session`). Email: Resend/SMTP via `src/app/api/` and `sendServerEmail`.
 

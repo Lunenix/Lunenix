@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isIanaTimeZone, sanitizeCustomInstructions } from "@/lib/luna";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
+import { requireSuperAdmin } from "@/lib/auth/requireSuperAdmin";
 
 const DEFAULT_SETTINGS = {
   agent_name: "Luna",
@@ -18,6 +19,8 @@ const DEFAULT_SETTINGS = {
  * Returns the workspace's Luna AI settings, or sensible defaults if none exist.
  */
 export async function GET(request: NextRequest) {
+  const gated = await requireSuperAdmin();
+  if ("error" in gated) return gated.error;
   const access = await verifyWorkspaceAccess(request);
   if (access.errorResponse) return access.errorResponse;
   const { supabase, workspaceId } = access;
@@ -45,6 +48,8 @@ export async function GET(request: NextRequest) {
  * Upserts the workspace's Luna AI settings.
  */
 export async function POST(request: NextRequest) {
+  const gated = await requireSuperAdmin();
+  if ("error" in gated) return gated.error;
   const body = await request.json();
   const workspaceId: string = (body.workspace_id ?? "").trim();
   const authed = await requireWorkspaceMember(workspaceId);
