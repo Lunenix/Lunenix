@@ -32,13 +32,13 @@ import {
   ClipboardSignature,
   FileSignature,
   FolderKanban,
-  Gauge,
   HardHat,
   Inbox,
   LayoutDashboard,
   ListChecks,
   LogOut,
   Mail,
+  MapPin,
   Package,
   Plus,
   Receipt,
@@ -62,7 +62,7 @@ const fieldNav = [
   { href: "/jobs", label: "Jobs", icon: FolderKanban },
   { href: "/inventory", label: "Inventory", icon: Package },
   { href: "/books", label: "Books", icon: BookOpen },
-  { href: "/mileage", label: "Mileage", icon: Gauge },
+  { href: "/mileage", label: "Mileage", icon: MapPin },
   { href: "/team", label: "Techs", icon: HardHat },
 ];
 

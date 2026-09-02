@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS public.mileage_logs (
   workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
   project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
   contact_id UUID REFERENCES public.contacts(id) ON DELETE SET NULL,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  user_id UUID,
   driven_on DATE NOT NULL DEFAULT CURRENT_DATE,
   miles NUMERIC(10,2) NOT NULL CHECK (miles > 0),
   rate_per_mile NUMERIC(8,4) NOT NULL DEFAULT 0.70,

@@ -24,6 +24,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ContactSheet } from "@/components/contacts/ContactSheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { contactDisplayName, type Contact, type CustomerEquipment, type Lead } from "@/types/database";
 import { ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
 
@@ -256,6 +258,106 @@ export default function ContactDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function EquipmentPanel({
+  contactId,
+  workspaceId,
+}: {
+  contactId: string;
+  workspaceId: string;
+}) {
+  const [rows, setRows] = useState<CustomerEquipment[]>([]);
+  const [name, setName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [serial, setSerial] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch(
+      `/api/customer-equipment?workspaceId=${workspaceId}&contactId=${contactId}`
+    );
+    const json = await res.json();
+    if (res.ok) setRows(json.equipment ?? []);
+  }, [contactId, workspaceId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function add() {
+    if (!name.trim()) return;
+    setSaving(true);
+    const res = await fetch("/api/customer-equipment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        contact_id: contactId,
+        name: name.trim(),
+        brand: brand.trim() || null,
+        model: model.trim() || null,
+        serial: serial.trim() || null,
+      }),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setName("");
+      setBrand("");
+      setModel("");
+      setSerial("");
+      load();
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No equipment on file.</p>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {rows.map((e) => (
+            <li key={e.id}>
+              <span className="font-medium">{e.name}</span>
+              {[e.brand, e.model, e.serial].filter(Boolean).length > 0 && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  — {[e.brand, e.model, e.serial].filter(Boolean).join(" · ")}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1 sm:col-span-2">
+          <Label>Unit name</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Furnace, condenser, water heater…"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label>Brand</Label>
+          <Input value={brand} onChange={(e) => setBrand(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>Model</Label>
+          <Input value={model} onChange={(e) => setModel(e.target.value)} />
+        </div>
+        <div className="space-y-1 sm:col-span-2">
+          <Label>Serial</Label>
+          <Input value={serial} onChange={(e) => setSerial(e.target.value)} />
+        </div>
+      </div>
+      <Button type="button" onClick={add} disabled={saving || !name.trim()}>
+        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Add equipment
+      </Button>
     </div>
   );
 }

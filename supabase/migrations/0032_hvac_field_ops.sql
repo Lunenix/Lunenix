@@ -5,7 +5,7 @@ ALTER TABLE public.leads
   ADD COLUMN IF NOT EXISTS source TEXT;
 
 ALTER TABLE public.projects
-  ADD COLUMN IF NOT EXISTS assignee_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS assignee_id UUID,
   ADD COLUMN IF NOT EXISTS address TEXT,
   ADD COLUMN IF NOT EXISTS urgent BOOLEAN NOT NULL DEFAULT false;
 
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.estimate_photos (
 CREATE TABLE IF NOT EXISTS public.technician_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   available BOOLEAN NOT NULL DEFAULT true,
   certifications TEXT,
   license_expires DATE,
