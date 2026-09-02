@@ -1,22 +1,41 @@
 ---
-description: Security & Data Privacy Directives for Lunenix
+description: Enterprise Security, Multi-Tenant Boundary, and API Secret Isolation Rules for Lunenix
+globs: "**/*.ts,**/*.tsx,**/*.sql"
 alwaysApply: true
 ---
 
-# Lunenix Security Baseline & Data Isolation
+# Lunenix Business Hub Security & Architecture Guardrails
 
-1. **Server-Side Lockdown**:
-   - NEVER expose sensitive API keys (`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SIMLI_API_KEY`, `ELEVENLABS_API_KEY`) to client components.
-   - Execute all third-party API interactions strictly inside server-side API routes (`src/app/api/`).
+## 1. Secrets & Server-Side Isolation
 
-2. **Tenant & Workspace Isolation**:
-   - Enforce Row-Level Security (RLS) across all Supabase operations.
-   - Ensure every query in database handlers explicitly filters by `workspace_id` and `user_id` to prevent cross-tenant data leakage.
+- Access `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SIMLI_API_KEY`, `ELEVENLABS_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, and `CRON_SECRET` only in server routes (`src/app/api/`) or server-only libs imported from those routes (`src/lib/luna-server.ts`, `src/lib/billing/`, `src/lib/supabase/server.ts`).
+- Never read those secrets in `"use client"` files. Never put them in `NEXT_PUBLIC_*`.
+- Stripe Checkout and Gemini run on the server. Luna must never collect card numbers.
 
-3. **Least-Privilege Context Payload**:
-   - Sanitize all data injected into Luna's context (`src/lib/luna.ts`).
-   - Only pass operational fields required for the prompt (e.g., project titles, task status, contact names). Never send raw authentication tokens, payment details, or password hashes.
+## 2. Multi-Tenant Row-Level Security (RLS)
 
-4. **Prompt Injection & System Guardrails**:
-   - Maintain strict prompt boundaries in `src/app/api/luna/chat/route.ts`.
-   - Reject prompts attempting to dump internal database schemas or bypass workspace limits.
+- Every query, mutation, and Luna tool write must filter by `workspace_id` (and `user_id` when the row is user-owned). Rely on RLS **and** explicit filters.
+- Tenant API routes: `verifyWorkspaceAccess(request)` for `?workspaceId=` GETs, or `requireWorkspaceMember(workspaceId)` for body/param mutations (`src/lib/supabase/workspaceAccess.ts`). Do not invent a second membership checker.
+- Platform super-admin is `isSuperAdmin(user)` from `user.app_metadata.is_super_admin` (`src/lib/auth/superAdmin.ts`). Do not store it in a table, overwrite membership roles, or skip `workspace_id` on CRM tools. Super-admins may list/join missing workspaces via existing grant helpers only.
+
+```typescript
+const auth = await requireWorkspaceMember(workspaceId);
+if ("error" in auth) return auth.error;
+// use auth.workspaceId on every subsequent query
+```
+
+## 3. Data Sanitization & Prompt Hardening
+
+- Sanitize Luna context in `src/lib/luna-server.ts`: titles, statuses, contact display names only. Strip auth headers, JWTs, password hashes, Stripe secrets, and service-role keys before Gemini.
+- Keep prompt isolation in `src/app/api/luna/chat/route.ts`. Refuse schema dumps, jailbreaks, instruction overrides, and cross-workspace access.
+- Spoken / avatar text: `cleanTextForTTS` / `toSpokenText` — no markdown, code blocks, tables, or list markers.
+
+## 4. Google Gemini SDK Standards
+
+- Import `@google/genai` and construct `GoogleGenAI` only in `src/app/api/luna/chat/route.ts` (or another API route). Model: `gemini-2.5-flash`.
+- Dispatch tools through `executeLunaTool`. Do not add a second tool loop.
+
+```typescript
+import { GoogleGenAI } from "@google/genai";
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+```
