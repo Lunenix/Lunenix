@@ -1,0 +1,15 @@
+---
+description: Always paste full Supabase SQL in chat for the user to run
+alwaysApply: true
+---
+
+# Show Supabase SQL in chat
+
+The user applies schema by pasting SQL into the **Supabase SQL editor**. Migrations in `supabase/migrations/` are not auto-run.
+
+Whenever you add, change, or tell them to apply database SQL:
+
+1. Paste the **full runnable SQL** in the chat (not just a file path).
+2. Put it in a `sql` code block they can copy in one shot.
+3. If several migrations are needed, paste each one in order and label the filename.
+4. Do not say “run the migration file” without including the SQL body.
