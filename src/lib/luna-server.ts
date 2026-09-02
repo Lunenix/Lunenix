@@ -9,6 +9,7 @@ import {
   type WorkspaceContextPayload,
 } from "@/lib/luna";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
+import { createOrReuseInvoicePaymentLink } from "@/lib/billing/invoicePaymentLink";
 import { sendEsignEmail } from "@/lib/esign/sendEmail";
 import { generateSignToken, getAppBaseUrl } from "@/lib/esign/helpers";
 import { sendSigningReminder } from "@/lib/esign/reminders";
@@ -2949,6 +2950,55 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Recorded payment for invoice ${data.invoice_number}, $${Number(data.total).toFixed(2)}. No card was charged.`
+      );
+    }
+
+    if (name === "generate_payment_link") {
+      const found = await requireOneInvoice(
+        supabase,
+        workspace_id,
+        argStringAny(args, ["invoice_number", "lookup"]),
+        argString(args, "contact_name")
+      );
+      if ("error" in found) return found;
+      const { data: row } = await supabase
+        .from("invoices")
+        .select(
+          "id, invoice_number, total, status, currency, stripe_payment_url, stripe_payment_link_id"
+        )
+        .eq("id", found.id)
+        .eq("workspace_id", workspace_id)
+        .maybeSingle();
+      if (!row?.id) {
+        return { error: "I could not load that invoice." };
+      }
+      const link = await createOrReuseInvoicePaymentLink(
+        supabase,
+        workspace_id,
+        {
+          id: String(row.id),
+          invoice_number: String(row.invoice_number),
+          total: Number(row.total) || 0,
+          status: String(row.status),
+          currency:
+            typeof row.currency === "string" ? row.currency : "usd",
+          stripe_payment_url:
+            typeof row.stripe_payment_url === "string"
+              ? row.stripe_payment_url
+              : null,
+          stripe_payment_link_id:
+            typeof row.stripe_payment_link_id === "string"
+              ? row.stripe_payment_link_id
+              : null,
+        }
+      );
+      if ("error" in link) return link;
+      const verb = link.reused ? "Here is the existing" : "Created a";
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `${verb} payment link for invoice ${found.invoice_number}: ${link.url}`
       );
     }
 

@@ -32,6 +32,7 @@ import {
   Pencil,
   Trash2,
   User,
+  Link2,
 } from "lucide-react";
 import {
   Invoice,
@@ -62,6 +63,7 @@ export default function InvoiceDetailPage({
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
 
   useEffect(() => {
     if (id && activeWorkspace?.id) {
@@ -129,6 +131,31 @@ export default function InvoiceDetailPage({
     window.open(`/api/invoices/${invoice.id}/pdf?${qs.toString()}`, "_blank");
   };
 
+  const handlePaymentLink = async () => {
+    if (!invoice) return;
+    setLinkBusy(true);
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/payment-link`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create payment link");
+      }
+      if (typeof data.url === "string") {
+        await fetchData();
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      }
+    } catch (error) {
+      console.error("Error creating payment link:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to create payment link"
+      );
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
   const handleMarkAsPaid = async () => {
     if (!invoice) return;
     try {
@@ -188,9 +215,37 @@ export default function InvoiceDetailPage({
         </div>
         <div className="flex gap-2">
           {invoice.status !== "paid" && invoice.status !== "cancelled" && (
-            <Button variant="outline" onClick={handleMarkAsPaid}>
-              Mark as Paid
+            <Button
+              variant="outline"
+              onClick={handlePaymentLink}
+              disabled={linkBusy}
+            >
+              {linkBusy ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Link2 className="mr-2 h-4 w-4" />
+              )}
+              {invoice.stripe_payment_url ? "Open payment link" : "Payment link"}
             </Button>
+          )}
+          {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handlePaymentLink}
+                disabled={linkBusy}
+              >
+                {linkBusy ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Link2 className="mr-2 h-4 w-4" />
+                )}
+                {invoice.stripe_payment_url ? "Open payment link" : "Payment link"}
+              </Button>
+              <Button variant="outline" onClick={handleMarkAsPaid}>
+                Mark as Paid
+              </Button>
+            </>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

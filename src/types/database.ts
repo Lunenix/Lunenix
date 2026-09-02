@@ -314,6 +314,8 @@ export interface Invoice {
   currency: string;
   notes: string | null;
   payment_terms: string | null;
+  stripe_payment_link_id?: string | null;
+  stripe_payment_url?: string | null;
   created_at: string;
   updated_at: string;
   // Optional relations for list + detail views.

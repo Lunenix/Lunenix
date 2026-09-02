@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/billing/stripe";
 import { grantExtraWorkspaceSlot } from "@/lib/billing/workspaceSlots";
+import { markInvoicePaidFromCheckout } from "@/lib/billing/invoicePaymentLink";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,14 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error("grantExtraWorkspaceSlot failed:", e);
         return NextResponse.json({ error: "Grant failed" }, { status: 500 });
+      }
+    }
+    if (session.metadata?.kind === "invoice_payment") {
+      try {
+        await markInvoicePaidFromCheckout(createAdminClient(), session);
+      } catch (e) {
+        console.error("markInvoicePaidFromCheckout failed:", e);
+        return NextResponse.json({ error: "Invoice update failed" }, { status: 500 });
       }
     }
   }

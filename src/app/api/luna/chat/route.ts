@@ -80,6 +80,7 @@ const BASE_SYSTEM_PROMPT =
   "When they ask to change a project (name, status, budget, dates, client, or description), call update_project. " +
   "When they ask to create an invoice, call create_invoice. Identify the client by contact name or email. Use total for the amount. " +
   "When they ask to change an invoice, call update_invoice. To email it, call send_invoice. To void it, call void_invoice. " +
+  "When they ask for a Stripe payment link or pay-now URL for an invoice, call generate_payment_link. Identify it by invoice number or client name. Do not take card numbers. " +
   "When they say a client paid, call record_invoice_payment. That only marks the invoice paid in the CRM. Never take card numbers or charge a card. " +
   "When they ask to draft an email without sending, call send_email_draft. Only call send_email when they clearly want it sent now. " +
   "When they ask about an SOP, policy, or how we do something internally, call search_knowledge_base. " +

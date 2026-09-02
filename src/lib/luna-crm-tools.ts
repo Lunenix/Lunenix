@@ -118,6 +118,19 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "generate_payment_link",
+    description:
+      "Create or reuse a Stripe Payment Link for an existing invoice total. Identify by invoice number or client name. Does not take card numbers. Does not pass a workspace id.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        invoice_number: { type: "string" },
+        lookup: { type: "string" },
+        contact_name: { type: "string" },
+      },
+    },
+  },
+  {
     name: "update_form",
     description:
       "Edit an existing form after create. Identify by name. Pass only fields that should change.",
