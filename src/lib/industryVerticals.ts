@@ -1,7 +1,7 @@
 /**
  * Lunenix Business Hub industry catalog.
- * 4 master sectors, 62 verticals, plus Other (custom workspace).
- * Keep slugs in sync with supabase/migrations/0029_industry_verticals.sql.
+ * 4 master sectors, listed verticals, plus Other (custom workspace).
+ * Keep slugs in sync with industry_pipeline_family in Supabase migrations.
  */
 
 export const CUSTOM_INDUSTRY_PRESET = "other";
@@ -90,6 +90,7 @@ export const INDUSTRY_SECTORS: IndustrySector[] = [
       { value: "event_planner", label: "Event Planner" },
       { value: "event_venue", label: "Event Venue" },
       { value: "florist_floral_design", label: "Florist & Floral Design" },
+      { value: "food_trucks", label: "Food Trucks" },
       { value: "hair_makeup_hmua", label: "Hair & Makeup (HMUA)" },
       { value: "mobile_bartending", label: "Mobile Bartending" },
       { value: "photography_videography", label: "Photography & Videography" },

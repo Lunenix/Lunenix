@@ -28,7 +28,7 @@ You are the lead technical architect for Lunenix: a Next.js 14 multi-tenant CRM 
 - Tasks: `todo` / `in_progress` / `done`; priorities `low` / `medium` / `high` / `urgent`. There is **no** `personal_todos` table—use `tasks`.
 - Projects: `planning` / `active` / `on_hold` / `completed` / `cancelled`.
 - Contracts: `name`, `contract_number`; statuses `draft` / `sent` / `active` / `completed` / `cancelled`. Do not recreate this table.
-- Workspaces: `industry_preset` is one of the 62 hub verticals or `other` (`src/lib/industryVerticals.ts`). `industry_custom_label` is required when the preset is `other`. Do not add a separate industries table.
+- Workspaces: `industry_preset` is one of the hub verticals in `src/lib/industryVerticals.ts` or `other`. `industry_custom_label` is required when the preset is `other`. Do not add a separate industries table.
 - `createClient()` from `@/lib/supabase/server` is **sync**. Cron jobs use `createAdminClient()` plus `CRON_SECRET`.
 
 ## Luna tools and speech

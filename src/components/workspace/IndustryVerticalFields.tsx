@@ -206,7 +206,7 @@ export function IndustryVerticalFields({
             maxLength={80}
           />
           <p className="text-xs text-muted-foreground">
-            Used when your model is not in the 62 listed verticals.
+            Used when your model is not in the listed verticals.
           </p>
         </div>
       )}
