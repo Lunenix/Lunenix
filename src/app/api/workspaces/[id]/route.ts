@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { isSuperAdmin } from "@/lib/auth/superAdmin";
+import { ensureSuperAdminMembership } from "@/lib/supabase/grantSuperAdminWorkspaces";
 
 /**
  * PATCH /api/workspaces/[id]
@@ -35,13 +37,29 @@ export async function PATCH(
     .single();
 
   if (memberErr || !membership) {
-    return NextResponse.json(
-      { error: "You are not a member of this workspace" },
-      { status: 403 }
-    );
+    if (isSuperAdmin(user)) {
+      try {
+        await ensureSuperAdminMembership(
+          createAdminClient(),
+          user.id,
+          workspaceId
+        );
+      } catch {
+        return NextResponse.json(
+          { error: "You are not a member of this workspace" },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: "You are not a member of this workspace" },
+        { status: 403 }
+      );
+    }
   }
 
-  if (!["owner", "admin"].includes(membership.role)) {
+  const role = membership?.role;
+  if (!isSuperAdmin(user) && !["owner", "admin"].includes(role ?? "")) {
     return NextResponse.json(
       { error: "Only owners and admins can rename this workspace" },
       { status: 403 }

@@ -50,55 +50,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
     setUserId(user.id);
 
-    const { data, error } = await supabase
-      .from("workspace_members")
-      .select("role, workspaces(*)")
-      .eq("user_id", user.id);
-
-    if (error) {
-      console.error("Failed to load workspaces:", error.message);
+    const res = await fetch("/api/workspaces");
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error("Failed to load workspaces:", json.error ?? res.status);
       return [];
     }
 
-    const rows = (data ?? []) as unknown as Array<{
-      role: string;
-      workspaces:
-        | {
-            id: string;
-            name: string;
-            slug: string;
-            created_at: string;
-            logo_url: string | null;
-            industry_preset: string | null;
-            phone?: string | null;
-            team_size?: string | null;
-            max_seats: number | null;
-            tier: string | null;
-            trial_ends_at?: string | null;
-          }
-        | null;
-    }>;
-
-    const list: WorkspaceWithMembership[] = rows
-      .filter((r) => r.workspaces)
-      .map((r) => {
-        const ws = r.workspaces as NonNullable<typeof r.workspaces>;
-        return {
-          id: ws.id,
-          name: ws.name,
-          slug: ws.slug,
-          created_at: ws.created_at,
-          logo_url: ws.logo_url,
-          industry_preset: ws.industry_preset,
-          phone: ws.phone ?? null,
-          team_size: ws.team_size ?? null,
-          max_seats: ws.max_seats ?? undefined,
-          tier: ws.tier ?? undefined,
-          trial_ends_at: ws.trial_ends_at ?? null,
-          membership_role: r.role,
-        };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const list = ((json.workspaces ?? []) as WorkspaceWithMembership[]).sort(
+      (a, b) => a.name.localeCompare(b.name)
+    );
 
     setWorkspaces(list);
     return list;

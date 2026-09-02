@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Content, FunctionDeclaration } from "@google/genai";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isIanaTimeZone, formatContextForGemini } from "@/lib/luna";
 import { sendEmailTool } from "@/lib/luna-tools";
 import { LUNA_CRM_TOOLS } from "@/lib/luna-crm-tools";
+import { isSuperAdmin } from "@/lib/auth/superAdmin";
+import { ensureSuperAdminMembership } from "@/lib/supabase/grantSuperAdminWorkspaces";
 import {
   executeLunaTool,
   formatLunaContextForPrompt,
@@ -898,6 +900,7 @@ export async function POST(req: NextRequest) {
     return await handleLunaChat({
       supabase,
       userId: user.id,
+      isPlatformAdmin: isSuperAdmin(user),
       message,
       workspaceId,
       clientTimezone,
@@ -919,6 +922,7 @@ export async function POST(req: NextRequest) {
 async function handleLunaChat(params: {
   supabase: ReturnType<typeof createClient>;
   userId: string;
+  isPlatformAdmin: boolean;
   message: string;
   workspaceId: string;
   clientTimezone: string | null;
@@ -928,6 +932,7 @@ async function handleLunaChat(params: {
   const {
     supabase,
     userId,
+    isPlatformAdmin,
     workspaceId,
     clientTimezone,
     history,
@@ -942,10 +947,25 @@ async function handleLunaChat(params: {
     .maybeSingle();
 
   if (memberErr || !membership) {
-    return NextResponse.json(
-      { error: "You are not a member of this workspace" },
-      { status: 403 }
-    );
+    if (isPlatformAdmin) {
+      try {
+        await ensureSuperAdminMembership(
+          createAdminClient(),
+          userId,
+          workspaceId
+        );
+      } catch {
+        return NextResponse.json(
+          { error: "You are not a member of this workspace" },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: "You are not a member of this workspace" },
+        { status: 403 }
+      );
+    }
   }
 
   if (!message.trim()) {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { isSuperAdmin } from "@/lib/auth/superAdmin";
+import { ensureSuperAdminMembership } from "@/lib/supabase/grantSuperAdminWorkspaces";
 
 type Authed = {
   supabase: ReturnType<typeof createClient>;
@@ -44,6 +46,20 @@ export async function requireWorkspaceMember(
     .single();
 
   if (memberError || !membership) {
+    if (isSuperAdmin(user)) {
+      try {
+        await ensureSuperAdminMembership(createAdminClient(), user.id, id);
+      } catch (e) {
+        console.error("ensureSuperAdminMembership failed:", e);
+        return {
+          error: NextResponse.json(
+            { error: "Forbidden: Access denied to workspace" },
+            { status: 403 }
+          ),
+        };
+      }
+      return { supabase, user, workspaceId: id };
+    }
     return {
       error: NextResponse.json(
         { error: "Forbidden: Access denied to workspace" },

@@ -21,13 +21,10 @@ export default function OnboardingPage() {
         router.replace("/login");
         return;
       }
-      const { data } = await supabase
-        .from("workspace_members")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1);
+      const res = await fetch("/api/workspaces");
+      const json = await res.json().catch(() => ({}));
       if (cancelled) return;
-      if (data && data.length > 0) {
+      if (res.ok && Array.isArray(json.workspaces) && json.workspaces.length > 0) {
         router.replace("/dashboard");
         return;
       }

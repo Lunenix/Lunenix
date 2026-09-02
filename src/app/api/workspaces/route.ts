@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { isSuperAdmin } from "@/lib/auth/superAdmin";
+import { grantMissingSuperAdminMemberships } from "@/lib/supabase/grantSuperAdminWorkspaces";
 import {
   isIndustryPreset,
   isTeamSize,
   seatsForTeamSize,
   trialEndsAt,
 } from "@/lib/workspace";
+import type { WorkspaceWithMembership } from "@/types/database";
 
 const LOGO_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -48,6 +51,93 @@ async function readWorkspacePayload(request: NextRequest): Promise<{
       typeof body.team_size === "string" ? body.team_size.trim() || null : null,
     logo: null,
   };
+}
+
+function asWorkspaceListItem(
+  ws: Record<string, unknown>,
+  role: string
+): WorkspaceWithMembership {
+  return {
+    id: String(ws.id),
+    name: String(ws.name ?? ""),
+    slug: String(ws.slug ?? ""),
+    created_at: String(ws.created_at ?? ""),
+    logo_url: typeof ws.logo_url === "string" ? ws.logo_url : null,
+    industry_preset:
+      typeof ws.industry_preset === "string" ? ws.industry_preset : null,
+    phone: typeof ws.phone === "string" ? ws.phone : null,
+    team_size: typeof ws.team_size === "string" ? ws.team_size : null,
+    max_seats: typeof ws.max_seats === "number" ? ws.max_seats : undefined,
+    tier: typeof ws.tier === "string" ? ws.tier : undefined,
+    trial_ends_at:
+      typeof ws.trial_ends_at === "string" ? ws.trial_ends_at : null,
+    membership_role: role,
+  };
+}
+
+/**
+ * GET /api/workspaces
+ * Lists workspaces the caller belongs to. Super-admins also receive every
+ * workspace they were missing from, without changing existing membership roles.
+ */
+export async function GET() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (isSuperAdmin(user)) {
+    const admin = createAdminClient();
+    try {
+      await grantMissingSuperAdminMemberships(admin);
+    } catch (e) {
+      console.error("grantMissingSuperAdminMemberships failed:", e);
+    }
+    const { data: workspaces, error } = await admin
+      .from("workspaces")
+      .select("*")
+      .order("name", { ascending: true });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    const { data: memberships } = await admin
+      .from("workspace_members")
+      .select("workspace_id, role")
+      .eq("user_id", user.id);
+    const roleById = new Map(
+      (memberships ?? []).map((m) => [
+        String(m.workspace_id),
+        String(m.role ?? "owner"),
+      ])
+    );
+    const list = (workspaces ?? []).map((ws) =>
+      asWorkspaceListItem(
+        ws as Record<string, unknown>,
+        roleById.get(String((ws as { id?: string }).id)) ?? "owner"
+      )
+    );
+    return NextResponse.json({ workspaces: list });
+  }
+
+  const { data, error } = await supabase
+    .from("workspace_members")
+    .select("role, workspaces(*)")
+    .eq("user_id", user.id);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  const list: WorkspaceWithMembership[] = (data ?? [])
+    .map((row) => {
+      const r = row as { role?: string; workspaces?: Record<string, unknown> | null };
+      if (!r.workspaces?.id) return null;
+      return asWorkspaceListItem(r.workspaces, r.role ?? "member");
+    })
+    .filter((w): w is WorkspaceWithMembership => Boolean(w))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return NextResponse.json({ workspaces: list });
 }
 
 /**
