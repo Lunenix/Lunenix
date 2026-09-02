@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AutomationAction, AutomationTriggerType } from "@/types/database";
-import { isFieldServiceWorkspace } from "@/lib/fieldService";
+import { resolveIndustryPreset } from "@/lib/industryVerticals";
+import {
+  allWorkflowPrefixes,
+  catalogWorkflowsForPreset,
+  fieldPresetUsesSharedPermits,
+} from "@/lib/automation/catalogDefaultWorkflows";
 
 export type IndustryWorkflowDef = {
   name: string;
@@ -904,15 +909,6 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   landscaping_lawn_care: LANDSCAPING_DEFAULT_WORKFLOWS,
 };
 
-/** Default workflow name prefixes. Each trade pack stays on its own preset. */
-const TRADE_PACK_PREFIXES: { preset: string; prefix: string }[] = [
-  { preset: "hvac", prefix: "HVAC:" },
-  { preset: "handyman", prefix: "Handyman:" },
-  { preset: "plumbing", prefix: "Plumbing:" },
-  { preset: "electrician", prefix: "Electrical:" },
-  { preset: "landscaping_lawn_care", prefix: "Landscaping:" },
-];
-
 async function pruneForeignIndustryWorkflows(
   supabase: SupabaseClient,
   workspaceId: string,
@@ -922,14 +918,15 @@ async function pruneForeignIndustryWorkflows(
     .from("automation_workflows")
     .select("id, name")
     .eq("workspace_id", workspaceId);
-  const field = isFieldServiceWorkspace(preset);
+  const prefixes = allWorkflowPrefixes();
+  const keepSharedPermits = fieldPresetUsesSharedPermits(preset);
   const ids = (existing ?? [])
     .filter((w: { id: string; name: string }) => {
       const name = w.name ?? "";
-      for (const pack of TRADE_PACK_PREFIXES) {
+      for (const pack of prefixes) {
         if (name.startsWith(pack.prefix) && preset !== pack.preset) return true;
       }
-      if (name.startsWith("Field:") && !field) return true;
+      if (name.startsWith("Field:") && !keepSharedPermits) return true;
       return false;
     })
     .map((w: { id: string }) => w.id);
@@ -953,10 +950,13 @@ export async function seedIndustryDefaultWorkflows(
     .select("industry_preset")
     .eq("id", workspaceId)
     .maybeSingle();
-  const preset = workspace?.industry_preset ?? "";
+  const preset =
+    resolveIndustryPreset(workspace?.industry_preset) ??
+    workspace?.industry_preset ??
+    "";
   await pruneForeignIndustryWorkflows(supabase, workspaceId, preset);
-  const trade = PACKS[preset] ?? [];
-  const pack = isFieldServiceWorkspace(preset)
+  const trade = PACKS[preset] ?? catalogWorkflowsForPreset(preset);
+  const pack = fieldPresetUsesSharedPermits(preset)
     ? [...trade, ...FIELD_PERMIT_WORKFLOWS]
     : trade;
   if (pack.length === 0) return 0;
