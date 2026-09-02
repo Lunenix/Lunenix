@@ -22,14 +22,13 @@ import {
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { toast } from "@/lib/toast";
 import {
-  INDUSTRY_PRESETS,
+  CUSTOM_INDUSTRY_PRESET,
   TEAM_SIZE_OPTIONS,
   TRIAL_DAYS,
 } from "@/lib/workspace";
+import { IndustryVerticalFields } from "@/components/workspace/IndustryVerticalFields";
 import type { WorkspaceWithMembership } from "@/types/database";
 import { Loader2 } from "lucide-react";
-
-export { INDUSTRY_PRESETS };
 
 interface AddCompanyModalProps {
   open: boolean;
@@ -48,7 +47,8 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
   } = useWorkspace();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [industryPreset, setIndustryPreset] = useState("general");
+  const [industryPreset, setIndustryPreset] = useState("");
+  const [industryCustom, setIndustryCustom] = useState("");
   const [teamSize, setTeamSize] = useState("1-5");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -62,7 +62,8 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
   const reset = () => {
     setName("");
     setPhone("");
-    setIndustryPreset("general");
+    setIndustryPreset("");
+    setIndustryCustom("");
     setTeamSize("1-5");
     setLogoFile(null);
   };
@@ -101,12 +102,23 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
       toast("Upload a company logo", "error");
       return;
     }
+    if (!industryPreset) {
+      toast("Choose an industry", "error");
+      return;
+    }
+    if (industryPreset === CUSTOM_INDUSTRY_PRESET && !industryCustom.trim()) {
+      toast("Describe your business type for Other", "error");
+      return;
+    }
     setSubmitting(true);
     try {
       const body = new FormData();
       body.append("name", name.trim());
       body.append("phone", phone.trim());
       body.append("industry_preset", industryPreset);
+      if (industryCustom.trim()) {
+        body.append("industry_custom_label", industryCustom.trim());
+      }
       body.append("team_size", teamSize);
       body.append("logo", logoFile);
       const res = await fetch("/api/workspaces", {
@@ -130,6 +142,7 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
           created_at: created.created_at,
           logo_url: created.logo_url ?? null,
           industry_preset: created.industry_preset ?? null,
+          industry_custom_label: created.industry_custom_label ?? null,
           phone: created.phone ?? null,
           team_size: created.team_size ?? null,
           max_seats: created.max_seats ?? undefined,
@@ -240,21 +253,13 @@ export function AddCompanyModal({ open, onOpenChange }: AddCompanyModalProps) {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="industry-preset">Industry</Label>
-                <Select value={industryPreset} onValueChange={setIndustryPreset}>
-                  <SelectTrigger id="industry-preset">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INDUSTRY_PRESETS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <IndustryVerticalFields
+                idPrefix="company"
+                value={industryPreset}
+                customLabel={industryCustom}
+                onValueChange={setIndustryPreset}
+                onCustomLabelChange={setIndustryCustom}
+              />
 
               <div className="space-y-2">
                 <Label htmlFor="team-size">Team size</Label>

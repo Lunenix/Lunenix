@@ -1,11 +1,11 @@
-/** Industry presets used for pipeline seeding. Keep in sync with seed_pipeline_stages. */
-export const INDUSTRY_PRESETS: { value: string; label: string }[] = [
-  { value: "bridal", label: "Bridal / Specialty Retail" },
-  { value: "mobile_bar", label: "Mobile Bar / Catering" },
-  { value: "contractor", label: "Trade Contractor" },
-  { value: "creative", label: "Creative Studio" },
-  { value: "general", label: "General Business" },
-];
+export {
+  CUSTOM_INDUSTRY_PRESET,
+  INDUSTRY_PRESETS,
+  INDUSTRY_SECTORS,
+  industryDisplayLabel,
+  isIndustryPreset,
+  normalizeIndustryCustomLabel,
+} from "@/lib/industryVerticals";
 
 export const TEAM_SIZE_OPTIONS: {
   value: string;
@@ -38,10 +38,6 @@ export function trialEndsAt(from = new Date()): string {
   const d = new Date(from);
   d.setUTCDate(d.getUTCDate() + TRIAL_DAYS);
   return d.toISOString();
-}
-
-export function isIndustryPreset(value: string): boolean {
-  return INDUSTRY_PRESETS.some((p) => p.value === value);
 }
 
 export function isTeamSize(value: string): boolean {

@@ -19,6 +19,7 @@ export interface Workspace {
   portal_slug?: string | null;
   custom_domain?: string | null;
   industry_preset?: string | null;
+  industry_custom_label?: string | null;
   phone?: string | null;
   team_size?: string | null;
   max_seats?: number;

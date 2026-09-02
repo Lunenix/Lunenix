@@ -3,9 +3,11 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isSuperAdmin } from "@/lib/auth/superAdmin";
 import { grantMissingSuperAdminMemberships } from "@/lib/supabase/grantSuperAdminWorkspaces";
 import {
+  CUSTOM_INDUSTRY_PRESET,
   EXTRA_WORKSPACE_PRICE_USD,
   isIndustryPreset,
   isTeamSize,
+  normalizeIndustryCustomLabel,
   seatsForTeamSize,
   trialEndsAt,
 } from "@/lib/workspace";
@@ -26,6 +28,7 @@ async function readWorkspacePayload(request: NextRequest): Promise<{
   name: string;
   slug: string;
   industryPreset: string | null;
+  industryCustomLabel: string | null;
   phone: string | null;
   teamSize: string | null;
   logo: File | null;
@@ -38,6 +41,8 @@ async function readWorkspacePayload(request: NextRequest): Promise<{
       name: String(form.get("name") ?? "").trim(),
       slug: String(form.get("slug") ?? "").trim(),
       industryPreset: String(form.get("industry_preset") ?? "").trim() || null,
+      industryCustomLabel:
+        String(form.get("industry_custom_label") ?? "").trim() || null,
       phone: String(form.get("phone") ?? "").trim() || null,
       teamSize: String(form.get("team_size") ?? "").trim() || null,
       logo: logo instanceof File && logo.size > 0 ? logo : null,
@@ -50,6 +55,10 @@ async function readWorkspacePayload(request: NextRequest): Promise<{
     industryPreset:
       typeof body.industry_preset === "string"
         ? body.industry_preset.trim() || null
+        : null,
+    industryCustomLabel:
+      typeof body.industry_custom_label === "string"
+        ? body.industry_custom_label.trim() || null
         : null,
     phone: typeof body.phone === "string" ? body.phone.trim() || null : null,
     teamSize:
@@ -70,6 +79,10 @@ function asWorkspaceListItem(
     logo_url: typeof ws.logo_url === "string" ? ws.logo_url : null,
     industry_preset:
       typeof ws.industry_preset === "string" ? ws.industry_preset : null,
+    industry_custom_label:
+      typeof ws.industry_custom_label === "string"
+        ? ws.industry_custom_label
+        : null,
     phone: typeof ws.phone === "string" ? ws.phone : null,
     team_size: typeof ws.team_size === "string" ? ws.team_size : null,
     max_seats: typeof ws.max_seats === "number" ? ws.max_seats : undefined,
@@ -199,6 +212,16 @@ export async function POST(request: NextRequest) {
   if (!payload.industryPreset || !isIndustryPreset(payload.industryPreset)) {
     return NextResponse.json({ error: "Choose an industry." }, { status: 400 });
   }
+  const industryCustomLabel =
+    payload.industryPreset === CUSTOM_INDUSTRY_PRESET
+      ? normalizeIndustryCustomLabel(payload.industryCustomLabel)
+      : null;
+  if (payload.industryPreset === CUSTOM_INDUSTRY_PRESET && !industryCustomLabel) {
+    return NextResponse.json(
+      { error: "Describe your business type for Other." },
+      { status: 400 }
+    );
+  }
   if (!payload.teamSize || !isTeamSize(payload.teamSize)) {
     return NextResponse.json({ error: "Choose your team size." }, { status: 400 });
   }
@@ -233,6 +256,7 @@ export async function POST(request: NextRequest) {
       tier: extraPaid ? "paid" : "trial",
       max_seats: seatsForTeamSize(payload.teamSize),
       industry_preset: payload.industryPreset,
+      industry_custom_label: industryCustomLabel,
       phone: payload.phone.slice(0, 40),
       team_size: payload.teamSize,
       trial_ends_at: extraPaid ? null : trialEndsAt(),

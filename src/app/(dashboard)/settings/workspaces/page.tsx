@@ -14,11 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  AddCompanyModal,
-  INDUSTRY_PRESETS,
-} from "@/components/workspace/AddCompanyModal";
+import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
 import { toast } from "@/lib/toast";
+import { industryDisplayLabel } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 import type { WorkspaceWithMembership } from "@/types/database";
 import { Check, Loader2, Pencil, Plus } from "lucide-react";
@@ -34,9 +32,11 @@ function roleBadgeClasses(role?: string): string {
   }
 }
 
-function presetLabel(preset?: string | null): string {
-  if (!preset) return "—";
-  return INDUSTRY_PRESETS.find((p) => p.value === preset)?.label ?? preset;
+function presetLabel(
+  preset?: string | null,
+  custom?: string | null
+): string {
+  return industryDisplayLabel(preset, custom);
 }
 
 export default function WorkspaceManagementPage() {
@@ -241,7 +241,10 @@ export default function WorkspaceManagementPage() {
 
                       {/* Industry preset */}
                       <TableCell className="text-muted-foreground">
-                        {presetLabel(ws.industry_preset)}
+                        {presetLabel(
+                          ws.industry_preset,
+                          ws.industry_custom_label
+                        )}
                       </TableCell>
 
                       {/* Tier */}

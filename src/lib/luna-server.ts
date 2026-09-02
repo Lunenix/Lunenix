@@ -8,6 +8,10 @@ import {
   isIanaTimeZone,
   type WorkspaceContextPayload,
 } from "@/lib/luna";
+import {
+  industryDisplayLabel,
+  industrySectorLabel,
+} from "@/lib/industryVerticals";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
 import { createOrReuseInvoicePaymentLink } from "@/lib/billing/invoicePaymentLink";
 import { sendEsignEmail } from "@/lib/esign/sendEmail";
@@ -84,6 +88,8 @@ export type LunaWorkspaceContext = {
   invoices: Record<string, unknown>[];
   forms: Record<string, unknown>[];
   workflows: Record<string, unknown>[];
+  workspaceName: string | null;
+  industry: string | null;
   homeCity: string | null;
   timezone: string | null;
   localTime: string | null;
@@ -829,6 +835,8 @@ export async function getLunaWorkspaceContext(
     invoices: [],
     forms: [],
     workflows: [],
+    workspaceName: null,
+    industry: null,
     homeCity: null,
     timezone: null,
     localTime: null,
@@ -847,6 +855,7 @@ export async function getLunaWorkspaceContext(
     { data: forms },
     { data: workflows },
     { data: aiSettings },
+    { data: workspaceRow },
   ] = await Promise.all([
     supabase
       .from("contacts")
@@ -904,6 +913,11 @@ export async function getLunaWorkspaceContext(
       .select("home_city, timezone")
       .eq("workspace_id", workspace_id)
       .maybeSingle(),
+    supabase
+      .from("workspaces")
+      .select("name, industry_preset, industry_custom_label")
+      .eq("id", workspace_id)
+      .maybeSingle(),
   ]);
 
   const homeCity =
@@ -918,6 +932,30 @@ export async function getLunaWorkspaceContext(
     (timezoneOverride && isIanaTimeZone(timezoneOverride)
       ? timezoneOverride
       : null);
+
+  const workspaceName =
+    typeof workspaceRow?.name === "string" && workspaceRow.name.trim()
+      ? workspaceRow.name.trim().slice(0, 120)
+      : null;
+  const industryLabel = industryDisplayLabel(
+    typeof workspaceRow?.industry_preset === "string"
+      ? workspaceRow.industry_preset
+      : null,
+    typeof workspaceRow?.industry_custom_label === "string"
+      ? workspaceRow.industry_custom_label
+      : null
+  );
+  const sector = industrySectorLabel(
+    typeof workspaceRow?.industry_preset === "string"
+      ? workspaceRow.industry_preset
+      : null
+  );
+  const industryLine =
+    industryLabel && industryLabel !== "—"
+      ? sector
+        ? `${industryLabel} — ${sector}`
+        : industryLabel
+      : null;
 
   return {
     contacts: (contacts ?? []).map((row: Record<string, unknown>) =>
@@ -944,6 +982,8 @@ export async function getLunaWorkspaceContext(
     workflows: (workflows ?? []).map((row: Record<string, unknown>) =>
       pickKeys(row, ["id", "name", "is_active", "trigger_type"])
     ),
+    workspaceName,
+    industry: industryLine,
     homeCity,
     timezone,
     localTime: timezone ? formatTimeInZone(timezone) : null,
@@ -1166,6 +1206,8 @@ export function formatLunaContextForPrompt(ctx: LunaWorkspaceContext): string {
 
   return [
     "Current workspace snapshot (this workspace only):",
+    ctx.workspaceName ? `Company: ${ctx.workspaceName}.` : "",
+    ctx.industry ? `Industry: ${ctx.industry}.` : "",
     ctx.homeCity || ctx.timezone || ctx.localTime
       ? `Locale: ${[
           ctx.homeCity ? `home city ${ctx.homeCity}` : "",

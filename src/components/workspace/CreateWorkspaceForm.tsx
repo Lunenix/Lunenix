@@ -18,8 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { IndustryVerticalFields } from "@/components/workspace/IndustryVerticalFields";
 import {
-  INDUSTRY_PRESETS,
+  CUSTOM_INDUSTRY_PRESET,
   TEAM_SIZE_OPTIONS,
   TRIAL_DAYS,
 } from "@/lib/workspace";
@@ -41,7 +42,8 @@ export function WorkspaceOnboardingForm({
 }: WorkspaceOnboardingFormProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [industry, setIndustry] = useState("general");
+  const [industry, setIndustry] = useState("");
+  const [industryCustom, setIndustryCustom] = useState("");
   const [teamSize, setTeamSize] = useState("1-5");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -60,6 +62,14 @@ export function WorkspaceOnboardingForm({
       setError("Upload your company logo.");
       return;
     }
+    if (!industry) {
+      setError("Choose an industry.");
+      return;
+    }
+    if (industry === CUSTOM_INDUSTRY_PRESET && !industryCustom.trim()) {
+      setError("Describe your business type for Other.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -68,6 +78,9 @@ export function WorkspaceOnboardingForm({
       body.append("slug", slugify(name));
       body.append("phone", phone.trim());
       body.append("industry_preset", industry);
+      if (industryCustom.trim()) {
+        body.append("industry_custom_label", industryCustom.trim());
+      }
       body.append("team_size", teamSize);
       body.append("logo", logoFile);
       const res = await fetch("/api/workspaces", {
@@ -137,21 +150,13 @@ export function WorkspaceOnboardingForm({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="ws-industry">Industry</Label>
-            <Select value={industry} onValueChange={setIndustry}>
-              <SelectTrigger id="ws-industry">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {INDUSTRY_PRESETS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <IndustryVerticalFields
+            idPrefix="ws"
+            value={industry}
+            customLabel={industryCustom}
+            onValueChange={setIndustry}
+            onCustomLabelChange={setIndustryCustom}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="ws-team">Team size</Label>
