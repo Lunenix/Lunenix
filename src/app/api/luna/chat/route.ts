@@ -14,12 +14,15 @@ import {
   ASK_PROJECT_NAME_REPLY,
   extractFormNameFromMessage,
   extractContactNameFromMessage,
+  extractContactFromNoteRequest,
+  extractNoteBody,
   extractProjectNameFromMessage,
   fillContactCreateArgs,
   inferLunaForcedTools,
   interpretPendingFormName,
   isFormCreateRequest,
   isContactCreateRequest,
+  isContactNoteRequest,
   isProjectCreateRequest,
   resolveFormCreateName,
   spokenToolResult,
@@ -57,6 +60,7 @@ const BASE_SYSTEM_PROMPT =
   "If they did not give a name, do not call create_form. Ask what to name it first, then wait. " +
   "When they ask to change a form after it exists, call update_form. " +
   "When they ask to add or create a contact, call create_contact. " +
+  "When they ask to add a note to a contact, call update_contact with that person's name and the note, with append_notes true. If they named the contact but not the note, ask what to write. Do not create a new contact. " +
   "When they ask to change, update, or edit a contact, call update_contact and identify them by name or email. " +
   "When they ask to search or list contacts, call search_contacts. " +
   "When they ask about sent mail or email history, call list_emails. For the inbox, call list_inbox. For email templates, call list_templates. " +
@@ -123,7 +127,7 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
   {
     name: "update_contact",
     description:
-      "Edit an existing contact in this workspace. Identify them by name or email, then pass only the fields that should change.",
+      "Edit an existing contact in this workspace. Identify them by name or email, then pass only the fields that should change. Use this to add notes; set append_notes true so existing notes are kept.",
     parametersJsonSchema: {
       type: "object",
       properties: {
@@ -141,6 +145,10 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
         phone: { type: "string" },
         address: { type: "string" },
         notes: { type: "string" },
+        append_notes: {
+          type: "boolean",
+          description: "True when adding a note; keep existing notes and append.",
+        },
         type: { type: "string", description: "person, organization, or lead" },
         tags: { type: "string", description: "Comma-separated tags" },
       },
@@ -533,6 +541,12 @@ function ruleBasedReply(message: string): string {
   if (isContactCreateRequest(message) && !extractContactNameFromMessage(message)) {
     return ASK_CONTACT_NAME_REPLY;
   }
+  if (isContactNoteRequest(message) && !extractNoteBody(message)) {
+    const who = extractContactFromNoteRequest(message);
+    return who
+      ? `What should I add to ${who}'s notes?`
+      : "Which contact should I add a note to, and what should it say?";
+  }
   if (isProjectCreateRequest(message) && !extractProjectNameFromMessage(message)) {
     return ASK_PROJECT_NAME_REPLY;
   }
@@ -806,6 +820,19 @@ async function geminiReply(params: {
   return null;
 }
 
+function lastUserHistoryText(history: unknown): string {
+  if (!Array.isArray(history)) return "";
+  for (let i = history.length - 1; i >= 0; i--) {
+    const item = history[i];
+    if (!item || typeof item !== "object") continue;
+    const row = item as { role?: unknown; text?: unknown };
+    if (row.role === "user" && typeof row.text === "string" && row.text.trim()) {
+      return row.text.trim();
+    }
+  }
+  return "";
+}
+
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -834,6 +861,7 @@ export async function POST(req: NextRequest) {
     if (body?.pendingAction === "create_form") pendingAction = "create_form";
     if (body?.pendingAction === "create_contact") pendingAction = "create_contact";
     if (body?.pendingAction === "create_project") pendingAction = "create_project";
+    if (body?.pendingAction === "add_contact_note") pendingAction = "add_contact_note";
     if (Array.isArray(body?.history)) history = body.history;
   } catch {
     /* ignore malformed body */
@@ -935,6 +963,22 @@ async function handleLunaChat(params: {
     }
   }
 
+  if (pendingAction === "add_contact_note") {
+    const prior = lastUserHistoryText(history);
+    const who =
+      extractContactFromNoteRequest(message) ||
+      extractContactFromNoteRequest(prior);
+    const noteText =
+      extractNoteBody(message) ||
+      (isContactNoteRequest(message) ? null : message.trim());
+    if (who && noteText) {
+      message = `Add a note to ${who}: ${noteText}`;
+      pendingAction = null;
+    } else if (!isContactNoteRequest(message) && !isContactCreateRequest(message)) {
+      pendingAction = null;
+    }
+  }
+
   if (pendingAction === "create_contact") {
     const pendingName =
       extractContactNameFromMessage(message) ||
@@ -957,6 +1001,16 @@ async function handleLunaChat(params: {
     } else if (!isProjectCreateRequest(message)) {
       pendingAction = null;
     }
+  }
+
+  if (isContactNoteRequest(message) && !extractNoteBody(message)) {
+    const who = extractContactFromNoteRequest(message);
+    return lunaSpeechJson(
+      who
+        ? `What should I add to ${who}'s notes?`
+        : "Which contact should I add a note to, and what should it say?",
+      { pendingAction: "add_contact_note" }
+    );
   }
 
   if (isFormCreateRequest(message) && !resolveFormCreateName(message)) {

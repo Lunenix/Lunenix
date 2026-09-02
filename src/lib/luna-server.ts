@@ -1241,9 +1241,55 @@ export function fillContactCreateArgs(
   return next;
 }
 
+export function isContactNoteRequest(message: string): boolean {
+  const m = message.trim();
+  if (/\b(create|make|new)\s+(a\s+|an\s+)?contacts?\b/i.test(m)) return false;
+  return (
+    /\b(add|append|put|write|leave|save)\b.{0,80}\bnotes?\b/i.test(m) ||
+    /\bnotes?\s+(?:to|on|for)\b/i.test(m)
+  );
+}
+
+export function extractContactFromNoteRequest(message: string): string | null {
+  const m = message.trim();
+  const patterns: RegExp[] = [
+    /\bnotes?\s+to\s+(?:the\s+)?(?:contact\s+)?([A-Za-z][A-Za-z .'-]{1,50}?)(?:\s*[:.\-]|\s+that\b|\s+saying\b|$)/i,
+    /\bcontact\s+([A-Za-z][A-Za-z .'-]{1,50}?)\s*$/i,
+    /\bfor\s+(?:contact\s+)?([A-Za-z][A-Za-z .'-]{1,50}?)(?:\s*[:.\-]|\s+that\b|$)/i,
+  ];
+  for (const re of patterns) {
+    const name = cleanExtractedFormName(m.match(re)?.[1]);
+    if (name) return stripRecordTitleTail(name);
+  }
+  return extractContactNameFromMessage(m);
+}
+
+export function extractNoteBody(message: string): string | null {
+  const m = message.trim();
+  const colon = m.match(/\bnotes?\b[\s\S]{0,100}[:]\s*(.+)$/i);
+  if (colon?.[1]?.trim()) return colon[1].trim().slice(0, 2000);
+  const toColon = m.match(
+    /\bto\s+(?:the\s+)?(?:contact\s+)?[A-Za-z][A-Za-z .'-]{1,50}\s*[:\-]\s*(.+)$/i
+  );
+  if (toColon?.[1]?.trim()) return toColon[1].trim().slice(0, 2000);
+  const saying = m.match(/\b(?:saying|that says?)\s+["']?(.+?)["']?\s*$/i);
+  if (saying?.[1]?.trim() && saying[1].trim().length > 2) {
+    return saying[1].trim().slice(0, 2000);
+  }
+  const thatClause = m.match(
+    /\bnotes?\s+to\s+(?:the\s+)?(?:contact\s+)?[A-Za-z][A-Za-z .'-]{1,50}?\s+that\s+(.+)$/i
+  );
+  if (thatClause?.[1]?.trim()) return thatClause[1].trim().slice(0, 2000);
+  return null;
+}
+
+export const ASK_CONTACT_NOTE_REPLY =
+  "What should I add to that contact's notes?";
+
 export function isContactCreateRequest(message: string): boolean {
   const m = message.trim();
   if (/\bcontact\s+form\b/i.test(m)) return false;
+  if (isContactNoteRequest(m)) return false;
   if (/\b(update|edit|change|rename)\b/i.test(m) && !/\b(create|add|new|make)\b/i.test(m)) {
     return false;
   }
@@ -1302,6 +1348,21 @@ export function inferLunaForcedTools(
       tools.push({
         name: "create_form",
         args: { name, fields: defaultFormFields(m) },
+      });
+    }
+  }
+
+  if (isContactNoteRequest(m)) {
+    const contactName = extractContactFromNoteRequest(m);
+    const notes = extractNoteBody(m);
+    if (contactName && notes) {
+      tools.push({
+        name: "update_contact",
+        args: {
+          contact_name: contactName,
+          notes,
+          append_notes: true,
+        },
       });
     }
   }
@@ -1604,7 +1665,24 @@ export async function executeLunaTool(
       if (email) updates.email = email;
       if (phone) updates.phone = phone;
       if (address) updates.address = address;
-      if (notes) updates.notes = notes;
+      if (notes) {
+        const append =
+          args.append_notes === true ||
+          argString(args, "append_notes") === "true";
+        if (append) {
+          const { data: existing } = await supabase
+            .from("contacts")
+            .select("notes")
+            .eq("id", found.id)
+            .eq("workspace_id", workspace_id)
+            .maybeSingle();
+          const prev =
+            typeof existing?.notes === "string" ? existing.notes.trim() : "";
+          updates.notes = prev ? `${prev}\n${notes}` : notes;
+        } else {
+          updates.notes = notes;
+        }
+      }
       if (typeArg === "organization" || typeArg === "lead" || typeArg === "person") {
         updates.type = typeArg;
       }
