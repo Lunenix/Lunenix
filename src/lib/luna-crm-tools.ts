@@ -1,5 +1,4 @@
 import type { FunctionDeclaration } from "@google/genai";
-import { BAR_LUNA_TOOLS } from "@/lib/verticals/bar/tools";
 
 /** Extra CRM tools for Luna. Telegram stays cron + env, not a tool. */
 export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
@@ -1424,5 +1423,4 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
       },
     },
   },
-  ...BAR_LUNA_TOOLS,
 ];

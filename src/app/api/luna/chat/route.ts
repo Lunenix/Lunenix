@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isIanaTimeZone, formatContextForGemini } from "@/lib/luna";
 import { sendEmailTool } from "@/lib/luna-tools";
 import { LUNA_CRM_TOOLS } from "@/lib/luna-crm-tools";
+import { getToolsForWorkspace } from "@/lib/verticals/registry";
 import { isSuperAdmin } from "@/lib/auth/superAdmin";
 import { requireSuperAdmin } from "@/lib/auth/requireSuperAdmin";
 import { ensureSuperAdminMembership } from "@/lib/supabase/grantSuperAdminWorkspaces";
@@ -734,12 +735,22 @@ async function geminiReply(params: {
       params.message
     );
 
+  const { data: wsRow } = await params.supabase
+    .from("workspaces")
+    .select("industry_preset")
+    .eq("id", params.workspaceId)
+    .maybeSingle();
+  const functionDeclarations = getToolsForWorkspace(
+    LUNA_TOOLS,
+    typeof wsRow?.industry_preset === "string" ? wsRow.industry_preset : null
+  );
+
   const config = {
     systemInstruction,
     temperature: 0.35,
     maxOutputTokens: wantsBriefing ? 2048 : 1536,
     automaticFunctionCalling: { disable: true },
-    tools: [{ functionDeclarations: LUNA_TOOLS }],
+    tools: [{ functionDeclarations }],
   };
 
   let response = await ai.models.generateContent({

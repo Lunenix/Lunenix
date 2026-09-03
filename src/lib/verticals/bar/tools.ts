@@ -1,6 +1,6 @@
 import type { FunctionDeclaration } from "@google/genai";
 
-/** Bar pack Luna tools. Wired through LUNA_CRM_TOOLS + executeLunaTool. */
+/** Bar pack Luna tools. Attached per workspace via getToolsForWorkspace. */
 export const BAR_LUNA_TOOLS: FunctionDeclaration[] = [
   {
     name: "bartending_log_event_specs",

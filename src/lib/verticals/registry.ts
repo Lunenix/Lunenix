@@ -1,8 +1,11 @@
 import {
+  INDUSTRY_PRESETS,
   industrySectorId,
   resolveIndustryPreset,
 } from "@/lib/industryVerticals";
+import type { FunctionDeclaration } from "@google/genai";
 import type { VerticalNavItem, VerticalPack } from "@/lib/verticals/types";
+import { mobileBartendingPack } from "@/lib/verticals/packs/mobile-bartending";
 
 const PACKS: VerticalPack[] = [];
 
@@ -108,3 +111,44 @@ registerVerticalPack({
     { href: "/books", label: "Books", icon: "BookOpen" },
   ],
 });
+
+/** Catalog sector label. Tool packs key off `industry_preset`, not this string. */
+export const EVENT_WEDDING_CATEGORY = "Event & Wedding Services";
+
+type VerticalLunaPack = {
+  key: string;
+  name: string;
+  tools: readonly FunctionDeclaration[];
+};
+
+const VERTICAL_TOOL_REGISTRY: Record<string, VerticalLunaPack> = {
+  [mobileBartendingPack.key]: mobileBartendingPack,
+  // Additional Event & Wedding packs (Florist, DJ, Caterer, Venue) register here
+};
+
+/** Resolve a Luna tool pack by `industry_preset` slug or catalog label. */
+export function getVerticalPack(
+  industryPreset?: string | null
+): VerticalLunaPack | null {
+  if (!industryPreset) return null;
+  const direct = VERTICAL_TOOL_REGISTRY[industryPreset];
+  if (direct) return direct;
+  const resolved = resolveIndustryPreset(industryPreset);
+  if (resolved && VERTICAL_TOOL_REGISTRY[resolved]) {
+    return VERTICAL_TOOL_REGISTRY[resolved];
+  }
+  const byLabel = INDUSTRY_PRESETS.find((p) => p.label === industryPreset);
+  if (byLabel && VERTICAL_TOOL_REGISTRY[byLabel.value]) {
+    return VERTICAL_TOOL_REGISTRY[byLabel.value];
+  }
+  return null;
+}
+
+export function getToolsForWorkspace(
+  baseTools: FunctionDeclaration[],
+  industryPreset?: string | null
+): FunctionDeclaration[] {
+  const pack = getVerticalPack(industryPreset);
+  if (!pack || !pack.tools.length) return baseTools;
+  return [...baseTools, ...pack.tools];
+}
