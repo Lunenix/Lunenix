@@ -1468,6 +1468,112 @@ export interface SteelQueueItem {
   project?: { id: string; name: string } | null;
 }
 
+export interface BarEvent {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  title: string;
+  event_on: string | null;
+  venue_name: string | null;
+  venue_address: string | null;
+  guest_count: number | null;
+  event_type: string;
+  lead_source: string | null;
+  package_tier: string;
+  consult_at: string | null;
+  consult_kind: string;
+  hours: number | null;
+  addons: string | null;
+  load_in_at: string | null;
+  event_start_at: string | null;
+  event_end_at: string | null;
+  breakdown_at: string | null;
+  staff_notes: string | null;
+  equipment_checklist: string | null;
+  venue_access: string | null;
+  theme_colors: string | null;
+  must_haves: string | null;
+  avoid_items: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BarMenu {
+  id: string;
+  workspace_id: string;
+  name: string;
+  package_tier: string;
+  setup_style: string;
+  cocktails: string | null;
+  mocktails: string | null;
+  dietary_notes: string | null;
+  garnish_notes: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BarLook {
+  id: string;
+  workspace_id: string;
+  kind: string;
+  title: string;
+  image_url: string | null;
+  venue_photo_url: string | null;
+  client_status: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BarCompliance {
+  id: string;
+  workspace_id: string;
+  kind: string;
+  name: string;
+  holder_name: string | null;
+  expires_on: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BarSupplyOrder {
+  id: string;
+  workspace_id: string;
+  vendor_name: string;
+  kind: string;
+  status: string;
+  pickup_on: string | null;
+  leftover_notes: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BarCrew {
+  id: string;
+  workspace_id: string;
+  name: string;
+  role: string;
+  tips_expires_on: string | null;
+  food_handler_expires_on: string | null;
+  rating: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BarOnsite {
+  id: string;
+  workspace_id: string;
+  kind: string;
+  title: string;
+  image_url: string | null;
+  incident_kind: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SteelWeldLog {
   id: string;
   workspace_id: string;

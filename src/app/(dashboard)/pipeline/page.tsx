@@ -11,6 +11,7 @@ import type {
   PipelineStage,
 } from "@/types/database";
 import { Loader2, KanbanSquare, Archive, ArchiveRestore } from "lucide-react";
+import { BAR_LEAD_SOURCES, isMobileBartendingWorkspace } from "@/lib/barService";
 
 export default function PipelinePage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
@@ -135,6 +136,11 @@ export default function PipelinePage() {
           initialLeads={leads}
           contacts={contacts}
           showArchived={showArchived}
+          sourceSuggestions={
+            isMobileBartendingWorkspace(activeWorkspace.industry_preset)
+              ? BAR_LEAD_SOURCES
+              : undefined
+          }
         />
       )}
     </div>

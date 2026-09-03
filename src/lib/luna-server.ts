@@ -22,6 +22,20 @@ import { ymdFromUnknown } from "@/lib/calendar";
 import { parseReminderMinutes } from "@/lib/tasks/reminder";
 import { createAdminClient } from "@/lib/supabase/server";
 import { PERMIT_STATUSES, PERMIT_KINDS, SERVICE_PLAN_FREQUENCIES, CLAIM_STATUSES, CLAIM_PRICING_MODES, MATERIAL_ORDER_STATUSES, MATERIAL_TYPES, PAINT_SHEENS, PREP_KINDS, PREP_STATUSES, HOA_COLOR_STATUSES, TREATMENT_METHODS, ACCESS_ENTRY_METHODS, FINDING_SYSTEMS, FINDING_SEVERITIES, FINDING_STATUSES, REPORT_STATUSES, ADDON_KINDS, ADDON_STATUSES, ASSET_CATEGORIES, ASSET_LOCATIONS, ASSET_STATUSES, RESERVATION_STATUSES, RATE_TYPES, PICKUP_METHODS, MAINT_STATUSES, CHANGE_ORDER_STATUSES, SUB_TRADES, PHASE_KINDS, PHASE_STATUSES, DELAY_CAUSES, DRAW_KINDS, DRAW_STATUSES, LIEN_WAIVER_STATUSES, SHOP_DESIGN_STATUSES, SHOP_SELECTION_KINDS, SHOP_STAGES, SHOP_FAB_STEPS, STEEL_DRAWING_STATUSES, STEEL_PE_STATUSES, STEEL_METALS, STEEL_FINISHES, STEEL_STAGES, STEEL_FAB_STEPS, WELD_TYPES, WELD_RESULTS, NDT_RESULTS } from "@/lib/fieldService";
+import {
+  BAR_COMPLIANCE_KINDS,
+  BAR_COMPLIANCE_STATUSES,
+  BAR_CONSULT_KINDS,
+  BAR_CREW_ROLES,
+  BAR_EVENT_STATUSES,
+  BAR_EVENT_TYPES,
+  BAR_INCIDENT_KINDS,
+  BAR_ONSITE_KINDS,
+  BAR_ORDER_KINDS,
+  BAR_ORDER_STATUSES,
+  BAR_PACKAGE_TIERS,
+  BAR_SETUP_STYLES,
+} from "@/lib/barService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -6123,6 +6137,376 @@ export async function executeLunaTool(
         workspace_id,
         name,
         `Logged ${data.weld_type} weld for ${data.welder_name}. Do not store cert numbers.`
+      );
+    }
+
+    if (name === "list_bar_events") {
+      const { data, error } = await supabase
+        .from("bar_events")
+        .select("title, event_on, venue_name, guest_count, package_tier, status")
+        .eq("workspace_id", workspace_id)
+        .order("event_on", { ascending: true })
+        .limit(20);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (e: {
+          title: string;
+          event_on: string | null;
+          venue_name: string | null;
+          guest_count: number | null;
+          package_tier: string;
+          status: string;
+        }) =>
+          `${e.title} ${e.event_on ?? "no date"} at ${e.venue_name ?? "no venue"}, ${e.guest_count ?? "?"} guests, ${e.package_tier}, ${e.status}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No bartending events in this workspace.",
+      };
+    }
+
+    if (name === "log_bar_event") {
+      const title = argString(args, "title");
+      if (!title) return { error: "Need an event name." };
+      let contactId: string | null = null;
+      const contactRef = argString(args, "contact_name");
+      if (contactRef) {
+        const contact = await requireOneContact(
+          supabase,
+          workspace_id,
+          contactRef
+        );
+        if ("error" in contact) return contact;
+        contactId = contact.id;
+      }
+      const event_type = (BAR_EVENT_TYPES as readonly string[]).includes(
+        argString(args, "event_type") ?? ""
+      )
+        ? argString(args, "event_type")
+        : "private_party";
+      const package_tier = (BAR_PACKAGE_TIERS as readonly string[]).includes(
+        argString(args, "package_tier") ?? ""
+      )
+        ? argString(args, "package_tier")
+        : "full_open";
+      const consult_kind = (BAR_CONSULT_KINDS as readonly string[]).includes(
+        argString(args, "consult_kind") ?? ""
+      )
+        ? argString(args, "consult_kind")
+        : "call";
+      const { data, error } = await supabase
+        .from("bar_events")
+        .insert({
+          workspace_id,
+          contact_id: contactId,
+          title: title.slice(0, 200),
+          event_on: argString(args, "event_on"),
+          venue_name: argString(args, "venue_name"),
+          guest_count: argNumber(args, "guest_count"),
+          event_type,
+          package_tier,
+          consult_kind,
+          status: (BAR_EVENT_STATUSES as readonly string[]).includes(
+            argString(args, "status") ?? ""
+          )
+            ? argString(args, "status")
+            : "inquiry",
+        })
+        .select("title")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that event." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged event ${data.title}.`
+      );
+    }
+
+    if (name === "list_bar_menus") {
+      const { data, error } = await supabase
+        .from("bar_menus")
+        .select("name, package_tier, setup_style, status")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (m: {
+          name: string;
+          package_tier: string;
+          setup_style: string;
+          status: string;
+        }) => `${m.name}: ${m.package_tier}, ${m.setup_style}, ${m.status}`
+      );
+      return {
+        ok: true,
+        summary: lines.length ? lines.join(". ") : "No bar menus in this workspace.",
+      };
+    }
+
+    if (name === "log_bar_menu") {
+      const menuName = argString(args, "name");
+      if (!menuName) return { error: "Need a menu name." };
+      const package_tier = (BAR_PACKAGE_TIERS as readonly string[]).includes(
+        argString(args, "package_tier") ?? ""
+      )
+        ? argString(args, "package_tier")
+        : "full_open";
+      const setup_style = (BAR_SETUP_STYLES as readonly string[]).includes(
+        argString(args, "setup_style") ?? ""
+      )
+        ? argString(args, "setup_style")
+        : "cart";
+      const { data, error } = await supabase
+        .from("bar_menus")
+        .insert({
+          workspace_id,
+          name: menuName.slice(0, 200),
+          package_tier,
+          setup_style,
+          cocktails: argString(args, "cocktails"),
+          dietary_notes: argString(args, "dietary_notes"),
+        })
+        .select("name")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that menu." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged menu ${data.name}.`
+      );
+    }
+
+    if (name === "list_bar_compliance") {
+      const { data, error } = await supabase
+        .from("bar_compliance")
+        .select("name, kind, status, expires_on")
+        .eq("workspace_id", workspace_id)
+        .order("expires_on", { ascending: true })
+        .limit(20);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (c: {
+          name: string;
+          kind: string;
+          status: string;
+          expires_on: string | null;
+        }) => `${c.name} ${c.kind} ${c.status}${c.expires_on ? ` until ${c.expires_on}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} License numbers are not spoken.`
+          : "No bar compliance records in this workspace.",
+      };
+    }
+
+    if (name === "log_bar_compliance") {
+      const cname = argString(args, "name");
+      if (!cname) return { error: "Need a compliance name." };
+      const kind = (BAR_COMPLIANCE_KINDS as readonly string[]).includes(
+        argString(args, "kind") ?? ""
+      )
+        ? argString(args, "kind")
+        : "liquor_license";
+      const status = (BAR_COMPLIANCE_STATUSES as readonly string[]).includes(
+        argString(args, "status") ?? ""
+      )
+        ? argString(args, "status")
+        : "needed";
+      const { data, error } = await supabase
+        .from("bar_compliance")
+        .insert({
+          workspace_id,
+          name: cname.slice(0, 200),
+          kind,
+          holder_name: argString(args, "holder_name"),
+          expires_on: argString(args, "expires_on"),
+          status,
+        })
+        .select("name")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that compliance item." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged compliance ${data.name}. Do not store license numbers in chat.`
+      );
+    }
+
+    if (name === "list_bar_orders") {
+      const { data, error } = await supabase
+        .from("bar_supply_orders")
+        .select("vendor_name, kind, status, pickup_on")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (o: {
+          vendor_name: string;
+          kind: string;
+          status: string;
+          pickup_on: string | null;
+        }) =>
+          `${o.vendor_name} ${o.kind} ${o.status}${o.pickup_on ? ` ${o.pickup_on}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No bar supply orders in this workspace.",
+      };
+    }
+
+    if (name === "log_bar_order") {
+      const vendor = argString(args, "vendor_name");
+      if (!vendor) return { error: "Need a vendor name." };
+      const kind = (BAR_ORDER_KINDS as readonly string[]).includes(
+        argString(args, "kind") ?? ""
+      )
+        ? argString(args, "kind")
+        : "alcohol";
+      const status = (BAR_ORDER_STATUSES as readonly string[]).includes(
+        argString(args, "status") ?? ""
+      )
+        ? argString(args, "status")
+        : "needed";
+      const { data, error } = await supabase
+        .from("bar_supply_orders")
+        .insert({
+          workspace_id,
+          vendor_name: vendor.slice(0, 200),
+          kind,
+          status,
+          pickup_on: argString(args, "pickup_on"),
+        })
+        .select("vendor_name")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that order." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged supply order from ${data.vendor_name}.`
+      );
+    }
+
+    if (name === "list_bar_crew") {
+      const { data, error } = await supabase
+        .from("bar_crew")
+        .select("name, role, tips_expires_on")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (c: { name: string; role: string; tips_expires_on: string | null }) =>
+          `${c.name} ${c.role}${c.tips_expires_on ? `, TIPS through ${c.tips_expires_on}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? `${lines.join(". ")} Certification numbers are not spoken.`
+          : "No bar crew in this workspace.",
+      };
+    }
+
+    if (name === "log_bar_crew") {
+      const crewName = argString(args, "name");
+      if (!crewName) return { error: "Need a crew name." };
+      const role = (BAR_CREW_ROLES as readonly string[]).includes(
+        argString(args, "role") ?? ""
+      )
+        ? argString(args, "role")
+        : "bartender";
+      const { data, error } = await supabase
+        .from("bar_crew")
+        .insert({
+          workspace_id,
+          name: crewName.slice(0, 200),
+          role,
+          tips_expires_on: argString(args, "tips_expires_on"),
+          rating: argNumber(args, "rating"),
+        })
+        .select("name")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that crew member." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged crew member ${data.name}. Do not store cert numbers.`
+      );
+    }
+
+    if (name === "list_bar_onsite") {
+      const { data, error } = await supabase
+        .from("bar_onsite")
+        .select("title, kind, incident_kind")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return { error: error.message };
+      const lines = (data ?? []).map(
+        (r: { title: string; kind: string; incident_kind: string | null }) =>
+          `${r.title} ${r.kind}${r.incident_kind ? ` ${r.incident_kind}` : ""}`
+      );
+      return {
+        ok: true,
+        summary: lines.length
+          ? lines.join(". ")
+          : "No on-site bar notes in this workspace.",
+      };
+    }
+
+    if (name === "log_bar_onsite") {
+      const onsiteTitle = argString(args, "title");
+      if (!onsiteTitle) return { error: "Need a title." };
+      const kind = (BAR_ONSITE_KINDS as readonly string[]).includes(
+        argString(args, "kind") ?? ""
+      )
+        ? argString(args, "kind")
+        : "setup_photo";
+      const incident_kind = (BAR_INCIDENT_KINDS as readonly string[]).includes(
+        argString(args, "incident_kind") ?? ""
+      )
+        ? argString(args, "incident_kind")
+        : null;
+      const { data, error } = await supabase
+        .from("bar_onsite")
+        .insert({
+          workspace_id,
+          title: onsiteTitle.slice(0, 200),
+          kind,
+          incident_kind,
+          notes: argString(args, "notes"),
+        })
+        .select("title")
+        .maybeSingle();
+      if (error || !data) {
+        return { error: error?.message ?? "Could not log that on-site note." };
+      }
+      return lunaMutationOk(
+        supabase,
+        workspace_id,
+        name,
+        `Logged on-site note ${data.title}.`
       );
     }
 

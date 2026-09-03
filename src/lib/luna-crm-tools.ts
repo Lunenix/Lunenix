@@ -1282,6 +1282,122 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "list_bar_events",
+    description:
+      "List bartending events (date, venue, guests, package). Does not return IDs unless asked.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_bar_event",
+    description:
+      "Log a bartending event: date, venue, guest count, type, package, and consult kind.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        event_on: { type: "string", description: "YYYY-MM-DD" },
+        venue_name: { type: "string" },
+        guest_count: { type: "number" },
+        event_type: { type: "string" },
+        package_tier: { type: "string" },
+        consult_kind: { type: "string" },
+        contact_name: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_bar_menus",
+    description: "List bar menus and package tiers.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_bar_menu",
+    description: "Log a bar package/menu with setup style and cocktail notes.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        package_tier: { type: "string" },
+        setup_style: { type: "string" },
+        cocktails: { type: "string" },
+        dietary_notes: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_bar_compliance",
+    description: "List liquor licenses, permits, insurance, and TIPS certs.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_bar_compliance",
+    description: "Log a license, permit, COI, venue requirement, or TIPS cert.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        kind: { type: "string" },
+        holder_name: { type: "string" },
+        expires_on: { type: "string", description: "YYYY-MM-DD" },
+        status: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "list_bar_orders",
+    description: "List alcohol and supply orders.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_bar_order",
+    description: "Log a liquor-store or supply order.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        vendor_name: { type: "string" },
+        kind: { type: "string" },
+        status: { type: "string" },
+        pickup_on: { type: "string", description: "YYYY-MM-DD" },
+      },
+    },
+  },
+  {
+    name: "list_bar_crew",
+    description: "List bartenders and barbacks (no cert numbers).",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_bar_crew",
+    description: "Log a bartender or barback with optional TIPS expiry date.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        role: { type: "string" },
+        tips_expires_on: { type: "string", description: "YYYY-MM-DD" },
+        rating: { type: "number" },
+      },
+    },
+  },
+  {
+    name: "list_bar_onsite",
+    description: "List on-site setup photos, consumption notes, and incidents.",
+    parametersJsonSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "log_bar_onsite",
+    description: "Log a setup photo, consumption note, or incident.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        kind: { type: "string" },
+        incident_kind: { type: "string" },
+        notes: { type: "string" },
+      },
+    },
+  },
+  {
     name: "create_service_plan",
     description:
       "Create a recurring service plan for a customer in this workspace.",

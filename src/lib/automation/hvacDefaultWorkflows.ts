@@ -2110,6 +2110,149 @@ export const STEELWORKING_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
   },
 ];
 
+export const BAR_DEFAULT_WORKFLOWS: IndustryWorkflowDef[] = [
+  {
+    name: "Bar: New inquiry",
+    description:
+      "When an inquiry lands, capture event source and basics.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Inquiry",
+    actions: [
+      task(
+        "New bar inquiry: {{lead.title}}",
+        "Set lead source: wedding, corporate event, private party, referral, or venue partnership. Capture name, phone, email, event date, venue, guest count, event type, and package interest. Email to book a consult or tasting. Two-way SMS is not live yet.",
+        0
+      ),
+      email(
+        "Thanks for contacting {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We received your bartending inquiry. Reply with your event date, venue, guest count, and a few times for a call or tasting.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Bar: Schedule consult",
+    description: "On Consultation, book a call or tasting on the calendar.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Consultation",
+    actions: [
+      task(
+        "Schedule consult / tasting: {{lead.title}}",
+        "On Events, log event date, venue, guest count, type, source, package interest, and consult kind (call, tasting, or in-person). Add it to the calendar. Send confirmation and a reminder. Two-way texting is not live. GPS auto-route is not live.",
+        0
+      ),
+      email(
+        "Your consultation is booked — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>We have your consult on the calendar. Reply if the time or venue changes.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Bar: Menu and look",
+    description:
+      "On Proposal Sent, lock package, cocktails, mock-up, and wish-wall notes before quoting.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Proposal Sent",
+    actions: [
+      task(
+        "Menu, mock-up, and estimate: {{lead.title}}",
+        "On Menus, set package tier, signature drinks, mocktails, dietary notes, and setup style (cart/tent/indoor). On Looks, log mock-up and inspiration URLs for client approval. On Events, store theme colors, must-haves, and avoids. Then quote guest count + package + hours + add-ons on Estimates. Email it. Two-way SMS is not live. Visual composite editor is not live — use photo URLs.",
+        0
+      ),
+      email(
+        "Your bartending estimate from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready from guest count, package, hours, and add-ons. Please review the menu and look, then reply to approve. A deposit invoice follows approval.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Bar: Booked event ops",
+    description:
+      "After Contract Signed, log licenses, order product, and staff the event.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Contract Signed",
+    actions: [
+      task(
+        "Compliance, orders, and crew: {{lead.title}}",
+        "On Compliance, log liquor/catering permit, liability COI, venue rider, and TIPS certs. On Bar orders, order alcohol/mixers/garnish by guest count. On Crew, assign bartenders/barbacks. Invoice remaining balance due before the event. OCR is not auto-filled. Luna never collects cards.",
+        1
+      ),
+    ],
+  },
+  {
+    name: "Bar: Event logistics",
+    description: "On Planning, lock load-in, staffing, and packing lists.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Planning",
+    actions: [
+      task(
+        "Lock logistics: {{lead.title}}",
+        "On Events, set load-in, start/end, breakdown, equipment checklist, and venue access (dock, power, water). Confirm final headcount. Check Inventory for carts/coolers/glassware. Flag staffing gaps on Bar ops.",
+        2
+      ),
+      email(
+        "Final headcount and payment — {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Please confirm final guest count. Final payment is due before the event. Reply with any menu or must-have changes.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Bar: Day-of",
+    description:
+      "On Day-Of, run setup photos, consumption, and incident notes.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Day-Of",
+    actions: [
+      task(
+        "Day-of bar checklist: {{lead.title}}",
+        "Confirm crew and load-in. On On-site, log setup photos, consumption if overage applies, and any refusal/spill incidents. Email that the team is arriving. Two-way SMS is not live.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Bar: Follow-up",
+    description:
+      "On Follow-Up, leftover returns, overage invoice, and thank-you.",
+    trigger_type: "lead_stage_change",
+    toStageName: "Follow-Up",
+    actions: [
+      task(
+        "Close the event: {{lead.title}}",
+        "On Bar orders, log leftover/returnable bottles. On Invoices, add gratuity/overage if needed. Tag receipts on Books (OCR is not auto-filled). Request a review. Track repeat corporate/venue clients on the contact.",
+        1
+      ),
+      email(
+        "Thank you from {{workspace.name}}",
+        "<p>Hi {{contact.first_name}},</p><p>Thank you for having us. If anything is still open on the invoice, we will send it next. We would love a review when you have a moment.</p><p>{{workspace.name}}</p>"
+      ),
+    ],
+  },
+  {
+    name: "Bar: After contract signed (e-sign)",
+    description: "When an e-sign contract completes, start booked-event ops.",
+    trigger_type: "contract_signed",
+    actions: [
+      task(
+        "Start booked event from signed contract",
+        "Move the card to Contract Signed if needed. Invoice the deposit. Luna never collects cards.",
+        0
+      ),
+    ],
+  },
+  {
+    name: "Bar: After invoice sent",
+    description: "When an invoice is sent, follow AR (deposit then final).",
+    trigger_type: "invoice_sent",
+    actions: [
+      task(
+        "Follow up on bar invoice",
+        "Watch aging. Final is often due before the event. Send a reminder if overdue. Flag expiring licenses or staffing gaps on Bar ops.",
+        3
+      ),
+    ],
+  },
+];
+
 /** Shared Home & Field permit tracking — seeded for every field-service workspace. */
 export const FIELD_PERMIT_WORKFLOWS: IndustryWorkflowDef[] = [
   {
@@ -2156,6 +2299,7 @@ const PACKS: Record<string, IndustryWorkflowDef[]> = {
   contractors_construction: CONSTRUCTION_DEFAULT_WORKFLOWS,
   woodworking_custom_carpentry: WOODWORKING_DEFAULT_WORKFLOWS,
   steelworking_metal_fabrication: STEELWORKING_DEFAULT_WORKFLOWS,
+  mobile_bartending: BAR_DEFAULT_WORKFLOWS,
 };
 
 async function pruneForeignIndustryWorkflows(
@@ -2230,6 +2374,12 @@ async function pruneForeignIndustryWorkflows(
       if (
         preset === "steelworking_metal_fabrication" &&
         name.startsWith("Steelworking & Metal Fabrication:")
+      ) {
+        return true;
+      }
+      if (
+        preset === "mobile_bartending" &&
+        name.startsWith("Mobile Bartending:")
       ) {
         return true;
       }

@@ -45,6 +45,7 @@ interface LeadSheetProps {
   contacts: Contact[];
   lead?: Lead | null;
   onSaved: (lead: Lead) => void;
+  sourceSuggestions?: readonly string[];
 }
 
 export function LeadSheet({
@@ -56,6 +57,7 @@ export function LeadSheet({
   contacts,
   lead,
   onSaved,
+  sourceSuggestions = FIELD_LEAD_SOURCE_SUGGESTIONS,
 }: LeadSheetProps) {
   const isEdit = Boolean(lead);
   const [title, setTitle] = useState("");
@@ -259,10 +261,10 @@ export function LeadSheet({
               list="lead-source-suggestions"
               value={source}
               onChange={(e) => setSource(e.target.value)}
-              placeholder="Interior repaint, exterior, storm / insurance…"
+              placeholder="Wedding, corporate, referral…"
             />
             <datalist id="lead-source-suggestions">
-              {FIELD_LEAD_SOURCE_SUGGESTIONS.map((s) => (
+              {sourceSuggestions.map((s) => (
                 <option key={s} value={s} />
               ))}
             </datalist>

@@ -120,6 +120,11 @@ export const MATERIAL_TYPES = [
   "aluminum",
   "stainless",
   "gas",
+  "alcohol",
+  "mixer",
+  "garnish",
+  "glassware",
+  "ice",
   "other",
 ] as const;
 export type MaterialType = (typeof MATERIAL_TYPES)[number];
@@ -143,6 +148,11 @@ export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
   aluminum: "Aluminum",
   stainless: "Stainless",
   gas: "Gas / consumable",
+  alcohol: "Alcohol",
+  mixer: "Mixers",
+  garnish: "Garnish",
+  glassware: "Glassware",
+  ice: "Ice",
   other: "Other",
 };
 
@@ -169,6 +179,9 @@ export const ESTIMATE_PHOTO_KINDS = [
   "mill",
   "weld",
   "erection",
+  "bar_setup",
+  "bar_menu",
+  "incident",
 ] as const;
 export type EstimatePhotoKind = (typeof ESTIMATE_PHOTO_KINDS)[number];
 export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
@@ -194,6 +207,9 @@ export const ESTIMATE_PHOTO_KIND_LABELS: Record<EstimatePhotoKind, string> = {
   mill: "Mill / existing steel",
   weld: "Weld documentation",
   erection: "Erection / install",
+  bar_setup: "Bar setup",
+  bar_menu: "Menu / signage",
+  incident: "Incident",
 };
 
 export const ROOFING_LEAD_SOURCES = [

@@ -21,6 +21,7 @@ import {
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
 import { ThemeToggleMenuItem } from "@/components/theme-toggle";
 import { isFieldServiceWorkspace } from "@/lib/fieldService";
+import { isMobileBartendingWorkspace } from "@/lib/barService";
 import {
   Bell,
   BookOpen,
@@ -73,6 +74,14 @@ import {
   Cylinder,
   Factory,
   Flame,
+  PartyPopper,
+  Wine,
+  Martini,
+  Images,
+  ShieldCheck,
+  ShoppingBag,
+  UserRound,
+  Camera,
 } from "lucide-react";
 
 const coreNav = [
@@ -115,6 +124,20 @@ const fieldNav = [
   { href: "/maintenance", label: "Maintenance", icon: Cog },
   { href: "/plans", label: "Recurring", icon: Repeat },
   { href: "/team", label: "Techs", icon: HardHat },
+];
+
+const barNav = [
+  { href: "/bar", label: "Bar ops", icon: Wine },
+  { href: "/events", label: "Events", icon: PartyPopper },
+  { href: "/menus", label: "Menus", icon: Martini },
+  { href: "/looks", label: "Looks", icon: Images },
+  { href: "/compliance", label: "Compliance", icon: ShieldCheck },
+  { href: "/bar-orders", label: "Bar orders", icon: ShoppingBag },
+  { href: "/crew", label: "Crew", icon: UserRound },
+  { href: "/onsite", label: "On-site", icon: Camera },
+  { href: "/estimates", label: "Estimates", icon: ClipboardSignature },
+  { href: "/inventory", label: "Inventory", icon: Package },
+  { href: "/books", label: "Books", icon: BookOpen },
 ];
 
 const restNav = [
@@ -162,9 +185,13 @@ export function Sidebar({
   const fieldService = isFieldServiceWorkspace(
     activeWorkspace?.industry_preset
   );
+  const bartending = isMobileBartendingWorkspace(
+    activeWorkspace?.industry_preset
+  );
   const navItems = [
     ...coreNav,
     ...(fieldService ? fieldNav : []),
+    ...(bartending ? barNav : []),
     ...restNav.filter((item) => !(fieldService && item.href === "/projects")),
   ];
   const [unreadCount, setUnreadCount] = useState(0);

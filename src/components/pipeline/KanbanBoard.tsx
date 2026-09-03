@@ -38,6 +38,7 @@ interface KanbanBoardProps {
   initialLeads: Lead[];
   contacts: Contact[];
   showArchived?: boolean;
+  sourceSuggestions?: readonly string[];
 }
 
 function formatCurrency(value: number | null, currency: string) {
@@ -228,6 +229,7 @@ export function KanbanBoard({
   initialLeads,
   contacts,
   showArchived = false,
+  sourceSuggestions,
 }: KanbanBoardProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
@@ -412,6 +414,7 @@ export function KanbanBoard({
         contacts={contacts}
         lead={editingLead}
         onSaved={handleSaved}
+        sourceSuggestions={sourceSuggestions}
       />
     </>
   );
