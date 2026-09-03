@@ -25,24 +25,10 @@ import {
   isTeamSize,
   seatsForTeamSize,
 } from "@/lib/workspace";
-import {
-  listVerticalPacks,
-  listVerticalLunaPacks,
-} from "@/lib/verticals/registry";
+import { inspectSystemArchitecture } from "@/lib/luna-super-admin-inspect";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const CRM_SURFACES = [
-  "contacts",
-  "invoices",
-  "tasks",
-  "projects",
-  "contracts",
-  "pipeline",
-  "forms",
-  "workflows",
-] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = { from: (relation: string) => any };
@@ -118,11 +104,6 @@ async function findUserIdByEmail(email: string): Promise<string | null> {
   }
 }
 
-function envFlag(name: string): boolean {
-  const v = process.env[name];
-  return typeof v === "string" && v.trim().length > 0;
-}
-
 export async function executeSuperAdminLunaTool(
   supabase: Db,
   workspaceId: string,
@@ -143,7 +124,10 @@ export async function executeSuperAdminLunaTool(
   if (denied) return denied;
 
   if (name === "admin_inspect_system_architecture") {
-    return inspectArchitecture(str(args, "target_component"));
+    return inspectSystemArchitecture(
+      createAdminClient(),
+      str(args, "target_component") ?? ""
+    );
   }
   if (name === "admin_provision_workspace") {
     return provisionWorkspace(userId, args);
@@ -155,121 +139,6 @@ export async function executeSuperAdminLunaTool(
     args,
     runWorkspaceTool
   );
-}
-
-async function inspectArchitecture(
-  target: string | null
-): Promise<ToolResult> {
-  const key = (target ?? "").trim().toLowerCase().replace(/\s+/g, "_");
-  if (key === "database_schema" || key === "schema") {
-    return {
-      ok: true,
-      summary:
-        "Shared CRM surfaces are contacts, invoices, tasks, projects, contracts, pipeline, forms, and workflows. Vertical packs add their own ops screens. SQL, columns, and RLS are not available through Luna.",
-      crm_surfaces: [...CRM_SURFACES],
-    };
-  }
-
-  if (key === "vertical_registry" || key === "registry") {
-    const packs = listVerticalPacks().map((p) => ({
-      id: p.id,
-      sector: p.sector ?? null,
-      presets: [...p.presets],
-      nav: p.nav.map((n) => n.label),
-    }));
-    const lunaPacks = listVerticalLunaPacks();
-    const lines = packs.map((p) => {
-      const presetNote = p.presets.length
-        ? p.presets.join(", ")
-        : "all presets in its sector";
-      return `${p.id} for ${presetNote}`;
-    });
-    const toolLines = lunaPacks.map(
-      (p) => `${p.name} with ${p.toolCount} Luna tools`
-    );
-    return {
-      ok: true,
-      summary:
-        (lines.length
-          ? `Installed nav packs: ${lines.join(". ")}.`
-          : "No vertical nav packs are registered.") +
-        (toolLines.length ? ` Tool packs: ${toolLines.join(". ")}.` : ""),
-      packs,
-      luna_packs: lunaPacks,
-    };
-  }
-
-  const admin = createAdminClient();
-
-  if (key === "active_workspaces" || key === "workspaces") {
-    const { data: workspaces, error } = await admin
-      .from("workspaces")
-      .select("id, name, industry_preset, industry_custom_label")
-      .order("name", { ascending: true })
-      .limit(80);
-    if (error) return { error: "Could not list workspaces." };
-    const rows = workspaces ?? [];
-    const names = rows.map((w: { name?: string }) =>
-      typeof w.name === "string" && w.name.trim() ? w.name.trim() : "Untitled"
-    );
-    const spoken = names.slice(0, 12).join(", ");
-    return {
-      ok: true,
-      summary: rows.length
-        ? `${rows.length} workspace${rows.length === 1 ? "" : "s"}${spoken ? `: ${spoken}` : ""}.`
-        : "No workspaces yet.",
-      workspaces: rows.map(
-        (w: {
-          id?: string;
-          name?: string;
-          industry_preset?: string | null;
-          industry_custom_label?: string | null;
-        }) => ({
-          id: typeof w.id === "string" ? w.id : "",
-          name:
-            typeof w.name === "string" && w.name.trim() ? w.name.trim() : "Untitled",
-          industry: industryDisplayLabel(
-            w.industry_preset,
-            w.industry_custom_label
-          ),
-        })
-      ),
-    };
-  }
-
-  if (key === "system_telemetry" || key === "telemetry" || key === "health") {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const [ws, members, activity] = await Promise.all([
-      admin.from("workspaces").select("id", { count: "exact", head: true }),
-      admin.from("workspace_members").select("id", { count: "exact", head: true }),
-      admin
-        .from("activity_logs")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", since),
-    ]);
-    const workspaceCount = ws.count ?? 0;
-    const memberCount = members.count ?? 0;
-    const activityCount = activity.count ?? 0;
-    return {
-      ok: true,
-      summary: `${workspaceCount} workspaces, ${memberCount} memberships, ${activityCount} activity events in the last day. Gemini ${envFlag("GEMINI_API_KEY") || envFlag("GOOGLE_API_KEY") ? "is" : "is not"} configured. Simli ${envFlag("SIMLI_API_KEY") ? "is" : "is not"} configured.`,
-      workspace_count: workspaceCount,
-      membership_count: memberCount,
-      activity_last_day: activityCount,
-      integrations: {
-        gemini: envFlag("GEMINI_API_KEY") || envFlag("GOOGLE_API_KEY"),
-        simli: envFlag("SIMLI_API_KEY"),
-        elevenlabs: envFlag("ELEVENLABS_API_KEY"),
-        stripe: envFlag("STRIPE_SECRET_KEY"),
-        resend: envFlag("RESEND_API_KEY"),
-      },
-    };
-  }
-
-  return {
-    error:
-      "Choose vertical_registry, database_schema, active_workspaces, or system_telemetry.",
-  };
 }
 
 async function provisionWorkspace(

@@ -8,19 +8,15 @@ import type { VerticalNavItem, VerticalPack } from "@/lib/verticals/types";
 import { mobileBartendingPack } from "@/lib/verticals/packs/mobile-bartending";
 import { SUPER_ADMIN_TOOLS } from "@/lib/luna-super-admin-tools";
 
-const PACKS: VerticalPack[] = [];
+/** Nav/ops packs keyed by pack id (`field`, `bar`, …). Not an industries table. */
+export const VERTICAL_REGISTRY: Record<string, VerticalPack> = {};
 
 export function registerVerticalPack(pack: VerticalPack): void {
-  const i = PACKS.findIndex((p) => p.id === pack.id);
-  if (i >= 0) {
-    PACKS[i] = pack;
-    return;
-  }
-  PACKS.push(pack);
+  VERTICAL_REGISTRY[pack.id] = pack;
 }
 
 export function listVerticalPacks(): readonly VerticalPack[] {
-  return PACKS;
+  return Object.values(VERTICAL_REGISTRY);
 }
 
 export function getVerticalPacks(
@@ -29,7 +25,7 @@ export function getVerticalPacks(
   const resolved = resolveIndustryPreset(industryPreset);
   if (!resolved) return [];
   const sector = industrySectorId(resolved);
-  return PACKS.filter((pack) => {
+  return listVerticalPacks().filter((pack) => {
     if (pack.presets.includes(resolved)) return true;
     if (pack.presets.length === 0 && pack.sector && pack.sector === sector) {
       return true;
