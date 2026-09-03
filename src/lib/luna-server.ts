@@ -38,6 +38,7 @@ import {
   barEventDateFields,
   flattenBarEventSpecs,
 } from "@/lib/barService";
+import { executeBarLunaTool } from "@/lib/verticals/bar/luna";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1780,6 +1781,24 @@ export async function executeLunaTool(
   const { workspace_id, user_id } = member;
 
   try {
+    const barPack = await executeBarLunaTool(
+      supabase,
+      workspace_id,
+      name,
+      args
+    );
+    if (barPack) {
+      if ("ok" in barPack && barPack.ok) {
+        return lunaMutationOk(
+          supabase,
+          workspace_id,
+          name,
+          barPack.summary
+        );
+      }
+      return barPack;
+    }
+
     if (name === "get_weather") {
       return await fetchWeather(argString(args, "location") ?? "");
     }

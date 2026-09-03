@@ -193,6 +193,26 @@ export function isOpenBarOrderStatus(status: string): boolean {
   return ["needed", "ordered", "pickup"].includes(status);
 }
 
+export function mapBarPackageTier(raw: unknown): BarPackageTier {
+  if (typeof raw !== "string" || !raw.trim()) return "full_open";
+  const slug = raw
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " ")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+  if ((BAR_PACKAGE_TIERS as readonly string[]).includes(slug)) {
+    return slug as BarPackageTier;
+  }
+  if (slug.includes("beer") || slug.includes("wine")) return "beer_wine";
+  if (slug.includes("mock")) return "mocktail";
+  if (slug.includes("signature") || slug.includes("premium")) return "signature";
+  if (slug.includes("custom")) return "custom";
+  if (slug.includes("open") || slug.includes("full")) return "full_open";
+  if (slug.includes("cocktail")) return "signature";
+  return "full_open";
+}
+
 export function isBarComplianceAlert(
   status: string,
   expiresOn: string | null

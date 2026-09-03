@@ -33,3 +33,8 @@ export type VerticalLunaToolFn = (
   toolName: string,
   args: Record<string, unknown>
 ) => Promise<Record<string, unknown> | null>;
+
+/** Pack tool result. Summaries only — no row dumps or IDs unless asked. */
+export type VerticalExecutionResult =
+  | { ok: true; summary: string }
+  | { error: string };
