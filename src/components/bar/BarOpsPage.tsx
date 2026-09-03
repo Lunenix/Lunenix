@@ -37,12 +37,14 @@ export function BarOpsPage({
   kind,
   wrap,
   fields,
+  apiBase = "/api/bar",
 }: {
   title: string;
   description: string;
   kind: string;
   wrap: string;
   fields: BarField[];
+  apiBase?: string;
 }) {
   const { activeWorkspace } = useWorkspace();
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
@@ -52,11 +54,11 @@ export function BarOpsPage({
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
     const res = await fetch(
-      `/api/bar/${kind}?workspaceId=${activeWorkspace.id}`
+      `${apiBase}/${kind}?workspaceId=${activeWorkspace.id}`
     );
     const json = await res.json();
     if (res.ok) setRows(Array.isArray(json[wrap]) ? json[wrap] : []);
-  }, [activeWorkspace, kind, wrap]);
+  }, [activeWorkspace, kind, wrap, apiBase]);
 
   useEffect(() => {
     if (activeWorkspace) void load();
@@ -73,7 +75,7 @@ export function BarOpsPage({
     for (const f of fields) {
       body[f.key] = form[f.key] || null;
     }
-    await fetch(`/api/bar/${kind}`, {
+    await fetch(`${apiBase}/${kind}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

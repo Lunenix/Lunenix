@@ -44,6 +44,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "woodworking_custom_carpentry") return "Shop:";
   if (resolved === "steelworking_metal_fabrication") return "Steel:";
   if (resolved === "mobile_bartending") return "Bar:";
+  if (resolved === "event_planner") return "Planner:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;
@@ -323,6 +324,147 @@ function creativePack(prefix: string, label: string): CatalogWorkflowDef[] {
         task(
           "Follow up on invoice payment",
           "Watch aging. Send a reminder if overdue. Record payment.",
+          3
+        ),
+      ],
+    },
+  ];
+}
+
+function plannerWorkflows(): CatalogWorkflowDef[] {
+  const prefix = "Planner:";
+  return [
+    {
+      name: named(prefix, "New inquiry"),
+      description: "When an inquiry lands, capture source and event basics.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Inquiry",
+      actions: [
+        task(
+          "New planner inquiry: {{lead.title}}",
+          "Set lead source: wedding, corporate event, private party, referral, or venue partnership. Capture name, phone, email, event date, venue, guest count, event type, and budget range. Email to book a consult. Two-way SMS is not live yet.",
+          0
+        ),
+        email(
+          "Thanks for contacting {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We received your planning inquiry. Reply with your event date, venue if known, guest count, and a few times for a consultation.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Schedule consult"),
+      description: "On Consultation, book the call or meeting.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Consultation",
+      actions: [
+        task(
+          "Schedule consult: {{lead.title}}",
+          "On Events, log event date, venue, guest count, type, source, budget range, and consult time. Add it to the calendar. Send confirmation and a reminder. Two-way texting is not live.",
+          0
+        ),
+        email(
+          "Your consultation is booked — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We have your consult on the calendar. Reply if the time or venue changes.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Send proposal"),
+      description: "On Proposal Sent, quote package plus add-ons.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Proposal Sent",
+      actions: [
+        task(
+          "Send planning proposal: {{lead.title}}",
+          "Confirm planning tier (full, partial, or day-of) and add-ons (design, vendor sourcing, RSVP). On Estimates, quote the package. Email it. Track sent / viewed / approved / expired. On approval, convert to a booked event and invoice the deposit. Two-way SMS is not live. Luna never collects cards.",
+          0
+        ),
+        email(
+          "Your planning proposal from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your proposal is ready from package and add-ons. Please review and reply to approve. A deposit invoice follows approval.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Booked event ops"),
+      description: "After Contract Signed, lock budget, vendors, and vision.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Contract Signed",
+      actions: [
+        task(
+          "Budget, vendors, and vision: {{lead.title}}",
+          "On Budget, set planned vs actual by venue, catering, florals, entertainment, rentals, and attire. On Vendors, start sourcing and log COI dates. On Vision, collect wish-wall image URLs and theme colors. Invoice remaining milestones. OCR is not auto-filled.",
+          1
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Planning logistics"),
+      description: "On Planning, lock guests, timeline, and rentals.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Planning",
+      actions: [
+        task(
+          "Lock guest list, timeline, and rentals: {{lead.title}}",
+          "On Guests, import RSVPs and meals. On Timeline, set setup through breakdown. On Event rentals, track linens/chairs/lighting. Share the timeline by email — this is not a live vendor portal. Flag staffing gaps on Planner ops.",
+          2
+        ),
+        email(
+          "RSVP deadline and final payment — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Please confirm remaining RSVPs. Final payment is due before the event. Reply with seating or must-have changes.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Day-of"),
+      description: "On Day-Of, run setup photos and issue notes.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Day-Of",
+      actions: [
+        task(
+          "Day-of planner checklist: {{lead.title}}",
+          "Confirm coordinators and vendor arrivals. On Day-of, log setup photos, issues (no-show, timeline change), and walkthrough photos. Email that the team is on site. Two-way SMS is not live.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Follow-up"),
+      description: "On Follow-Up, books, thank-you, and review.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Follow-Up",
+      actions: [
+        task(
+          "Close the event: {{lead.title}}",
+          "On Invoices, collect remaining balance. Tag receipts on Books (OCR is not auto-filled). Request a review. Track repeat corporate or venue clients on the contact.",
+          1
+        ),
+        email(
+          "Thank you from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Thank you for having us. If anything is still open on the invoice, we will send it next. We would love a review when you have a moment.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After contract signed (e-sign)"),
+      description: "When an e-sign contract completes, start planning.",
+      trigger_type: "contract_signed",
+      actions: [
+        task(
+          "Start planning from signed contract",
+          "Move the card to Contract Signed if needed. Create the booked event, invoice the deposit, and open budget lines.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After invoice sent"),
+      description: "When an invoice is sent, follow AR.",
+      trigger_type: "invoice_sent",
+      actions: [
+        task(
+          "Follow up on planner invoice",
+          "Watch aging. Send a reminder if overdue. Flag final payment due before the event.",
           3
         ),
       ],
@@ -831,6 +973,7 @@ export function catalogWorkflowsForPreset(preset: string): CatalogWorkflowDef[] 
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? "this business";
   if (resolved === "cleaning_services") return cleaningWorkflows();
+  if (resolved === "event_planner") return plannerWorkflows();
   const sector = industrySectorId(resolved);
   if (sector === "home_field") return fieldPack(prefix, label);
   if (sector === "creative_professional") return creativePack(prefix, label);

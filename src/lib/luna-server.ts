@@ -39,6 +39,7 @@ import {
   flattenBarEventSpecs,
 } from "@/lib/barService";
 import { executeBarLunaTool } from "@/lib/verticals/bar/luna";
+import { executePlannerLunaTool } from "@/lib/verticals/planner/luna";
 import { executeSuperAdminLunaTool } from "@/lib/luna-super-admin";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
@@ -1791,6 +1792,24 @@ export async function executeLunaTool(
       executeLunaTool
     );
     if (adminPack) return adminPack;
+
+    const plannerPack = await executePlannerLunaTool(
+      supabase,
+      workspace_id,
+      name,
+      args
+    );
+    if (plannerPack) {
+      if ("ok" in plannerPack && plannerPack.ok) {
+        return lunaMutationOk(
+          supabase,
+          workspace_id,
+          name,
+          plannerPack.summary
+        );
+      }
+      return plannerPack;
+    }
 
     const barPack = await executeBarLunaTool(
       supabase,

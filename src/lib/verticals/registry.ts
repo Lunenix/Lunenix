@@ -6,6 +6,7 @@ import {
 import type { FunctionDeclaration } from "@google/genai";
 import type { VerticalNavItem, VerticalPack } from "@/lib/verticals/types";
 import { mobileBartendingPack } from "@/lib/verticals/packs/mobile-bartending";
+import { eventPlannerPack } from "@/lib/verticals/packs/event-planner";
 import { SUPER_ADMIN_TOOLS } from "@/lib/luna-super-admin-tools";
 
 /** Nav/ops packs keyed by pack id (`field`, `bar`, …). Not an industries table. */
@@ -109,6 +110,30 @@ registerVerticalPack({
   ],
 });
 
+registerVerticalPack({
+  id: "planner",
+  presets: ["event_planner"],
+  sector: "event_wedding",
+  workflowPrefix: "Planner:",
+  hideProjectsNav: true,
+  nav: [
+    { href: "/planner", label: "Planner ops", icon: "CalendarHeart" },
+    { href: "/events", label: "Events", icon: "PartyPopper" },
+    { href: "/vision", label: "Vision", icon: "Images" },
+    { href: "/layouts", label: "Layouts", icon: "LayoutGrid" },
+    { href: "/budget", label: "Budget", icon: "Wallet" },
+    { href: "/event-vendors", label: "Vendors", icon: "Store" },
+    { href: "/guests", label: "Guests", icon: "UserCheck" },
+    { href: "/timeline", label: "Timeline", icon: "ChartGantt" },
+    { href: "/coordinators", label: "Coordinators", icon: "UserCog" },
+    { href: "/event-rentals", label: "Event rentals", icon: "Armchair" },
+    { href: "/day-of", label: "Day-of", icon: "Camera" },
+    { href: "/estimates", label: "Estimates", icon: "ClipboardSignature" },
+    { href: "/inventory", label: "Inventory", icon: "Package" },
+    { href: "/books", label: "Books", icon: "BookOpen" },
+  ],
+});
+
 /** Catalog sector label. Tool packs key off `industry_preset`, not this string. */
 export const EVENT_WEDDING_CATEGORY = "Event & Wedding Services";
 
@@ -120,7 +145,7 @@ type VerticalLunaPack = {
 
 const VERTICAL_TOOL_REGISTRY: Record<string, VerticalLunaPack> = {
   [mobileBartendingPack.key]: mobileBartendingPack,
-  // Additional Event & Wedding packs (Florist, DJ, Caterer, Venue) register here
+  [eventPlannerPack.key]: eventPlannerPack,
 };
 
 /** Resolve a Luna tool pack by `industry_preset` slug or catalog label. */
@@ -168,4 +193,10 @@ export function listVerticalLunaPacks(): {
     name: pack.name,
     toolCount: pack.tools.length,
   }));
+}
+
+export function isRegisteredPackTool(toolName: string): boolean {
+  return Object.values(VERTICAL_TOOL_REGISTRY).some((pack) =>
+    pack.tools.some((t) => t.name === toolName)
+  );
 }

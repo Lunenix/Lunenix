@@ -12,6 +12,10 @@ import type {
 } from "@/types/database";
 import { Loader2, KanbanSquare, Archive, ArchiveRestore } from "lucide-react";
 import { BAR_LEAD_SOURCES, isMobileBartendingWorkspace } from "@/lib/barService";
+import {
+  PLANNER_LEAD_SOURCES,
+  isEventPlannerWorkspace,
+} from "@/lib/plannerService";
 
 export default function PipelinePage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
@@ -137,9 +141,11 @@ export default function PipelinePage() {
           contacts={contacts}
           showArchived={showArchived}
           sourceSuggestions={
-            isMobileBartendingWorkspace(activeWorkspace.industry_preset)
-              ? BAR_LEAD_SOURCES
-              : undefined
+            isEventPlannerWorkspace(activeWorkspace.industry_preset)
+              ? [...PLANNER_LEAD_SOURCES]
+              : isMobileBartendingWorkspace(activeWorkspace.industry_preset)
+                ? [...BAR_LEAD_SOURCES]
+                : undefined
           }
         />
       )}

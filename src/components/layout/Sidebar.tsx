@@ -21,7 +21,8 @@ import {
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
 import { ThemeToggleMenuItem } from "@/components/theme-toggle";
 import { isFieldServiceWorkspace } from "@/lib/fieldService";
-import { isMobileBartendingWorkspace } from "@/lib/barService";
+import { getVerticalPacks, shouldHideProjectsNav } from "@/lib/verticals/registry";
+import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   BookOpen,
@@ -82,6 +83,13 @@ import {
   ShoppingBag,
   UserRound,
   Camera,
+  CalendarHeart,
+  LayoutGrid,
+  Wallet,
+  Store,
+  UserCheck,
+  UserCog,
+  Armchair,
 } from "lucide-react";
 
 const coreNav = [
@@ -126,19 +134,27 @@ const fieldNav = [
   { href: "/team", label: "Techs", icon: HardHat },
 ];
 
-const barNav = [
-  { href: "/bar", label: "Bar ops", icon: Wine },
-  { href: "/events", label: "Events", icon: PartyPopper },
-  { href: "/menus", label: "Menus", icon: Martini },
-  { href: "/looks", label: "Looks", icon: Images },
-  { href: "/compliance", label: "Compliance", icon: ShieldCheck },
-  { href: "/bar-orders", label: "Bar orders", icon: ShoppingBag },
-  { href: "/crew", label: "Crew", icon: UserRound },
-  { href: "/onsite", label: "On-site", icon: Camera },
-  { href: "/estimates", label: "Estimates", icon: ClipboardSignature },
-  { href: "/inventory", label: "Inventory", icon: Package },
-  { href: "/books", label: "Books", icon: BookOpen },
-];
+const PACK_ICONS: Record<string, LucideIcon> = {
+  Wine,
+  PartyPopper,
+  Martini,
+  Images,
+  ShieldCheck,
+  ShoppingBag,
+  UserRound,
+  Camera,
+  ClipboardSignature,
+  Package,
+  BookOpen,
+  CalendarHeart,
+  LayoutGrid,
+  Wallet,
+  Store,
+  UserCheck,
+  ChartGantt,
+  UserCog,
+  Armchair,
+};
 
 const restNav = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
@@ -185,14 +201,21 @@ export function Sidebar({
   const fieldService = isFieldServiceWorkspace(
     activeWorkspace?.industry_preset
   );
-  const bartending = isMobileBartendingWorkspace(
-    activeWorkspace?.industry_preset
-  );
+  const packNav = getVerticalPacks(activeWorkspace?.industry_preset)
+    .filter((pack) => pack.id !== "field")
+    .flatMap((pack) =>
+      pack.nav.map((item) => ({
+        href: item.href,
+        label: item.label,
+        icon: PACK_ICONS[item.icon] ?? ClipboardList,
+      }))
+    );
+  const hideProjects = shouldHideProjectsNav(activeWorkspace?.industry_preset);
   const navItems = [
     ...coreNav,
     ...(fieldService ? fieldNav : []),
-    ...(bartending ? barNav : []),
-    ...restNav.filter((item) => !(fieldService && item.href === "/projects")),
+    ...packNav,
+    ...restNav.filter((item) => !(hideProjects && item.href === "/projects")),
   ];
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);

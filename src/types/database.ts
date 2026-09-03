@@ -1576,6 +1576,33 @@ export interface BarOnsite {
   created_at: string;
 }
 
+export interface PlannerEvent {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  title: string;
+  event_on: string | null;
+  venue_name: string | null;
+  venue_address: string | null;
+  guest_count: number | null;
+  event_type: string;
+  lead_source: string | null;
+  planning_tier: string;
+  addons: string | null;
+  budget_range: string | null;
+  budget_total: number | null;
+  deposit_paid: boolean;
+  retainer_amount: number;
+  consult_at: string | null;
+  theme_colors: string | null;
+  must_haves: string | null;
+  avoid_items: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SteelWeldLog {
   id: string;
   workspace_id: string;

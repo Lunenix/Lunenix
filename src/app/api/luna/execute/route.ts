@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/auth/requireSuperAdmin";
 import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import { executeLunaTool } from "@/lib/luna-server";
-import { getVerticalPack } from "@/lib/verticals/registry";
+import { getVerticalPack, isRegisteredPackTool } from "@/lib/verticals/registry";
 
 /**
  * Direct pack/CRM tool run for Luna. Same dispatcher as chat (`executeLunaTool`).
@@ -60,9 +60,7 @@ export async function POST(req: NextRequest) {
       : null
   );
   const packToolNames = new Set((pack?.tools ?? []).map((t) => t.name));
-  const isPackTool =
-    packToolNames.has(toolName) || toolName.startsWith("bartending_");
-  if (isPackTool && !packToolNames.has(toolName)) {
+  if (isRegisteredPackTool(toolName) && !packToolNames.has(toolName)) {
     return NextResponse.json(
       {
         error:
