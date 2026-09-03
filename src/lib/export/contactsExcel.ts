@@ -182,11 +182,11 @@ export async function parseContactsWorkbook(
       tags: "",
     };
     let any = false;
-    for (const [col, key] of colMap) {
+    Array.from(colMap.entries()).forEach(([col, key]) => {
       const text = cellText(excelRow.getCell(col).value);
       if (text) any = true;
       raw[key] = text;
-    }
+    });
     if (!any) continue;
     const parsed: ParsedContactImport = {
       type: parseContactType(raw.type),
