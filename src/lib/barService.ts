@@ -206,3 +206,32 @@ export function isBarComplianceAlert(
   soon.setDate(soon.getDate() + 30);
   return d <= soon;
 }
+
+/** Accept nested `{ event_specs: { ... } }` from API/Luna payloads. */
+export function flattenBarEventSpecs(
+  body: Record<string, unknown>
+): Record<string, unknown> {
+  const specs = body.event_specs;
+  if (specs && typeof specs === "object" && !Array.isArray(specs)) {
+    return { ...body, ...(specs as Record<string, unknown>) };
+  }
+  return body;
+}
+
+function trimStr(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+/** Map `event_date` (ISO) onto `event_on` (date) and `event_start_at`. */
+export function barEventDateFields(body: Record<string, unknown>): {
+  event_on: string | null;
+  event_start_at: string | null;
+} {
+  const eventDate = trimStr(body.event_date);
+  const eventOnRaw = trimStr(body.event_on) ?? eventDate;
+  const event_start_at = trimStr(body.event_start_at) ?? eventDate;
+  return {
+    event_on: eventOnRaw ? eventOnRaw.slice(0, 10) : null,
+    event_start_at,
+  };
+}

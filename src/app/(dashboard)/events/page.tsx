@@ -20,7 +20,7 @@ export default function BarEventsPage() {
   return (
     <BarOpsPage
       title="Events"
-      description="Consultations and booked events: date, venue, guests, package, load-in, and venue access. Two-way SMS is not live — use email."
+      description="Consultations and booked events: date, venue, guests, retainer, deposit paid, package, load-in, and venue access. Amounts only — Luna never collects cards. Two-way SMS is not live — use email."
       kind="events"
       wrap="events"
       fields={[
@@ -30,12 +30,22 @@ export default function BarEventsPage() {
         { key: "venue_address", label: "Venue address", kind: "text", list: false },
         { key: "guest_count", label: "Guest count", kind: "number" },
         {
+          key: "deposit_paid",
+          label: "Deposit paid",
+          kind: "select",
+          options: [
+            { value: "false", label: "No" },
+            { value: "true", label: "Yes" },
+          ],
+        },
+        { key: "retainer_amount", label: "Retainer amount", kind: "number" },
+        {
           key: "event_type",
           label: "Event type",
           kind: "select",
           options: opts(BAR_EVENT_TYPES, BAR_EVENT_TYPE_LABELS),
         },
-        { key: "lead_source", label: "Lead source", kind: "text" },
+        { key: "lead_source", label: "Lead source", kind: "text", list: false },
         {
           key: "package_tier",
           label: "Package",

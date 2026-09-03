@@ -1478,6 +1478,8 @@ export interface BarEvent {
   venue_name: string | null;
   venue_address: string | null;
   guest_count: number | null;
+  deposit_paid: boolean;
+  retainer_amount: number;
   event_type: string;
   lead_source: string | null;
   package_tier: string;

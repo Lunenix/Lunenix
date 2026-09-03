@@ -1290,14 +1290,21 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
   {
     name: "log_bar_event",
     description:
-      "Log a bartending event: date, venue, guest count, type, package, and consult kind.",
+      "Log a bartending event: date, venue, guest count, deposit/retainer (amount only, never card numbers), type, package, and consult kind.",
     parametersJsonSchema: {
       type: "object",
       properties: {
         title: { type: "string" },
         event_on: { type: "string", description: "YYYY-MM-DD" },
+        event_date: {
+          type: "string",
+          description: "ISO datetime; sets event date and start if event_on is omitted",
+        },
         venue_name: { type: "string" },
+        venue_address: { type: "string" },
         guest_count: { type: "number" },
+        deposit_paid: { type: "boolean" },
+        retainer_amount: { type: "number" },
         event_type: { type: "string" },
         package_tier: { type: "string" },
         consult_kind: { type: "string" },

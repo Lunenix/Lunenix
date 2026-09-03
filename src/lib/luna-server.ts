@@ -35,6 +35,8 @@ import {
   BAR_ORDER_STATUSES,
   BAR_PACKAGE_TIERS,
   BAR_SETUP_STYLES,
+  barEventDateFields,
+  flattenBarEventSpecs,
 } from "@/lib/barService";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
@@ -143,6 +145,18 @@ function argNumber(args: Record<string, unknown>, key: string): number | null {
   if (typeof value === "string" && value.trim()) {
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function argBool(args: Record<string, unknown>, key: string): boolean | null {
+  const value = args[key];
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value !== 0;
+  if (typeof value === "string" && value.trim()) {
+    const s = value.trim().toLowerCase();
+    if (["true", "yes", "1", "paid"].includes(s)) return true;
+    if (["false", "no", "0"].includes(s)) return false;
   }
   return null;
 }
@@ -6143,7 +6157,9 @@ export async function executeLunaTool(
     if (name === "list_bar_events") {
       const { data, error } = await supabase
         .from("bar_events")
-        .select("title, event_on, venue_name, guest_count, package_tier, status")
+        .select(
+          "title, event_on, venue_name, guest_count, deposit_paid, retainer_amount, package_tier, status"
+        )
         .eq("workspace_id", workspace_id)
         .order("event_on", { ascending: true })
         .limit(20);
@@ -6154,10 +6170,12 @@ export async function executeLunaTool(
           event_on: string | null;
           venue_name: string | null;
           guest_count: number | null;
+          deposit_paid: boolean;
+          retainer_amount: number;
           package_tier: string;
           status: string;
         }) =>
-          `${e.title} ${e.event_on ?? "no date"} at ${e.venue_name ?? "no venue"}, ${e.guest_count ?? "?"} guests, ${e.package_tier}, ${e.status}`
+          `${e.title} ${e.event_on ?? "no date"} at ${e.venue_name ?? "no venue"}, ${e.guest_count ?? "?"} guests, retainer ${e.retainer_amount}, deposit ${e.deposit_paid ? "paid" : "unpaid"}, ${e.package_tier}, ${e.status}`
       );
       return {
         ok: true,
@@ -6168,10 +6186,11 @@ export async function executeLunaTool(
     }
 
     if (name === "log_bar_event") {
-      const title = argString(args, "title");
+      const flat = flattenBarEventSpecs(args);
+      const title = argString(flat, "title");
       if (!title) return { error: "Need an event name." };
       let contactId: string | null = null;
-      const contactRef = argString(args, "contact_name");
+      const contactRef = argString(flat, "contact_name");
       if (contactRef) {
         const contact = await requireOneContact(
           supabase,
@@ -6182,36 +6201,41 @@ export async function executeLunaTool(
         contactId = contact.id;
       }
       const event_type = (BAR_EVENT_TYPES as readonly string[]).includes(
-        argString(args, "event_type") ?? ""
+        argString(flat, "event_type") ?? ""
       )
-        ? argString(args, "event_type")
+        ? argString(flat, "event_type")
         : "private_party";
       const package_tier = (BAR_PACKAGE_TIERS as readonly string[]).includes(
-        argString(args, "package_tier") ?? ""
+        argString(flat, "package_tier") ?? ""
       )
-        ? argString(args, "package_tier")
+        ? argString(flat, "package_tier")
         : "full_open";
       const consult_kind = (BAR_CONSULT_KINDS as readonly string[]).includes(
-        argString(args, "consult_kind") ?? ""
+        argString(flat, "consult_kind") ?? ""
       )
-        ? argString(args, "consult_kind")
+        ? argString(flat, "consult_kind")
         : "call";
+      const dates = barEventDateFields(flat);
       const { data, error } = await supabase
         .from("bar_events")
         .insert({
           workspace_id,
           contact_id: contactId,
           title: title.slice(0, 200),
-          event_on: argString(args, "event_on"),
-          venue_name: argString(args, "venue_name"),
-          guest_count: argNumber(args, "guest_count"),
+          event_on: dates.event_on,
+          event_start_at: dates.event_start_at,
+          venue_name: argString(flat, "venue_name"),
+          venue_address: argString(flat, "venue_address"),
+          guest_count: argNumber(flat, "guest_count"),
+          deposit_paid: argBool(flat, "deposit_paid") ?? false,
+          retainer_amount: argNumber(flat, "retainer_amount") ?? 0,
           event_type,
           package_tier,
           consult_kind,
           status: (BAR_EVENT_STATUSES as readonly string[]).includes(
-            argString(args, "status") ?? ""
+            argString(flat, "status") ?? ""
           )
-            ? argString(args, "status")
+            ? argString(flat, "status")
             : "inquiry",
         })
         .select("title")

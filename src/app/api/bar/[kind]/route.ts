@@ -17,6 +17,8 @@ import {
   BAR_ORDER_STATUSES,
   BAR_PACKAGE_TIERS,
   BAR_SETUP_STYLES,
+  barEventDateFields,
+  flattenBarEventSpecs,
 } from "@/lib/barService";
 
 const KINDS = {
@@ -51,6 +53,18 @@ function num(body: Record<string, unknown>, key: string) {
   return Number.isFinite(n) ? n : null;
 }
 
+function bool(body: Record<string, unknown>, key: string, fallback = false) {
+  const v = body[key];
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number" && Number.isFinite(v)) return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (["true", "yes", "1", "paid"].includes(s)) return true;
+    if (["false", "no", "0", ""].includes(s)) return false;
+  }
+  return fallback;
+}
+
 function payloadFor(
   kind: Kind,
   workspaceId: string,
@@ -58,15 +72,18 @@ function payloadFor(
 ): Record<string, unknown> {
   const base = { workspace_id: workspaceId, notes: str(body, "notes") };
   if (kind === "events") {
+    const dates = barEventDateFields(body);
     return {
       ...base,
       contact_id: str(body, "contact_id"),
       project_id: str(body, "project_id"),
       title: str(body, "title") ?? "",
-      event_on: str(body, "event_on"),
+      event_on: dates.event_on,
       venue_name: str(body, "venue_name"),
       venue_address: str(body, "venue_address"),
       guest_count: num(body, "guest_count"),
+      deposit_paid: bool(body, "deposit_paid"),
+      retainer_amount: num(body, "retainer_amount") ?? 0,
       event_type: inList(BAR_EVENT_TYPES, body.event_type, "private_party"),
       lead_source: str(body, "lead_source"),
       package_tier: inList(BAR_PACKAGE_TIERS, body.package_tier, "full_open"),
@@ -75,7 +92,7 @@ function payloadFor(
       hours: num(body, "hours"),
       addons: str(body, "addons"),
       load_in_at: str(body, "load_in_at"),
-      event_start_at: str(body, "event_start_at"),
+      event_start_at: dates.event_start_at,
       event_end_at: str(body, "event_end_at"),
       breakdown_at: str(body, "breakdown_at"),
       staff_notes: str(body, "staff_notes"),
@@ -179,7 +196,8 @@ export async function POST(
   if (!kind) {
     return NextResponse.json({ error: "Unknown bar resource" }, { status: 404 });
   }
-  const body = (await request.json()) as Record<string, unknown>;
+  const raw = (await request.json()) as Record<string, unknown>;
+  const body = kind === "events" ? flattenBarEventSpecs(raw) : raw;
   const auth = await requireWorkspaceMember(String(body.workspace_id ?? ""));
   if ("error" in auth) return auth.error;
   const spec = KINDS[kind];

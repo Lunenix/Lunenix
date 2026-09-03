@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const [events, compliance, orders, crew, invoices, bills] = await Promise.all([
     supabase
       .from("bar_events")
-      .select("id, title, event_on, status, staff_notes")
+      .select("id, title, event_on, status, staff_notes, deposit_paid")
       .eq("workspace_id", workspaceId),
     supabase
       .from("bar_compliance")
@@ -117,6 +117,16 @@ export async function GET(request: Request) {
         .map((e: { title: string }) => ({
           kind: "staffing",
           label: `Staffing gap: ${e.title}`,
+          href: "/events",
+        })),
+      ...eventRows
+        .filter(
+          (e: { status: string; deposit_paid: boolean }) =>
+            e.status === "booked" && !e.deposit_paid
+        )
+        .map((e: { title: string }) => ({
+          kind: "deposit",
+          label: `Deposit unpaid: ${e.title}`,
           href: "/events",
         })),
     ],
