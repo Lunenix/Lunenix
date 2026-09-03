@@ -1,0 +1,24 @@
+---
+description: How to add an industry vertical pack without growing luna-server or HVAC workflows
+alwaysApply: true
+---
+
+# Vertical packs
+
+New workspaces go in `src/lib/verticals/<slug>/`. Register them in `src/lib/verticals/registry.ts`. Shared CRM (contacts, invoices, pipeline, tasks) stays as-is.
+
+## Add a pack
+
+1. Confirm `industry_preset` already exists in `src/lib/industryVerticals.ts`. Do not add an industries table.
+2. Put constants, SQL (isolated tables + RLS), API, UI, workflows, and Luna tools under that slug (or next to existing CRM routes if they are shared).
+3. Call `registerVerticalPack` with `preset` slugs (and `nav`). Workflow names use a unique prefix (`Bar:`, `HVAC:`) so packs never merge.
+4. Tenant writes: `requireWorkspaceMember` + `.eq("workspace_id", workspaceId)`. Luna tools: `executeLunaTool` only; `requireSuperAdmin` on Luna routes.
+
+## Do not
+
+- Splice another 400 lines into `src/lib/luna-server.ts`, `src/lib/luna-crm-tools.ts`, `src/lib/automation/hvacDefaultWorkflows.ts`, or Sidebar `fieldNav` until the pack is registered and those files are the thin dispatcher.
+- Open those giant files unless this task is wiring tools or seed `PACKS`.
+- Mix another trade into an existing pack (bartending is not HVAC/Field).
+- Recreate contacts/invoices/tasks/projects/contracts. Invoices use `total` and `contact_id`.
+
+Template: `src/lib/barService.ts` and `src/app/(dashboard)/events/page.tsx`. One chat per vertical.
