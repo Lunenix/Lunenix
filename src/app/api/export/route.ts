@@ -1,22 +1,34 @@
 import { NextResponse } from "next/server";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 import { generateExcelBuffer } from "@/lib/export/excel";
-import { contactDisplayName, type Contact } from "@/types/database";
+import {
+  CONTACT_EXCEL_COLUMNS,
+  CONTACT_EXCEL_EXAMPLE,
+  CONTACT_EXCEL_SHEET,
+  type ContactExcelRow,
+} from "@/lib/export/contactsExcel";
+import type { Contact } from "@/types/database";
 
-const EXPORT_TYPES = new Set(["contacts"]);
 const MAX_ROWS = 5000;
 
-type ContactExportRow = {
-  name: string;
-  email: string;
-  company: string;
-  type: string;
-  created_at: string;
-};
+function toExcelRow(row: Partial<Contact>): ContactExcelRow {
+  return {
+    type: typeof row.type === "string" ? row.type : "person",
+    first_name: typeof row.first_name === "string" ? row.first_name : "",
+    last_name: typeof row.last_name === "string" ? row.last_name : "",
+    organization_name:
+      typeof row.organization_name === "string" ? row.organization_name : "",
+    email: typeof row.email === "string" ? row.email : "",
+    phone: typeof row.phone === "string" ? row.phone : "",
+    address: typeof row.address === "string" ? row.address : "",
+    notes: typeof row.notes === "string" ? row.notes : "",
+    tags: Array.isArray(row.tags) ? row.tags.join(", ") : "",
+  };
+}
 
 /**
  * GET /api/export?workspaceId=...&type=contacts
- * Membership-checked XLSX download. Uses real contact columns.
+ * Optional template=1 returns a blank workbook with an example row.
  */
 export async function GET(request: Request) {
   const auth = await verifyWorkspaceAccess(request);
@@ -24,60 +36,41 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const type = (searchParams.get("type") ?? "contacts").trim().toLowerCase();
-  if (!EXPORT_TYPES.has(type)) {
+  if (type !== "contacts") {
     return NextResponse.json({ error: "Invalid export type" }, { status: 400 });
   }
 
-  const { supabase, workspaceId } = auth;
+  const template = searchParams.get("template") === "1";
+  let rows: ContactExcelRow[] = [CONTACT_EXCEL_EXAMPLE];
 
-  if (type === "contacts") {
-    const { data: contacts, error } = await supabase
+  if (!template) {
+    const { data: contacts, error } = await auth.supabase
       .from("contacts")
       .select(
-        "type, first_name, last_name, organization_name, email, created_at"
+        "type, first_name, last_name, organization_name, email, phone, address, notes, tags"
       )
-      .eq("workspace_id", workspaceId)
+      .eq("workspace_id", auth.workspaceId)
       .order("created_at", { ascending: false })
       .limit(MAX_ROWS);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    const rows: ContactExportRow[] = (contacts ?? []).map(
-      (row: Partial<Contact>) => ({
-        name: contactDisplayName({
-          type: (row.type as Contact["type"]) ?? "person",
-          first_name: row.first_name ?? null,
-          last_name: row.last_name ?? null,
-          organization_name: row.organization_name ?? null,
-          email: row.email ?? null,
-        }),
-        email: typeof row.email === "string" ? row.email : "",
-        company:
-          typeof row.organization_name === "string" ? row.organization_name : "",
-        type: typeof row.type === "string" ? row.type : "",
-        created_at:
-          typeof row.created_at === "string" ? row.created_at : "",
-      })
-    );
-
-    const fileBuffer = await generateExcelBuffer("Contacts", [
-      { header: "Name", key: "name", width: 25 },
-      { header: "Email", key: "email", width: 30 },
-      { header: "Company", key: "company", width: 25 },
-      { header: "Type", key: "type", width: 15 },
-      { header: "Created At", key: "created_at", width: 20 },
-    ], rows);
-
-    return new NextResponse(new Uint8Array(fileBuffer), {
-      headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": 'attachment; filename="contacts-export.xlsx"',
-      },
-    });
+    rows = (contacts ?? []).map((row: Partial<Contact>) => toExcelRow(row));
   }
 
-  return NextResponse.json({ error: "Invalid export type" }, { status: 400 });
+  const fileBuffer = await generateExcelBuffer(
+    CONTACT_EXCEL_SHEET,
+    CONTACT_EXCEL_COLUMNS,
+    rows
+  );
+  const filename = template ? "contacts-template.xlsx" : "contacts-export.xlsx";
+
+  return new NextResponse(new Uint8Array(fileBuffer), {
+    headers: {
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+  });
 }

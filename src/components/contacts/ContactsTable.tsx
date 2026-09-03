@@ -14,7 +14,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Search, RefreshCw, Mail, Building, Loader2 } from "lucide-react";
+import {
+  UserPlus,
+  Search,
+  RefreshCw,
+  Mail,
+  Building,
+  Loader2,
+  Download,
+  Upload,
+} from "lucide-react";
 import { ContactSheet } from "@/components/contacts/ContactSheet";
 import {
   contactDisplayName,
@@ -52,6 +61,8 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [excelBusy, setExcelBusy] = useState<"export" | "import" | null>(null);
+  const [excelMessage, setExcelMessage] = useState<string | null>(null);
 
   const fetchContacts = useCallback(async () => {
     if (!workspaceId) return;
@@ -85,6 +96,64 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
     });
   }, [contacts, searchQuery]);
 
+  async function downloadExcel(template: boolean) {
+    setExcelBusy("export");
+    setExcelMessage(null);
+    try {
+      const params = new URLSearchParams({
+        workspaceId,
+        type: "contacts",
+      });
+      if (template) params.set("template", "1");
+      const res = await fetch(`/api/export?${params.toString()}`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = template ? "contacts-template.xlsx" : "contacts-export.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExcelMessage(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExcelBusy(null);
+    }
+  }
+
+  async function uploadExcel(file: File) {
+    setExcelBusy("import");
+    setExcelMessage(null);
+    try {
+      const body = new FormData();
+      body.append("workspace_id", workspaceId);
+      body.append("file", file);
+      const res = await fetch("/api/contacts/import", {
+        method: "POST",
+        body,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Import failed");
+      }
+      const extra =
+        Array.isArray(json.errors) && json.errors.length
+          ? ` ${json.errors[0]}`
+          : "";
+      setExcelMessage(
+        `Imported ${json.created ?? 0} new and updated ${json.updated ?? 0}.${extra}`
+      );
+      await fetchContacts();
+    } catch (err) {
+      setExcelMessage(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setExcelBusy(null);
+    }
+  }
+
   return (
     <>
       <Card className="border-border/40">
@@ -92,10 +161,66 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
           <div>
             <CardTitle className="text-xl font-bold">Contacts &amp; Leads</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              People, organizations, and leads in this workspace.
+              People, organizations, and leads in this workspace. Excel import
+              matches existing rows by email.
             </p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={excelBusy !== null}
+              onClick={() => void downloadExcel(true)}
+            >
+              {excelBusy === "export" ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="mr-1 h-3.5 w-3.5" />
+              )}
+              Template
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={excelBusy !== null}
+              onClick={() => void downloadExcel(false)}
+            >
+              {excelBusy === "export" ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="mr-1 h-3.5 w-3.5" />
+              )}
+              Download Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              disabled={excelBusy !== null}
+              onClick={() =>
+                document.getElementById("contacts-excel-upload")?.click()
+              }
+            >
+              {excelBusy === "import" ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="mr-1 h-3.5 w-3.5" />
+              )}
+              Upload Excel
+            </Button>
+            <input
+              id="contacts-excel-upload"
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void uploadExcel(file);
+              }}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -112,6 +237,9 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {excelMessage ? (
+            <p className="text-xs text-muted-foreground">{excelMessage}</p>
+          ) : null}
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
