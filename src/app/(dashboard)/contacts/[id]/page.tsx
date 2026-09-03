@@ -26,8 +26,8 @@ import {
 import { ContactSheet } from "@/components/contacts/ContactSheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { contactDisplayName, type Contact, type CustomerEquipment, type Lead } from "@/types/database";
-import { ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
+import { contactDisplayName, isArchived, type Contact, type CustomerEquipment, type Lead } from "@/types/database";
+import { Archive, ArchiveRestore, ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
 
 export default function ContactDetailPage() {
   const params = useParams();
@@ -40,6 +40,7 @@ export default function ContactDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +64,19 @@ export default function ContactDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  async function handleArchive(archived: boolean) {
+    setArchiving(true);
+    const res = await fetch(`/api/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived }),
+    });
+    setArchiving(false);
+    if (res.ok) {
+      await load();
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -113,12 +127,29 @@ export default function ContactDetailPage() {
             <h1 className="text-2xl font-bold tracking-tight">
               {contactDisplayName(contact)}
             </h1>
-            <Badge variant="secondary" className="mt-1">
-              {contact.type}
-            </Badge>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary">{contact.type}</Badge>
+              {isArchived(contact) ? (
+                <Badge variant="outline">Archived</Badge>
+              ) : null}
+            </div>
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void handleArchive(!isArchived(contact))}
+            disabled={archiving}
+          >
+            {archiving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : isArchived(contact) ? (
+              <ArchiveRestore className="mr-2 h-4 w-4" />
+            ) : (
+              <Archive className="mr-2 h-4 w-4" />
+            )}
+            {isArchived(contact) ? "Restore" : "Archive"}
+          </Button>
           <Button variant="outline" onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
@@ -198,6 +229,7 @@ export default function ContactDetailPage() {
                   <TableHead>Title</TableHead>
                   <TableHead>Value</TableHead>
                   <TableHead>Expected close</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -213,6 +245,13 @@ export default function ContactDetailPage() {
                       {l.expected_close_date
                         ? new Date(l.expected_close_date).toLocaleDateString()
                         : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {isArchived(l) ? (
+                        <Badge variant="outline">Archived</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Active</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

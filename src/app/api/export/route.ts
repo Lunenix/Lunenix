@@ -50,6 +50,7 @@ export async function GET(request: Request) {
         "type, first_name, last_name, organization_name, email, phone, address, notes, tags"
       )
       .eq("workspace_id", auth.workspaceId)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(MAX_ROWS);
 

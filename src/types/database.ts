@@ -118,6 +118,7 @@ export interface Contact {
   notes: string | null;
   avatar_url: string | null;
   tags: string[];
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -153,9 +154,14 @@ export interface Lead {
   position: number;
   expected_close_date: string | null;
   source: string | null;
+  archived_at?: string | null;
   created_at: string;
   updated_at: string;
   contact?: Contact | null;
+}
+
+export function isArchived(row: { archived_at?: string | null }): boolean {
+  return Boolean(row.archived_at);
 }
 
 /**

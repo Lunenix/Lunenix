@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     .from("contacts")
     .select("id, email")
     .eq("workspace_id", auth.workspaceId)
+    .is("archived_at", null)
     .not("email", "is", null);
 
   if (listError) {

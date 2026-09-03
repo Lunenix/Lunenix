@@ -6,17 +6,26 @@ import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 /**
  * GET /api/contacts?workspaceId=...
  * Lists contacts for the given workspace.
+ * Default: active only. Pass archived=1 for archived contacts.
  */
 export async function GET(request: Request) {
   const auth = await verifyWorkspaceAccess(request);
   if (auth.errorResponse) return auth.errorResponse;
 
   const { supabase, workspaceId } = auth;
-  const { data: contacts, error } = await supabase
+  const { searchParams } = new URL(request.url);
+  const archived = searchParams.get("archived") === "1";
+
+  let query = supabase
     .from("contacts")
     .select("*")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
+  query = archived
+    ? query.not("archived_at", "is", null)
+    : query.is("archived_at", null);
+
+  const { data: contacts, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

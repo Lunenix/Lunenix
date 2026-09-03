@@ -10,7 +10,7 @@ import type {
   Pipeline,
   PipelineStage,
 } from "@/types/database";
-import { Loader2, KanbanSquare } from "lucide-react";
+import { Loader2, KanbanSquare, Archive, ArchiveRestore } from "lucide-react";
 
 export default function PipelinePage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
@@ -20,12 +20,17 @@ export default function PipelinePage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
     setLoading(true);
+    const pipelineQs = new URLSearchParams({
+      workspaceId: activeWorkspace.id,
+    });
+    if (showArchived) pipelineQs.set("archived", "1");
     const [pRes, cRes] = await Promise.all([
-      fetch(`/api/pipeline?workspaceId=${activeWorkspace.id}`),
+      fetch(`/api/pipeline?${pipelineQs.toString()}`),
       fetch(`/api/contacts?workspaceId=${activeWorkspace.id}`),
     ]);
     const pJson = await pRes.json();
@@ -37,7 +42,7 @@ export default function PipelinePage() {
     }
     if (cRes.ok) setContacts(cJson.contacts ?? []);
     setLoading(false);
-  }, [activeWorkspace]);
+  }, [activeWorkspace, showArchived]);
 
   useEffect(() => {
     if (activeWorkspace) load();
@@ -84,9 +89,24 @@ export default function PipelinePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pipeline</h1>
           <p className="text-sm text-muted-foreground">
-            Track deals through your stages in {activeWorkspace.name}
+            Track deals through your stages in {activeWorkspace.name}. Archive
+            a deal from its card sheet to hide it from the board.
           </p>
         </div>
+        {pipeline ? (
+          <Button
+            variant={showArchived ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? (
+              <ArchiveRestore className="mr-2 h-4 w-4" />
+            ) : (
+              <Archive className="mr-2 h-4 w-4" />
+            )}
+            {showArchived ? "Showing archived" : "Show archived"}
+          </Button>
+        ) : null}
       </div>
 
       {loading ? (
@@ -114,6 +134,7 @@ export default function PipelinePage() {
           stages={stages}
           initialLeads={leads}
           contacts={contacts}
+          showArchived={showArchived}
         />
       )}
     </div>

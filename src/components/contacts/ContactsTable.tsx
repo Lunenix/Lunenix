@@ -23,10 +23,13 @@ import {
   Loader2,
   Download,
   Upload,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { ContactSheet } from "@/components/contacts/ContactSheet";
 import {
   contactDisplayName,
+  isArchived,
   type Contact,
   type ContactType,
 } from "@/types/database";
@@ -63,14 +66,16 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [excelBusy, setExcelBusy] = useState<"export" | "import" | null>(null);
   const [excelMessage, setExcelMessage] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveBusyId, setArchiveBusyId] = useState<string | null>(null);
 
   const fetchContacts = useCallback(async () => {
     if (!workspaceId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(
-        `/api/contacts?workspaceId=${encodeURIComponent(workspaceId)}`
-      );
+      const params = new URLSearchParams({ workspaceId });
+      if (showArchived) params.set("archived", "1");
+      const res = await fetch(`/api/contacts?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load contacts");
       const data = await res.json();
       setContacts(Array.isArray(data.contacts) ? data.contacts : []);
@@ -79,7 +84,7 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId]);
+  }, [workspaceId, showArchived]);
 
   useEffect(() => {
     void fetchContacts();
@@ -154,6 +159,24 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
     }
   }
 
+  async function setContactArchived(contact: Contact, archived: boolean) {
+    setArchiveBusyId(contact.id);
+    try {
+      const res = await fetch(`/api/contacts/${contact.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not update contact");
+      setContacts((prev) => prev.filter((c) => c.id !== contact.id));
+    } catch (err) {
+      console.error("Archive contact error:", err);
+    } finally {
+      setArchiveBusyId(null);
+    }
+  }
+
   return (
     <>
       <Card className="border-border/40">
@@ -162,10 +185,24 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
             <CardTitle className="text-xl font-bold">Contacts &amp; Leads</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
               People, organizations, and leads in this workspace. Excel import
-              matches existing rows by email.
+              matches active rows by email. Archive hides a contact from this
+              list without deleting it.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              variant={showArchived ? "secondary" : "outline"}
+              size="sm"
+              className="h-8"
+              onClick={() => setShowArchived((v) => !v)}
+            >
+              {showArchived ? (
+                <ArchiveRestore className="mr-1 h-3.5 w-3.5" />
+              ) : (
+                <Archive className="mr-1 h-3.5 w-3.5" />
+              )}
+              {showArchived ? "Showing archived" : "Show archived"}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -256,8 +293,9 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
             </div>
           ) : filteredContacts.length === 0 ? (
             <div className="rounded-lg border border-dashed py-12 text-center text-xs text-muted-foreground">
-              No contacts found in this workspace. Ask Luna to add a contact or
-              create one above.
+              {showArchived
+                ? "No archived contacts in this workspace."
+                : "No contacts found in this workspace. Ask Luna to add a contact or create one above."}
             </div>
           ) : (
             <div className="overflow-hidden rounded-md border border-border/40">
@@ -269,6 +307,7 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
                     <TableHead>Email</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Created</TableHead>
+                    <TableHead className="w-[1%] text-right"> </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-xs">
@@ -300,6 +339,30 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
                       <TableCell>{typeBadge(contact.type)}</TableCell>
                       <TableCell className="text-right font-mono text-[11px] text-muted-foreground">
                         {new Date(contact.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={archiveBusyId === contact.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            void setContactArchived(
+                              contact,
+                              !isArchived(contact)
+                            );
+                          }}
+                        >
+                          {archiveBusyId === contact.id ? (
+                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                          ) : isArchived(contact) ? (
+                            <ArchiveRestore className="mr-1 h-3.5 w-3.5" />
+                          ) : (
+                            <Archive className="mr-1 h-3.5 w-3.5" />
+                          )}
+                          {isArchived(contact) ? "Restore" : "Archive"}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

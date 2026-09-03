@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { LeadSheet } from "@/components/pipeline/LeadSheet";
 import {
   contactDisplayName,
+  isArchived,
   type Contact,
   type Lead,
   type PipelineStage,
@@ -36,6 +37,7 @@ interface KanbanBoardProps {
   stages: PipelineStage[];
   initialLeads: Lead[];
   contacts: Contact[];
+  showArchived?: boolean;
 }
 
 function formatCurrency(value: number | null, currency: string) {
@@ -225,12 +227,17 @@ export function KanbanBoard({
   stages,
   initialLeads,
   contacts,
+  showArchived = false,
 }: KanbanBoardProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetStageId, setSheetStageId] = useState<string>("");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+
+  useEffect(() => {
+    setLeads(initialLeads);
+  }, [initialLeads]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -355,7 +362,13 @@ export function KanbanBoard({
   }
 
   function handleSaved(saved: Lead) {
+    const archivedOnBoard =
+      isArchived(saved) || Boolean(saved.contact && isArchived(saved.contact));
+    const shouldShow = showArchived ? archivedOnBoard : !archivedOnBoard;
     setLeads((prev) => {
+      if (!shouldShow) {
+        return prev.filter((l) => l.id !== saved.id);
+      }
       const exists = prev.some((l) => l.id === saved.id);
       if (exists) {
         return prev.map((l) => (l.id === saved.id ? saved : l));

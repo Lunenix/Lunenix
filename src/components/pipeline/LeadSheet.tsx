@@ -30,10 +30,11 @@ import { cn } from "@/lib/utils";
 import { FIELD_LEAD_SOURCE_SUGGESTIONS } from "@/lib/fieldService";
 import {
   contactDisplayName,
+  isArchived,
   type Contact,
   type Lead,
 } from "@/types/database";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Archive, ArchiveRestore } from "lucide-react";
 
 interface LeadSheetProps {
   open: boolean;
@@ -112,6 +113,27 @@ export function LeadSheet({
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save deal");
+      onSaved(json.lead);
+      onOpenChange(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleArchive(archived: boolean) {
+    if (!lead) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to update deal");
       onSaved(json.lead);
       onOpenChange(false);
     } catch (e) {
@@ -262,7 +284,25 @@ export function LeadSheet({
           )}
         </div>
 
-        <SheetFooter className="mt-6">
+        <SheetFooter className="mt-6 gap-2 sm:justify-between">
+          {isEdit ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleArchive(!isArchived(lead!))}
+              disabled={saving}
+            >
+              {isArchived(lead!) ? (
+                <ArchiveRestore className="mr-2 h-4 w-4" />
+              ) : (
+                <Archive className="mr-2 h-4 w-4" />
+              )}
+              {isArchived(lead!) ? "Restore deal" : "Archive deal"}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -274,6 +314,7 @@ export function LeadSheet({
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEdit ? "Save changes" : "Create deal"}
           </Button>
+          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>

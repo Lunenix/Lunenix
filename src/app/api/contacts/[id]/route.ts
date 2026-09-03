@@ -29,6 +29,9 @@ export async function PATCH(
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
   }
+  if (typeof body.archived === "boolean") {
+    update.archived_at = body.archived ? new Date().toISOString() : null;
+  }
 
   const { data, error } = await supabase
     .from("contacts")

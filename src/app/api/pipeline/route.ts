@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
   }
 
   const pipeline = pipelines[0];
+  const archived = request.nextUrl.searchParams.get("archived") === "1";
 
   const [{ data: stages, error: sErr }, { data: leads, error: lErr }] =
     await Promise.all([
@@ -58,7 +59,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ pipeline, stages, leads });
+  const visible = ((leads ?? []) as Array<{
+    archived_at?: string | null;
+    contact?: { archived_at?: string | null } | null;
+  }>).filter((lead) => {
+    const isArchived = Boolean(lead.archived_at) || Boolean(lead.contact?.archived_at);
+    return archived ? isArchived : !isArchived;
+  });
+
+  return NextResponse.json({ pipeline, stages, leads: visible });
 }
 
 /**

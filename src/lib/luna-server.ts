@@ -195,6 +195,7 @@ async function resolveWorkspaceContactId(
       .select("id")
       .eq("id", explicit)
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
       .maybeSingle();
     return typeof data?.id === "string" ? data.id : null;
   }
@@ -341,6 +342,7 @@ async function findContactMatches(
       .from("contacts")
       .select("id, first_name, last_name, organization_name, email")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
       .ilike("email", nameOrEmail)
       .limit(5);
     return (data ?? []).map((row: Record<string, unknown>) => ({
@@ -352,6 +354,7 @@ async function findContactMatches(
     .from("contacts")
     .select("id, first_name, last_name, organization_name, email")
     .eq("workspace_id", workspaceId)
+    .is("archived_at", null)
     .limit(80);
   const rows = (data ?? []) as Array<Record<string, unknown>>;
   const mapped = rows.map((row) => ({
@@ -862,6 +865,7 @@ export async function getLunaWorkspaceContext(
       .from("contacts")
       .select("id, type, first_name, last_name, organization_name, email, phone")
       .eq("workspace_id", workspace_id)
+      .is("archived_at", null)
       .order("updated_at", { ascending: false })
       .limit(40),
     supabase
@@ -1025,6 +1029,7 @@ export async function getWorkspaceContext(
       .from("contacts")
       .select("id, first_name, last_name, organization_name, email, type")
       .eq("workspace_id", workspace_id)
+      .is("archived_at", null)
       .order("updated_at", { ascending: false })
       .limit(20),
     supabase
@@ -2550,6 +2555,7 @@ export async function executeLunaTool(
           .select("id, stage_id, title, contact_id")
           .eq("workspace_id", workspace_id)
           .eq("contact_id", contactId)
+          .is("archived_at", null)
           .limit(1)
           .maybeSingle();
         if (!lead?.id) {
@@ -3256,6 +3262,7 @@ export async function executeLunaTool(
         .from("contacts")
         .select("id, first_name, last_name, organization_name, email, type")
         .eq("workspace_id", workspace_id)
+        .is("archived_at", null)
         .order("updated_at", { ascending: false })
         .limit(80);
       if (error) return { error: error.message };
@@ -3651,6 +3658,7 @@ export async function executeLunaTool(
         .from("leads")
         .select("title, value, stage_id")
         .eq("workspace_id", workspace_id)
+        .is("archived_at", null)
         .order("updated_at", { ascending: false })
         .limit(12);
       if (query) q = q.ilike("title", `%${query}%`);
