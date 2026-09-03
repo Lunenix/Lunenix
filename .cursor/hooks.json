@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterShellExecution": [
+      {
+        "command": "node .cursor/hooks/note-main-push.cjs",
+        "matcher": "git push"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/deploy-after-stop.cjs",
+        "loop_limit": 1
+      }
+    ]
+  }
+}

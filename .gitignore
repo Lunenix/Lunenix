@@ -31,6 +31,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# agent deploy follow-up stamp (local only)
+.cursor/hooks/.state/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
