@@ -16,22 +16,24 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const archived = searchParams.get("archived") === "1";
 
-  let query = supabase
+  const { data: contacts, error } = await supabase
     .from("contacts")
     .select("*")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
-  query = archived
-    ? query.not("archived_at", "is", null)
-    : query.is("archived_at", null);
-
-  const { data: contacts, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ contacts: contacts ?? [] });
+  const visible = ((contacts ?? []) as Array<{ archived_at?: string | null }>).filter(
+    (row) => {
+      const isArchived = Boolean(row.archived_at);
+      return archived ? isArchived : !isArchived;
+    }
+  );
+
+  return NextResponse.json({ contacts: visible });
 }
 
 /**
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
   const auth = await requireWorkspaceMember(body.workspace_id);
   if ("error" in auth) return auth.error;
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     workspace_id: auth.workspaceId,
     type: body.type ?? "person",
     first_name: body.first_name ?? null,
@@ -54,13 +56,25 @@ export async function POST(request: NextRequest) {
     address: body.address ?? null,
     notes: body.notes ?? null,
     tags: Array.isArray(body.tags) ? body.tags : [],
+    archived_at: null,
   };
 
-  const { data, error } = await auth.supabase
+  let { data, error } = await auth.supabase
     .from("contacts")
     .insert(payload)
     .select("*")
     .single();
+
+  if (error && /archived_at/i.test(error.message)) {
+    delete payload.archived_at;
+    const retry = await auth.supabase
+      .from("contacts")
+      .insert(payload)
+      .select("*")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

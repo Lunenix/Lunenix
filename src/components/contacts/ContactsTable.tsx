@@ -68,19 +68,27 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
   const [excelMessage, setExcelMessage] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archiveBusyId, setArchiveBusyId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchContacts = useCallback(async () => {
     if (!workspaceId) return;
-    setIsLoading(true);
     try {
       const params = new URLSearchParams({ workspaceId });
       if (showArchived) params.set("archived", "1");
       const res = await fetch(`/api/contacts?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to load contacts");
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Failed to load contacts"
+        );
+      }
+      setLoadError(null);
       setContacts(Array.isArray(data.contacts) ? data.contacts : []);
     } catch (err) {
       console.error("Contacts fetch error:", err);
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to load contacts"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -274,6 +282,9 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {loadError ? (
+            <p className="text-xs font-medium text-destructive">{loadError}</p>
+          ) : null}
           {excelMessage ? (
             <p className="text-xs text-muted-foreground">{excelMessage}</p>
           ) : null}
@@ -377,7 +388,17 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         workspaceId={workspaceId}
-        onSaved={() => void fetchContacts()}
+        onSaved={(saved) => {
+          if (saved?.id && !showArchived) {
+            setContacts((prev) => {
+              if (prev.some((c) => c.id === saved.id)) {
+                return prev.map((c) => (c.id === saved.id ? saved : c));
+              }
+              return [saved, ...prev];
+            });
+          }
+          void fetchContacts();
+        }}
       />
     </>
   );
