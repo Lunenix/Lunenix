@@ -6,6 +6,7 @@ import {
 import type { FunctionDeclaration } from "@google/genai";
 import type { VerticalNavItem, VerticalPack } from "@/lib/verticals/types";
 import { mobileBartendingPack } from "@/lib/verticals/packs/mobile-bartending";
+import { SUPER_ADMIN_TOOLS } from "@/lib/luna-super-admin-tools";
 
 const PACKS: VerticalPack[] = [];
 
@@ -151,4 +152,24 @@ export function getToolsForWorkspace(
   const pack = getVerticalPack(industryPreset);
   if (!pack || !pack.tools.length) return baseTools;
   return [...baseTools, ...pack.tools];
+}
+
+/** Chat tool list. Pack tools plus platform-owner admin tools. */
+export function getLunaChatTools(
+  baseTools: FunctionDeclaration[],
+  industryPreset?: string | null
+): FunctionDeclaration[] {
+  return [...getToolsForWorkspace(baseTools, industryPreset), ...SUPER_ADMIN_TOOLS];
+}
+
+export function listVerticalLunaPacks(): {
+  key: string;
+  name: string;
+  toolCount: number;
+}[] {
+  return Object.values(VERTICAL_TOOL_REGISTRY).map((pack) => ({
+    key: pack.key,
+    name: pack.name,
+    toolCount: pack.tools.length,
+  }));
 }

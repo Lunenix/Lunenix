@@ -39,6 +39,7 @@ import {
   flattenBarEventSpecs,
 } from "@/lib/barService";
 import { executeBarLunaTool } from "@/lib/verticals/bar/luna";
+import { executeSuperAdminLunaTool } from "@/lib/luna-super-admin";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1781,6 +1782,16 @@ export async function executeLunaTool(
   const { workspace_id, user_id } = member;
 
   try {
+    const adminPack = await executeSuperAdminLunaTool(
+      supabase,
+      workspace_id,
+      user_id,
+      name,
+      args,
+      executeLunaTool
+    );
+    if (adminPack) return adminPack;
+
     const barPack = await executeBarLunaTool(
       supabase,
       workspace_id,
