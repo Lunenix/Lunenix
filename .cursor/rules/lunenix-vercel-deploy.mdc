@@ -1,16 +1,19 @@
 ---
-description: After shipping to main, confirm or trigger the Vercel production deploy
+description: After a completed feature, merge to main, push, and confirm Vercel production
 alwaysApply: true
 ---
 
-# Vercel production after a completed ship
+# Ship completed work to production
 
-When the user asks you to finish, commit, or push work to `main`, treat production as part of done:
+When a **feature is complete** (the user accepted the change, or you finished the requested work with a commit), do not wait for a separate “deploy” or “push to main” message.
 
-1. Push to `origin/main` when they asked you to.
-2. Then confirm the Vercel production deployment for that SHA.
-3. If Vercel’s Git integration already started a deploy, wait and report the URL. Do not create a second production deploy for the same commit.
-4. If no deploy started, run `npm run deploy:prod` (`npx vercel deploy --prod --yes`) from the repo root.
-5. That command needs a logged-in Vercel CLI **or** `VERCEL_TOKEN` in the environment. Never put the token in client code, `NEXT_PUBLIC_*`, or git. If login is missing, tell the user to run `npx vercel login` once (and `npx vercel link` if the project is not linked) rather than inventing credentials.
+1. Commit on the current branch if there are uncommitted feature changes (skip empty commits).
+2. If that branch is not `main`, merge it into `main` (fast-forward when possible).
+3. Push `origin/main`.
+4. Confirm the Vercel **production** deploy for that SHA.
+5. If Vercel’s Git integration already started a deploy, wait and report the URL. Do not create a second production deploy for the same commit.
+6. If no deploy started, run `npm run deploy:prod` (`npx vercel deploy --prod --yes`) from the repo root. That needs a logged-in Vercel CLI or `VERCEL_TOKEN`. Never put the token in client code, `NEXT_PUBLIC_*`, or git. If login is missing, tell the user to run `npx vercel login` once (`npx vercel link` if the project is not linked).
 
-Do not production-deploy uncommitted work or a branch other than `main` unless the user explicitly asks for a preview deploy (`npx vercel deploy --yes` without `--prod`).
+Do not production-deploy uncommitted work or a branch other than `main` unless the user asks for a preview (`npx vercel deploy --yes` without `--prod`).
+
+**Do not auto-merge** when the user (or a Cursor action) said not to push, to stay on a branch, or to only create a PR. Do not ship half-finished or explicitly WIP work.
