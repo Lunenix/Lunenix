@@ -5,7 +5,8 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
-import type { AutomationAction } from "@/types/database";
+import { sendWorkspaceTelegram } from "@/lib/sms-persist";
+import { contactDisplayName, type AutomationAction } from "@/types/database";
 
 // Automation runs from trusted server contexts (including public routes such
 // as form submission and contract signing), so it uses the admin client to
@@ -121,6 +122,85 @@ export async function handleSendEmailAction(
       return { success: false, error: result.error || "Failed to send email" };
     }
 
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Send Text Action
+ * Sends a Telegram message to the contact on this workflow.
+ */
+export async function handleSendTelegramAction(
+  action: AutomationAction,
+  context: {
+    workspace_id: string;
+    contact?: unknown;
+    [key: string]: unknown;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const contactData = context.contact as
+      | {
+          id?: string;
+          telegram_chat_id?: string | null;
+          type?: "person" | "organization" | "lead";
+          first_name?: string | null;
+          last_name?: string | null;
+          organization_name?: string | null;
+          email?: string | null;
+        }
+      | undefined;
+    const contactId = contactData?.id;
+    if (!contactId) {
+      return { success: false, error: "No contact on this workflow to text." };
+    }
+    const rawBody =
+      typeof action.config.body === "string" ? action.config.body : "";
+    if (!rawBody.trim()) {
+      return { success: false, error: "Text body is empty." };
+    }
+    const named = contactData
+      ? {
+          ...contactData,
+          name: contactDisplayName({
+            type: contactData.type ?? "person",
+            first_name: contactData.first_name ?? null,
+            last_name: contactData.last_name ?? null,
+            organization_name: contactData.organization_name ?? null,
+            email: contactData.email ?? null,
+          }),
+        }
+      : contactData;
+    const body = replaceVariables(rawBody, { ...context, contact: named });
+    const supabase = await getSupabaseClient();
+    let chatId = contactData?.telegram_chat_id ?? null;
+    if (!chatId) {
+      const { data } = await supabase
+        .from("contacts")
+        .select("telegram_chat_id")
+        .eq("id", contactId)
+        .eq("workspace_id", context.workspace_id)
+        .maybeSingle();
+      chatId = typeof data?.telegram_chat_id === "string" ? data.telegram_chat_id : null;
+    }
+    if (!chatId) {
+      return {
+        success: false,
+        error: "That contact has not opened the workspace Telegram bot.",
+      };
+    }
+    const sent = await sendWorkspaceTelegram(supabase, {
+      workspaceId: context.workspace_id,
+      chatId,
+      body,
+      contactId,
+    });
+    if ("error" in sent) return { success: false, error: sent.error };
     return { success: true };
   } catch (err) {
     return {

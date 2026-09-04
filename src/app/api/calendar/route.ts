@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   const [tasksRes, invoicesRes, projectsRes, bookingsRes] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, status, due_date")
+      .select("id, title, status, due_date, contact_id")
       .eq("workspace_id", workspaceId)
       .not("due_date", "is", null)
       .gte("due_date", from)
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       .limit(500),
     supabase
       .from("invoices")
-      .select("id, invoice_number, status, due_date")
+      .select("id, invoice_number, status, due_date, contact_id")
       .eq("workspace_id", workspaceId)
       .not("due_date", "is", null)
       .gte("due_date", from)
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       .limit(500),
     supabase
       .from("projects")
-      .select("id, name, status, due_date")
+      .select("id, name, status, due_date, contact_id")
       .eq("workspace_id", workspaceId)
       .not("due_date", "is", null)
       .gte("due_date", from)
@@ -62,20 +62,26 @@ export async function GET(request: Request) {
       .limit(500),
     supabase
       .from("schedule_events")
-      .select("id, title, status, starts_at")
+      .select("id, title, status, starts_at, contact_id")
       .eq("workspace_id", workspaceId)
       .gte("starts_at", `${from}T00:00:00`)
       .lte("starts_at", `${to}T23:59:59.999`)
       .limit(500),
   ]);
 
-  if (tasksRes.error || invoicesRes.error || projectsRes.error) {
+  if (
+    tasksRes.error ||
+    invoicesRes.error ||
+    projectsRes.error ||
+    bookingsRes.error
+  ) {
     return NextResponse.json(
       {
         error:
           tasksRes.error?.message ||
           invoicesRes.error?.message ||
           projectsRes.error?.message ||
+          bookingsRes.error?.message ||
           "Calendar fetch failed",
       },
       { status: 500 }
@@ -94,6 +100,7 @@ export async function GET(request: Request) {
       date,
       href: "/tasks",
       status: typeof row.status === "string" ? row.status : "",
+      contactId: typeof row.contact_id === "string" ? row.contact_id : null,
     });
   }
 
@@ -109,6 +116,7 @@ export async function GET(request: Request) {
       date,
       href: `/invoices/${row.id}`,
       status: typeof row.status === "string" ? row.status : "",
+      contactId: typeof row.contact_id === "string" ? row.contact_id : null,
     });
   }
 
@@ -122,6 +130,7 @@ export async function GET(request: Request) {
       date,
       href: `/projects/${row.id}`,
       status: typeof row.status === "string" ? row.status : "",
+      contactId: typeof row.contact_id === "string" ? row.contact_id : null,
     });
   }
 
@@ -135,6 +144,7 @@ export async function GET(request: Request) {
       date,
       href: "/schedule",
       status: typeof row.status === "string" ? row.status : "",
+      contactId: typeof row.contact_id === "string" ? row.contact_id : null,
     });
   }
 

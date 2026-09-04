@@ -16,8 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ESTIMATE_STATUS_LABELS, ESTIMATE_PHOTO_KINDS, ESTIMATE_PHOTO_KIND_LABELS, type EstimatePhotoKind } from "@/lib/fieldService";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/lib/toast";
-import type { Estimate, EstimateLineItem } from "@/types/database";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { SendTextDialog } from "@/components/texts/SendTextDialog";
+import {
+  contactDisplayName,
+  type Estimate,
+  type EstimateLineItem,
+} from "@/types/database";
+import { ArrowLeft, Loader2, MessageSquare } from "lucide-react";
 
 export default function EstimateDetailPage() {
   const params = useParams();
@@ -28,6 +33,7 @@ export default function EstimateDetailPage() {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [photoKind, setPhotoKind] = useState<EstimatePhotoKind>("photo");
+  const [textOpen, setTextOpen] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/estimates/${id}`);
@@ -133,6 +139,14 @@ export default function EstimateDetailPage() {
         <Button onClick={() => act("send")} disabled={busy}>
           Email estimate
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => setTextOpen(true)}
+          disabled={!est.contact_id}
+        >
+          <MessageSquare className="mr-2 h-4 w-4" />
+          Text customer
+        </Button>
         <Button variant="outline" onClick={() => act("approve")} disabled={busy}>
           Customer approved — create job
         </Button>
@@ -222,6 +236,17 @@ export default function EstimateDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <SendTextDialog
+        open={textOpen}
+        onOpenChange={setTextOpen}
+        workspaceId={est.workspace_id}
+        contactId={est.contact_id}
+        contactLabel={est.contact ? contactDisplayName(est.contact) : null}
+        defaultBody={`Hi${
+          est.contact ? ` ${contactDisplayName(est.contact)}` : ""
+        }, your estimate "${est.title}" is ready. Total ${formatCurrency(Number(est.total))}.`}
+      />
     </div>
   );
 }

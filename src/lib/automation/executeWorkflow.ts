@@ -11,6 +11,7 @@ import type {
 } from "@/types/database";
 import {
   handleSendEmailAction,
+  handleSendTelegramAction,
   handleCreateTaskAction,
   handleUpdateContactAction,
   handleMoveLeadAction,
@@ -355,6 +356,9 @@ async function executeAction(
     switch (action.type) {
       case "send_email":
         return await handleSendEmailAction(action, ctx);
+
+      case "send_telegram":
+        return await handleSendTelegramAction(action, ctx);
       
       case "create_task":
         return await handleCreateTaskAction(action, ctx);

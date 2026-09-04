@@ -24,10 +24,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ContactSheet } from "@/components/contacts/ContactSheet";
+import { SendTextDialog } from "@/components/texts/SendTextDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { contactDisplayName, isArchived, type Contact, type CustomerEquipment, type Lead } from "@/types/database";
-import { Archive, ArchiveRestore, ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Loader2, MessageSquare, Pencil, Trash2 } from "lucide-react";
 
 export default function ContactDetailPage() {
   const params = useParams();
@@ -38,6 +39,7 @@ export default function ContactDetailPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
+  const [textOpen, setTextOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -110,6 +112,10 @@ export default function ContactDetailPage() {
   const details: { label: string; value: string | null }[] = [
     { label: "Email", value: contact.email },
     { label: "Phone", value: contact.phone },
+    {
+      label: "Telegram",
+      value: contact.telegram_chat_id ? "Linked" : null,
+    },
     { label: "Organization", value: contact.organization_name },
     { label: "Address", value: contact.address },
   ];
@@ -136,6 +142,10 @@ export default function ContactDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setTextOpen(true)}>
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Text
+          </Button>
           <Button
             variant="outline"
             onClick={() => void handleArchive(!isArchived(contact))}
@@ -260,6 +270,14 @@ export default function ContactDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <SendTextDialog
+        open={textOpen}
+        onOpenChange={setTextOpen}
+        workspaceId={contact.workspace_id}
+        contactId={contact.id}
+        contactLabel={contactDisplayName(contact)}
+      />
 
       <ContactSheet
         open={editOpen}

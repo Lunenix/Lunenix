@@ -21,8 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
-import type { Contact, ContactType } from "@/types/database";
+import { SendTextDialog } from "@/components/texts/SendTextDialog";
+import { contactDisplayName, type Contact, type ContactType } from "@/types/database";
+import { Loader2, MessageSquare } from "lucide-react";
 
 interface ContactSheetProps {
   open: boolean;
@@ -53,6 +54,7 @@ export function ContactSheet({
   const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [textOpen, setTextOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -113,6 +115,7 @@ export function ContactSheet({
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
@@ -242,6 +245,18 @@ export function ContactSheet({
         </div>
 
         <SheetFooter className="mt-6">
+          {isEdit && contact ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="mr-auto"
+              onClick={() => setTextOpen(true)}
+              disabled={saving}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Text
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -256,5 +271,15 @@ export function ContactSheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+    {isEdit && contact ? (
+      <SendTextDialog
+        open={textOpen}
+        onOpenChange={setTextOpen}
+        workspaceId={workspaceId}
+        contactId={contact.id}
+        contactLabel={contactDisplayName(contact)}
+      />
+    ) : null}
+    </>
   );
 }

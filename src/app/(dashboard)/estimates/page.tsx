@@ -39,7 +39,8 @@ import {
   type Contact,
   type Estimate,
 } from "@/types/database";
-import { Loader2, Plus } from "lucide-react";
+import { SendTextDialog } from "@/components/texts/SendTextDialog";
+import { Loader2, MessageSquare, Plus } from "lucide-react";
 
 export default function EstimatesPage() {
   const { activeWorkspace } = useWorkspace();
@@ -53,6 +54,7 @@ export default function EstimatesPage() {
   const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [textEstimate, setTextEstimate] = useState<Estimate | null>(null);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -172,6 +174,7 @@ export default function EstimatesPage() {
             <TableHead>Visit</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Total</TableHead>
+            <TableHead className="text-right"> </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -194,10 +197,47 @@ export default function EstimatesPage() {
                 </Badge>
               </TableCell>
               <TableCell>{formatCurrency(Number(e.total))}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={!e.contact_id}
+                  onClick={() => setTextEstimate(e)}
+                >
+                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                  Text
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {activeWorkspace ? (
+        <SendTextDialog
+          open={Boolean(textEstimate)}
+          onOpenChange={(open) => {
+            if (!open) setTextEstimate(null);
+          }}
+          workspaceId={activeWorkspace.id}
+          contactId={textEstimate?.contact_id}
+          contactLabel={
+            textEstimate?.contact
+              ? contactDisplayName(textEstimate.contact)
+              : null
+          }
+          defaultBody={
+            textEstimate
+              ? `Hi${
+                  textEstimate.contact
+                    ? ` ${contactDisplayName(textEstimate.contact)}`
+                    : ""
+                }, your estimate "${textEstimate.title}" is ready. Total ${formatCurrency(Number(textEstimate.total))}.`
+              : undefined
+          }
+        />
+      ) : null}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

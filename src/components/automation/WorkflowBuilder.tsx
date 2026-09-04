@@ -53,6 +53,7 @@ const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string }[] = [
 
 const ACTION_OPTIONS: { value: AutomationActionType; label: string }[] = [
   { value: "send_email", label: "Send Email" },
+  { value: "send_telegram", label: "Send Text" },
   { value: "create_task", label: "Create Task" },
   { value: "update_contact", label: "Update Contact" },
   { value: "move_lead", label: "Move Lead" },
@@ -319,6 +320,29 @@ export function WorkflowBuilder({
                     </div>
 
                     {/* Action-specific configuration */}
+                    {action.type === "send_telegram" && (
+                      <div className="space-y-2">
+                        <Label>Text message</Label>
+                        <Textarea
+                          value={(action.config.body as string) || ""}
+                          onChange={(e) =>
+                            updateAction(index, {
+                              ...action,
+                              config: { ...action.config, body: e.target.value },
+                            })
+                          }
+                          placeholder="Hi {{contact.name}}, your estimate is ready."
+                          rows={4}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Sends on Telegram to the contact on this trigger. Use
+                          {" "}
+                          <code className="text-[11px]">{"{{contact.name}}"}</code>
+                          . They must already have opened the workspace bot.
+                        </p>
+                      </div>
+                    )}
+
                     {action.type === "send_email" && (
                       <div className="space-y-2">
                         <Label>Email Template</Label>

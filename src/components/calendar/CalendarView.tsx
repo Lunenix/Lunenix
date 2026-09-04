@@ -11,8 +11,16 @@ import {
   type CalendarEvent,
   type CalendarKind,
 } from "@/lib/calendar";
+import { SendTextDialog } from "@/components/texts/SendTextDialog";
+import { contactDisplayName, type Contact } from "@/types/database";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, CalendarDays, Loader2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -34,8 +42,11 @@ export function CalendarView() {
     () => new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const [textEvent, setTextEvent] = useState<CalendarEvent | null>(null);
+  const [textPickerOpen, setTextPickerOpen] = useState(false);
 
   const year = cursor.getFullYear();
   const monthIndex = cursor.getMonth();
@@ -52,10 +63,15 @@ export function CalendarView() {
       from: bounds.from,
       to: bounds.to,
     });
-    const res = await fetch(`/api/calendar?${qs.toString()}`);
-    const json = await res.json().catch(() => ({}));
-    if (res.ok) setEvents(Array.isArray(json.events) ? json.events : []);
+    const [calRes, cRes] = await Promise.all([
+      fetch(`/api/calendar?${qs.toString()}`),
+      fetch(`/api/contacts?workspaceId=${activeWorkspace.id}`),
+    ]);
+    const json = await calRes.json().catch(() => ({}));
+    const cJson = await cRes.json().catch(() => ({}));
+    if (calRes.ok) setEvents(Array.isArray(json.events) ? json.events : []);
     else setEvents([]);
+    if (cRes.ok) setContacts(cJson.contacts ?? []);
     setLoading(false);
   }, [activeWorkspace, bounds.from, bounds.to]);
 
@@ -112,6 +128,9 @@ export function CalendarView() {
     month: "long",
     year: "numeric",
   });
+  const textContact = textEvent?.contactId
+    ? contacts.find((c) => c.id === textEvent.contactId)
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -225,33 +244,89 @@ export function CalendarView() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => setTextPickerOpen(true)}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Send text
+            </Button>
             {selectedEvents.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nothing dated this day. Add a booking on Schedule, or set due
                 dates on tasks, invoices, and projects.
               </p>
             ) : (
-              selectedEvents.map((event) => (
-                <Link
-                  key={event.id}
-                  href={event.href}
-                  className="block rounded-md border p-3 hover:bg-muted/50"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{event.title}</p>
-                    <Badge variant="secondary">{KIND_LABEL[event.kind]}</Badge>
+              selectedEvents.map((event) => {
+                const contact = event.contactId
+                  ? contacts.find((c) => c.id === event.contactId)
+                  : undefined;
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-md border p-3"
+                  >
+                    <Link
+                      href={event.href}
+                      className="block hover:underline"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">{event.title}</p>
+                        <Badge variant="secondary">
+                          {KIND_LABEL[event.kind]}
+                        </Badge>
+                      </div>
+                    </Link>
+                    {event.status ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {event.status.replace(/_/g, " ")}
+                      </p>
+                    ) : null}
+                    {contact ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {contactDisplayName(contact)}
+                      </p>
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 h-7 px-2 text-xs"
+                      disabled={!event.contactId}
+                      onClick={() => setTextEvent(event)}
+                    >
+                      <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                      Text
+                    </Button>
                   </div>
-                  {event.status && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {event.status.replace(/_/g, " ")}
-                    </p>
-                  )}
-                </Link>
-              ))
+                );
+              })
             )}
           </CardContent>
         </Card>
       </div>
+
+      <SendTextDialog
+        open={Boolean(textEvent)}
+        onOpenChange={(open) => {
+          if (!open) setTextEvent(null);
+        }}
+        workspaceId={activeWorkspace.id}
+        contactId={textEvent?.contactId}
+        contactLabel={textContact ? contactDisplayName(textContact) : null}
+        defaultBody={
+          textEvent
+            ? `Reminder: ${textEvent.title} on ${textEvent.date}.`
+            : undefined
+        }
+      />
+      <SendTextDialog
+        open={textPickerOpen}
+        onOpenChange={setTextPickerOpen}
+        workspaceId={activeWorkspace.id}
+        contacts={contacts}
+      />
     </div>
   );
 }

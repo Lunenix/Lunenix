@@ -583,6 +583,7 @@ export type AutomationTriggerType =
 
 export type AutomationActionType =
   | "send_email"
+  | "send_telegram"
   | "create_task"
   | "update_contact"
   | "move_lead"
@@ -645,6 +646,7 @@ export const AUTOMATION_TRIGGER_LABELS: Record<AutomationTriggerType, string> = 
 
 export const AUTOMATION_ACTION_LABELS: Record<AutomationActionType, string> = {
   send_email: "Send Email",
+  send_telegram: "Send Text",
   create_task: "Create Task",
   update_contact: "Update Contact",
   move_lead: "Move Lead",
