@@ -95,6 +95,10 @@ import {
   ScrollText,
   Timer,
   CircleDollarSign,
+  Sparkles,
+  MapPinned,
+  Shirt,
+  Scissors,
 } from "lucide-react";
 
 const coreNav = [
@@ -166,6 +170,11 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   Timer,
   CircleDollarSign,
   Cog,
+  Sparkles,
+  MapPinned,
+  Shirt,
+  Scissors,
+  UsersRound,
 };
 
 const restNav = [

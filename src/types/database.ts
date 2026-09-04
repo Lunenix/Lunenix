@@ -1637,6 +1637,30 @@ export interface VenueBooking {
   created_at: string;
 }
 
+export interface BridalItem {
+  id: string;
+  workspace_id: string;
+  title: string;
+  tag_code: string | null;
+  kind: string;
+  style_name: string | null;
+  size: string | null;
+  color: string | null;
+  designer: string | null;
+  price: number | null;
+  cost: number | null;
+  qty: number;
+  reorder_below: number | null;
+  status: string;
+  rack: string | null;
+  section: string | null;
+  hanger: string | null;
+  location_label: string | null;
+  sample_sale: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SteelWeldLog {
   id: string;
   workspace_id: string;

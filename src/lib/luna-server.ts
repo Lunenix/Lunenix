@@ -41,6 +41,7 @@ import {
 import { executeBarLunaTool } from "@/lib/verticals/bar/luna";
 import { executePlannerLunaTool } from "@/lib/verticals/planner/luna";
 import { executeVenueLunaTool } from "@/lib/verticals/venue/luna";
+import { executeBridalLunaTool } from "@/lib/verticals/bridal/luna";
 import { executeSuperAdminLunaTool } from "@/lib/luna-super-admin";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
@@ -1793,6 +1794,24 @@ export async function executeLunaTool(
       executeLunaTool
     );
     if (adminPack) return adminPack;
+
+    const bridalPack = await executeBridalLunaTool(
+      supabase,
+      workspace_id,
+      name,
+      args
+    );
+    if (bridalPack) {
+      if ("ok" in bridalPack && bridalPack.ok) {
+        return lunaMutationOk(
+          supabase,
+          workspace_id,
+          name,
+          bridalPack.summary
+        );
+      }
+      return bridalPack;
+    }
 
     const venuePack = await executeVenueLunaTool(
       supabase,

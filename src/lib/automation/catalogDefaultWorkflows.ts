@@ -46,6 +46,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "mobile_bartending") return "Bar:";
   if (resolved === "event_planner") return "Planner:";
   if (resolved === "event_venue") return "Venue:";
+  if (resolved === "bridal_shop") return "Bridal:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;
@@ -618,6 +619,134 @@ function venueWorkflows(): CatalogWorkflowDef[] {
   ];
 }
 
+function bridalWorkflows(): CatalogWorkflowDef[] {
+  const prefix = "Bridal:";
+  return [
+    {
+      name: named(prefix, "New inquiry"),
+      description: "When an inquiry lands, capture source and wedding basics.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Inquiry",
+      actions: [
+        task(
+          "New bridal inquiry: {{lead.title}}",
+          "Set lead source: bride, bridesmaid, mother-of-bride, referral, online, or walk-in. Capture name, wedding date, party size, budget, and style prefs. Email to book a fitting. Two-way SMS is not live.",
+          0
+        ),
+        email(
+          "Thanks for contacting {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We received your inquiry. Reply with your wedding date, a few appointment times, and any silhouette or designer notes.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Schedule appointment"),
+      description: "On Consultation, book the fitting.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Consultation",
+      actions: [
+        task(
+          "Schedule fitting: {{lead.title}}",
+          "On Appointments, log time, wedding date, party size, budget, and stylist. Add it to the calendar. Send confirmation. Two-way texting is not live.",
+          0
+        ),
+        email(
+          "Your fitting is booked — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We have your appointment on the calendar. Reply if the time changes.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Fitting session"),
+      description: "On Planning, pull tagged gowns.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Planning",
+      actions: [
+        task(
+          "Pull gowns for fitting: {{lead.title}}",
+          "On Floor inventory, search style/size/designer and note rack/section/hanger. On Fittings, log pulled tags, try-on photo URLs, and favorites. Mark those items In fitting room. This is not live RFID or a 3D engine.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Write the order"),
+      description: "On Proposal Sent, write the sale.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Proposal Sent",
+      actions: [
+        task(
+          "Write bridal order: {{lead.title}}",
+          "On Orders, choose in-stock vs special order, designer ETA, and deposit. Use Contracts for the sale agreement. Invoice the deposit. Payment plans are later invoices. Luna never collects cards.",
+          0
+        ),
+        email(
+          "Your gown order from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your order is written. We will send the agreement to sign and a deposit invoice. Special orders include the expected arrival window.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Alterations"),
+      description: "After Contract Signed, start alterations.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Contract Signed",
+      actions: [
+        task(
+          "Start alterations: {{lead.title}}",
+          "On Alterations, log measurements, seamstress, and next fitting. Mark the gown In alterations on Floor inventory. Invoice remaining balance before pickup.",
+          1
+        ),
+        email(
+          "Alterations appointment — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your next fitting is on the calendar. Bring shoes you will wear with the gown if you have them.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Ready for pickup"),
+      description: "On Follow-Up, pickup and review.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Follow-Up",
+      actions: [
+        task(
+          "Close the sale: {{lead.title}}",
+          "Confirm balance paid, gown picked up, and accessories. Request a review. Tag receipts on Books (OCR is not auto-filled).",
+          1
+        ),
+        email(
+          "Thank you from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Congratulations. If the gown is ready, we will confirm pickup and any remaining balance. We would love a review when you have a moment.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After contract signed (e-sign)"),
+      description: "When an e-sign contract completes, start the order.",
+      trigger_type: "contract_signed",
+      actions: [
+        task(
+          "Start order from signed sale",
+          "Move the card if needed. Create the order, invoice the deposit, and hold the gown tag.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After invoice sent"),
+      description: "When an invoice is sent, follow AR.",
+      trigger_type: "invoice_sent",
+      actions: [
+        task(
+          "Follow up on bridal invoice",
+          "Watch aging. Send a reminder if overdue. Flag balance due before pickup.",
+          3
+        ),
+      ],
+    },
+  ];
+}
+
 function eventPack(prefix: string, label: string): CatalogWorkflowDef[] {
   return [
     {
@@ -1121,6 +1250,7 @@ export function catalogWorkflowsForPreset(preset: string): CatalogWorkflowDef[] 
   if (resolved === "cleaning_services") return cleaningWorkflows();
   if (resolved === "event_planner") return plannerWorkflows();
   if (resolved === "event_venue") return venueWorkflows();
+  if (resolved === "bridal_shop") return bridalWorkflows();
   const sector = industrySectorId(resolved);
   if (sector === "home_field") return fieldPack(prefix, label);
   if (sector === "creative_professional") return creativePack(prefix, label);

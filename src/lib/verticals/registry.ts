@@ -8,6 +8,7 @@ import type { VerticalNavItem, VerticalPack } from "@/lib/verticals/types";
 import { mobileBartendingPack } from "@/lib/verticals/packs/mobile-bartending";
 import { eventPlannerPack } from "@/lib/verticals/packs/event-planner";
 import { eventVenuePack } from "@/lib/verticals/packs/event-venue";
+import { bridalShopPack } from "@/lib/verticals/packs/bridal-shop";
 import { SUPER_ADMIN_TOOLS } from "@/lib/luna-super-admin-tools";
 
 /** Nav/ops packs keyed by pack id (`field`, `bar`, …). Not an industries table. */
@@ -161,6 +162,30 @@ registerVerticalPack({
   ],
 });
 
+registerVerticalPack({
+  id: "bridal",
+  presets: ["bridal_shop"],
+  sector: "event_wedding",
+  workflowPrefix: "Bridal:",
+  hideProjectsNav: true,
+  nav: [
+    { href: "/bridal", label: "Bridal ops", icon: "Sparkles" },
+    { href: "/appointments", label: "Appointments", icon: "CalendarCheck" },
+    { href: "/floor-map", label: "Floor map", icon: "MapPinned" },
+    { href: "/gowns", label: "Floor inventory", icon: "Shirt" },
+    { href: "/bridal-style", label: "Style matching", icon: "Images" },
+    { href: "/fittings", label: "Fittings", icon: "Camera" },
+    { href: "/bridal-orders", label: "Orders", icon: "ShoppingBag" },
+    { href: "/alterations", label: "Alterations", icon: "Scissors" },
+    { href: "/bridal-party", label: "Bridal party", icon: "UsersRound" },
+    { href: "/bridal-staff", label: "Staff", icon: "UserCog" },
+    { href: "/receiving", label: "Receiving", icon: "Package" },
+    { href: "/estimates", label: "Estimates", icon: "ClipboardSignature" },
+    { href: "/inventory", label: "Inventory", icon: "Package" },
+    { href: "/books", label: "Books", icon: "BookOpen" },
+  ],
+});
+
 /** Catalog sector label. Tool packs key off `industry_preset`, not this string. */
 export const EVENT_WEDDING_CATEGORY = "Event & Wedding Services";
 
@@ -174,6 +199,7 @@ const VERTICAL_TOOL_REGISTRY: Record<string, VerticalLunaPack> = {
   [mobileBartendingPack.key]: mobileBartendingPack,
   [eventPlannerPack.key]: eventPlannerPack,
   [eventVenuePack.key]: eventVenuePack,
+  [bridalShopPack.key]: bridalShopPack,
 };
 
 /** Resolve a Luna tool pack by `industry_preset` slug or catalog label. */
