@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -21,15 +20,14 @@ import {
   type Contact,
   type SmsMessage,
   type SmsThread,
-  type WorkspaceSmsSettings,
 } from "@/types/database";
 import { Loader2 } from "lucide-react";
 
 export default function TextsPage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
-  const [settings, setSettings] = useState<WorkspaceSmsSettings | null>(null);
   const [platformOk, setPlatformOk] = useState(false);
-  const [fromNumber, setFromNumber] = useState("");
+  const [deepLink, setDeepLink] = useState<string | null>(null);
+  const [botUsername, setBotUsername] = useState<string | null>(null);
   const [threads, setThreads] = useState<SmsThread[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -37,7 +35,6 @@ export default function TextsPage() {
   const [draft, setDraft] = useState("");
   const [newContactId, setNewContactId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
   const [sending, setSending] = useState(false);
 
   const load = useCallback(async () => {
@@ -53,9 +50,9 @@ export default function TextsPage() {
     const tj = await t.json().catch(() => ({}));
     const cj = await c.json().catch(() => ({}));
     if (s.ok) {
-      setSettings(sj.settings ?? null);
-      setFromNumber(sj.settings?.from_e164 ?? "");
       setPlatformOk(Boolean(sj.platform_configured));
+      setDeepLink(typeof sj.deep_link === "string" ? sj.deep_link : null);
+      setBotUsername(typeof sj.bot_username === "string" ? sj.bot_username : null);
     }
     if (t.ok) setThreads(tj.threads ?? []);
     if (c.ok) setContacts(cj.contacts ?? []);
@@ -78,28 +75,6 @@ export default function TextsPage() {
     else setMessages([]);
   }, [activeId, loadMessages]);
 
-  async function saveSettings() {
-    if (!activeWorkspace) return;
-    setSavingSettings(true);
-    const res = await fetch("/api/sms/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspace_id: activeWorkspace.id,
-        from_e164: fromNumber.trim() || null,
-        enabled: true,
-      }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setSavingSettings(false);
-    if (!res.ok) {
-      toast(json.error ?? "Could not save SMS settings.", "error");
-      return;
-    }
-    setSettings(json.settings);
-    toast("SMS number saved.");
-  }
-
   async function send(threadId?: string, contactId?: string) {
     if (!activeWorkspace || !draft.trim()) return;
     setSending(true);
@@ -116,7 +91,7 @@ export default function TextsPage() {
     const json = await res.json().catch(() => ({}));
     setSending(false);
     if (!res.ok) {
-      toast(json.error ?? "Could not send that text.", "error");
+      toast(json.error ?? "Could not send that Telegram message.", "error");
       return;
     }
     setDraft("");
@@ -136,58 +111,58 @@ export default function TextsPage() {
     return (
       <div className="flex h-64 flex-col items-center justify-center text-center">
         <p className="text-muted-foreground">
-          Create or select a workspace to send texts.
+          Create or select a workspace to message on Telegram.
         </p>
       </div>
     );
   }
 
-  const contactsWithPhone = contacts.filter((c) => c.phone);
+  const contactsWithChat = contacts.filter((c) => c.telegram_chat_id);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Texts</h1>
         <p className="text-sm text-muted-foreground">
-          Two-way SMS for {activeWorkspace.name}. Replies land in this inbox
-          when Twilio posts to this workspace&apos;s From number.
+          Two-way Telegram for {activeWorkspace.name}. Customers open the bot
+          with this workspace link; replies land here.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Workspace number</CardTitle>
+          <CardTitle className="text-base">Telegram bot</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           {!platformOk ? (
-            <p className="text-sm text-muted-foreground">
-              Platform Twilio is not configured yet. After{" "}
-              <code className="text-xs">TWILIO_ACCOUNT_SID</code> and{" "}
-              <code className="text-xs">TWILIO_AUTH_TOKEN</code> are set, save
-              the From number here and point the Twilio webhook to{" "}
-              <code className="text-xs">/api/sms/inbound</code>.
+            <p>
+              Set <code className="text-xs">TELEGRAM_BOT_TOKEN</code> and{" "}
+              <code className="text-xs">TELEGRAM_WEBHOOK_SECRET</code> on the
+              server. Point the bot webhook to{" "}
+              <code className="text-xs">/api/telegram/webhook</code>. Optional:{" "}
+              <code className="text-xs">TELEGRAM_BOT_USERNAME</code> for the
+              deep link below.
             </p>
-          ) : null}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="from-e164">From (E.164)</Label>
-              <Input
-                id="from-e164"
-                value={fromNumber}
-                onChange={(e) => setFromNumber(e.target.value)}
-                placeholder="+15551234567"
-                className="w-56"
-              />
-            </div>
-            <Button onClick={saveSettings} disabled={savingSettings}>
-              {savingSettings ? "Saving…" : "Save number"}
-            </Button>
-          </div>
-          {settings?.from_e164 ? (
-            <p className="text-xs text-muted-foreground">
-              Active From number: {settings.from_e164}
+          ) : deepLink ? (
+            <p>
+              Share this link so a client starts a thread in this workspace
+              {botUsername ? ` (@${botUsername})` : ""}:{" "}
+              <a
+                className="text-foreground underline"
+                href={deepLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {deepLink}
+              </a>
             </p>
-          ) : null}
+          ) : (
+            <p>
+              Bot token is set. Add{" "}
+              <code className="text-xs">TELEGRAM_BOT_USERNAME</code> to show a
+              t.me start link for this workspace.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -212,7 +187,7 @@ export default function TextsPage() {
                 >
                   {thread.contact
                     ? contactDisplayName(thread.contact)
-                    : "Unknown contact"}
+                    : "Telegram chat"}
                 </button>
               ))
             )}
@@ -222,7 +197,7 @@ export default function TextsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
-              {activeId ? "Thread" : "New text"}
+              {activeId ? "Thread" : "New message"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -248,17 +223,17 @@ export default function TextsPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Start with a contact</Label>
+                <Label>Contact already linked to Telegram</Label>
                 <Select
                   value={newContactId || "none"}
                   onValueChange={(v) => setNewContactId(v === "none" ? "" : v)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Contact with a phone" />
+                    <SelectValue placeholder="Select contact" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Select contact</SelectItem>
-                    {contactsWithPhone.map((c) => (
+                    {contactsWithChat.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {contactDisplayName(c)}
                       </SelectItem>
@@ -270,7 +245,7 @@ export default function TextsPage() {
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Write a text…"
+              placeholder="Write a Telegram message…"
               rows={3}
             />
             <Button

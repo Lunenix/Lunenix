@@ -1471,7 +1471,7 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
   {
     name: "send_sms",
     description:
-      "Send a two-way SMS to a contact in this workspace. The contact must have a phone number. Do not read back the number.",
+      "Send a Telegram message to a contact in this workspace via the hub bot. The contact must already have opened the bot. Do not read chat ids aloud.",
     parametersJsonSchema: {
       type: "object",
       properties: {
@@ -1483,8 +1483,22 @@ export const LUNA_CRM_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "send_telegram",
+    description:
+      "Same as send_sms. Two-way messaging is Telegram only. There is no Twilio or SMS provider.",
+    parametersJsonSchema: {
+      type: "object",
+      properties: {
+        contact_name: { type: "string" },
+        contact_email: { type: "string" },
+        body: { type: "string" },
+        message: { type: "string" },
+      },
+    },
+  },
+  {
     name: "list_sms_threads",
-    description: "List recent two-way text conversations in this workspace. Names only.",
+    description: "List recent Telegram conversations in this workspace. Names only.",
     parametersJsonSchema: { type: "object", properties: {} },
   },
 ];

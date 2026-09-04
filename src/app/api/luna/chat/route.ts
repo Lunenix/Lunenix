@@ -93,11 +93,11 @@ const BASE_SYSTEM_PROMPT =
   "When they ask what is on the calendar, this week, or upcoming deadlines, call get_calendar. " +
   "For appointments, visits, or meetings with a start time, call create_booking. Do not use create_task for those. " +
   "To list upcoming bookings, call list_bookings. " +
-  "To send a two-way text to a contact, call send_sms. The contact must already have a phone number. Do not read the number aloud. " +
+  "To message a contact on Telegram, call send_telegram. They must already have opened this workspace bot. Do not read chat ids aloud. There is no Twilio or SMS provider. " +
   "A task client is a contact. Pass contact_name or contact_email on create_task or update_task. " +
   "When they ask to email a calendar invite, call send_calendar_invite. That creates the dated task and emails a calendar file. It is not Google Calendar. " +
   "When they ask to change, complete, or delete a task, call update_task, complete_task, or delete_task. " +
-  "Telegram reminders are sent by a scheduled job using the workspace bot. There is no Telegram tool. Do not claim you messaged Telegram. " +
+  "Task reminder pings use the scheduled Telegram job to TELEGRAM_CHAT_ID. Do not claim you sent a reminder ping unless that job ran. " +
   "Use earlier turns in this conversation for follow-ups such as that one, her email, or do the same for them. Still call tools to change CRM data. " +
   "Do not claim you sent calendar invites or emailed other people unless the matching send tool succeeded. " +
   "Never invent a contact or project without a tool result. " +

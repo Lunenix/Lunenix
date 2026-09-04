@@ -49,3 +49,36 @@ export async function sendTelegramAlert(
   return { ok: true };
 }
 
+export function telegramBotConfigured(): boolean {
+  return Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim());
+}
+
+export function telegramBotUsername(): string | null {
+  const raw = process.env.TELEGRAM_BOT_USERNAME?.trim() ?? "";
+  if (!raw) return null;
+  return raw.replace(/^@/, "");
+}
+
+/** Customer / workspace chat. Not the staff alert TELEGRAM_CHAT_ID. */
+export async function sendTelegramMessage(
+  chatId: string,
+  text: string
+): Promise<{ ok: true } | { error: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) {
+    return { error: "Telegram bot is not configured. Set TELEGRAM_BOT_TOKEN." };
+  }
+  const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text.slice(0, 4000),
+    }),
+  });
+  if (!res.ok) {
+    return { error: "Telegram rejected the message." };
+  }
+  return { ok: true };
+}
+

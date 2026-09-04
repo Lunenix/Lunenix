@@ -1,37 +1,31 @@
-/** Client-safe phone helpers. Twilio credentials stay in server-only modules. */
+/** Client-safe Telegram chat id helpers. Bot token stays server-only. */
 
-const E164_RE = /^\+[1-9][0-9]{7,14}$/;
+export const MESSAGE_BODY_MAX = 1600;
 
-export function digitsOnly(raw: string): string {
-  return raw.replace(/\D/g, "");
-}
+const CHAT_ID_RE = /^-?\d{5,20}$/;
 
-export function toE164(raw: unknown): string | null {
+export function normalizeTelegramChatId(raw: unknown): string | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return String(Math.trunc(raw));
+  }
   if (typeof raw !== "string") return null;
-  const compact = raw.trim().replace(/[\s().-]/g, "");
-  if (!compact) return null;
-  if (E164_RE.test(compact)) return compact;
-  const digits = digitsOnly(compact);
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  if (digits.length >= 8 && digits.length <= 15) return `+${digits}`;
-  return null;
+  const trimmed = raw.trim();
+  if (!CHAT_ID_RE.test(trimmed)) return null;
+  return trimmed;
 }
 
-export function last10Digits(raw: string): string | null {
-  const digits = digitsOnly(raw);
-  if (digits.length < 10) return null;
-  return digits.slice(-10);
+export function workspaceStartParam(workspaceId: string): string {
+  return `w${workspaceId.replace(/-/g, "")}`;
 }
 
-export function phonesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (!a || !b) return false;
-  const ea = toE164(a);
-  const eb = toE164(b);
-  if (ea && eb && ea === eb) return true;
-  const da = last10Digits(a);
-  const db = last10Digits(b);
-  return Boolean(da && db && da === db);
+export function workspaceIdFromStartParam(param: string): string | null {
+  const compact = param.trim().replace(/^w/i, "");
+  if (!/^[0-9a-f]{32}$/i.test(compact)) return null;
+  return [
+    compact.slice(0, 8),
+    compact.slice(8, 12),
+    compact.slice(12, 16),
+    compact.slice(16, 20),
+    compact.slice(20, 32),
+  ].join("-");
 }
-
-export const SMS_BODY_MAX = 1600;

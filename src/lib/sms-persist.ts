@@ -1,68 +1,44 @@
 import "server-only";
 
-import { phonesMatch, SMS_BODY_MAX, toE164 } from "@/lib/sms";
-import { sendTwilioSms } from "@/lib/sms-server";
+import { MESSAGE_BODY_MAX, normalizeTelegramChatId } from "@/lib/sms";
+import { sendTelegramMessage, telegramBotConfigured } from "@/lib/notify/telegram";
 import { contactDisplayName } from "@/types/database";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = { from: (relation: string) => any };
 
-export async function findContactByPhone(
+export async function findContactByTelegramChat(
   supabase: Db,
   workspaceId: string,
-  phone: string
+  chatId: string
 ): Promise<{ id: string; label: string } | null> {
+  const id = normalizeTelegramChatId(chatId);
+  if (!id) return null;
   const { data } = await supabase
     .from("contacts")
-    .select("id, type, first_name, last_name, organization_name, email, phone")
+    .select("id, type, first_name, last_name, organization_name, email")
     .eq("workspace_id", workspaceId)
-    .not("phone", "is", null)
-    .limit(500);
-  const match = (data ?? []).find((row: { phone: string | null }) =>
-    phonesMatch(row.phone, phone)
-  );
-  if (!match) return null;
-  return { id: match.id, label: contactDisplayName(match) };
-}
-
-export async function getWorkspaceSmsFrom(
-  supabase: Db,
-  workspaceId: string
-): Promise<{ from: string; enabled: boolean } | { error: string }> {
-  const { data, error } = await supabase
-    .from("workspace_sms_settings")
-    .select("from_e164, enabled")
-    .eq("workspace_id", workspaceId)
+    .eq("telegram_chat_id", id)
     .maybeSingle();
-  if (error) return { error: error.message };
-  const from = toE164(data?.from_e164 ?? null);
-  if (!from) {
-    return {
-      error:
-        "This workspace has no SMS number yet. Add the Twilio From number on Texts.",
-    };
-  }
-  if (data?.enabled === false) {
-    return { error: "Texting is turned off for this workspace." };
-  }
-  return { from, enabled: true };
+  if (!data?.id) return null;
+  return { id: data.id, label: contactDisplayName(data) };
 }
 
-export async function upsertSmsThread(
+export async function upsertTelegramThread(
   supabase: Db,
   opts: {
     workspaceId: string;
-    phone: string;
+    chatId: string;
     contactId: string | null;
   }
 ): Promise<{ id: string } | { error: string }> {
-  const phone = toE164(opts.phone);
-  if (!phone) return { error: "Need a valid phone number." };
+  const chatId = normalizeTelegramChatId(opts.chatId);
+  if (!chatId) return { error: "Need a valid Telegram chat id." };
   const { data: existing } = await supabase
     .from("sms_threads")
     .select("id, contact_id")
     .eq("workspace_id", opts.workspaceId)
-    .eq("contact_phone", phone)
+    .eq("telegram_chat_id", chatId)
     .maybeSingle();
   if (existing?.id) {
     const patch: Record<string, unknown> = {
@@ -81,7 +57,7 @@ export async function upsertSmsThread(
     .insert({
       workspace_id: opts.workspaceId,
       contact_id: opts.contactId,
-      contact_phone: phone,
+      telegram_chat_id: chatId,
       last_message_at: new Date().toISOString(),
     })
     .select("id")
@@ -92,7 +68,7 @@ export async function upsertSmsThread(
   return { id: data.id };
 }
 
-export async function recordSmsMessage(
+export async function recordHubMessage(
   supabase: Db,
   opts: {
     workspaceId: string;
@@ -102,7 +78,7 @@ export async function recordSmsMessage(
     providerSid?: string | null;
   }
 ): Promise<{ error?: string }> {
-  const body = opts.body.trim().slice(0, SMS_BODY_MAX);
+  const body = opts.body.trim().slice(0, MESSAGE_BODY_MAX);
   if (!body) return { error: "Empty message." };
   const { error } = await supabase.from("sms_messages").insert({
     workspace_id: opts.workspaceId,
@@ -120,38 +96,42 @@ export async function recordSmsMessage(
   return {};
 }
 
-export async function sendWorkspaceSms(
+export async function sendWorkspaceTelegram(
   supabase: Db,
   opts: {
     workspaceId: string;
-    to: string;
+    chatId: string;
     body: string;
     contactId: string | null;
   }
 ): Promise<{ summary: string } | { error: string }> {
-  const settings = await getWorkspaceSmsFrom(supabase, opts.workspaceId);
-  if ("error" in settings) return settings;
-  const to = toE164(opts.to);
-  if (!to) return { error: "That contact needs a valid phone number." };
-  const sent = await sendTwilioSms({
-    from: settings.from,
-    to,
-    body: opts.body,
-  });
+  if (!telegramBotConfigured()) {
+    return { error: "Telegram bot is not configured. Set TELEGRAM_BOT_TOKEN." };
+  }
+  const chatId = normalizeTelegramChatId(opts.chatId);
+  if (!chatId) return { error: "That contact needs a Telegram chat id." };
+  const sent = await sendTelegramMessage(chatId, opts.body);
   if ("error" in sent) return sent;
-  const thread = await upsertSmsThread(supabase, {
+  const thread = await upsertTelegramThread(supabase, {
     workspaceId: opts.workspaceId,
-    phone: to,
+    chatId,
     contactId: opts.contactId,
   });
   if ("error" in thread) return thread;
-  const recorded = await recordSmsMessage(supabase, {
+  const recorded = await recordHubMessage(supabase, {
     workspaceId: opts.workspaceId,
     threadId: thread.id,
     direction: "outbound",
     body: opts.body,
-    providerSid: sent.sid,
   });
   if (recorded.error) return { error: recorded.error };
-  return { summary: "Text sent." };
+  if (opts.contactId) {
+    await supabase
+      .from("contacts")
+      .update({ telegram_chat_id: chatId })
+      .eq("id", opts.contactId)
+      .eq("workspace_id", opts.workspaceId)
+      .is("telegram_chat_id", null);
+  }
+  return { summary: "Telegram message sent." };
 }

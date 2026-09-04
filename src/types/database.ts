@@ -114,6 +114,7 @@ export interface Contact {
   organization_name: string | null;
   email: string | null;
   phone: string | null;
+  telegram_chat_id?: string | null;
   address: string | null;
   notes: string | null;
   avatar_url: string | null;
@@ -1755,18 +1756,11 @@ export interface ScheduleEvent {
   > | null;
 }
 
-export interface WorkspaceSmsSettings {
-  workspace_id: string;
-  from_e164: string | null;
-  enabled: boolean;
-  updated_at: string | null;
-}
-
 export interface SmsThread {
   id: string;
   workspace_id: string;
   contact_id: string | null;
-  contact_phone: string;
+  telegram_chat_id: string;
   last_message_at: string;
   created_at: string;
   contact?: Pick<
@@ -1778,6 +1772,7 @@ export interface SmsThread {
     | "organization_name"
     | "email"
     | "phone"
+    | "telegram_chat_id"
   > | null;
 }
 

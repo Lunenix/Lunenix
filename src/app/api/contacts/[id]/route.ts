@@ -21,6 +21,7 @@ export async function PATCH(
     "organization_name",
     "email",
     "phone",
+    "telegram_chat_id",
     "address",
     "notes",
     "tags",

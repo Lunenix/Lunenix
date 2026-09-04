@@ -26,6 +26,7 @@ const PUBLIC_PATHS = [
   "/api/tasks/reminders/run",
   "/api/service-plans/run",
   "/api/telegram/test",
+  "/api/telegram/webhook",
   // Stripe Checkout webhooks (signed by Stripe, no session cookie).
   "/api/billing/stripe/webhook",
 ];

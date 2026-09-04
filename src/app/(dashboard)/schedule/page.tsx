@@ -133,7 +133,7 @@ export default function SchedulePage() {
         <h1 className="text-2xl font-bold tracking-tight">Schedule</h1>
         <p className="text-sm text-muted-foreground">
           Bookings for {activeWorkspace.name}. They also appear on Calendar.
-          Confirm with a client from Texts.
+          Confirm with a client from Texts (Telegram).
         </p>
       </div>
 
