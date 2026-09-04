@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "starts_at is required" }, { status: 400 });
   }
 
-  let contactId: string | null = body.contact_id ?? null;
+  const contactId: string | null = body.contact_id ?? null;
   if (contactId) {
     const { data: client } = await auth.supabase
       .from("contacts")
