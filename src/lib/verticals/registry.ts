@@ -1,7 +1,6 @@
 import {
   INDUSTRY_PRESETS,
   industryPresetsInSector,
-  industrySectorId,
   resolveIndustryPreset,
 } from "@/lib/industryVerticals";
 import type { FunctionDeclaration } from "@google/genai";
@@ -31,14 +30,7 @@ export function getVerticalPacks(
 ): VerticalPack[] {
   const resolved = resolveIndustryPreset(industryPreset);
   if (!resolved) return [];
-  const sector = industrySectorId(resolved);
-  return listVerticalPacks().filter((pack) => {
-    if (pack.presets.includes(resolved)) return true;
-    if (pack.presets.length === 0 && pack.sector && pack.sector === sector) {
-      return true;
-    }
-    return false;
-  });
+  return listVerticalPacks().filter((pack) => pack.presets.includes(resolved));
 }
 
 export function verticalNavFor(

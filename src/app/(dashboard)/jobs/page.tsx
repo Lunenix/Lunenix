@@ -18,6 +18,8 @@ import {
   JOB_WORK_PHASE_LABELS,
   INSPECTION_PHASES,
   INSPECTION_PHASE_LABELS,
+  isPaintingWorkspace,
+  isInspectionWorkspace,
 } from "@/lib/fieldService";
 import { Loader2 } from "lucide-react";
 
@@ -25,6 +27,10 @@ export default function JobsPage() {
   const { activeWorkspace } = useWorkspace();
   const [jobs, setJobs] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const showPaintPhase = isPaintingWorkspace(activeWorkspace?.industry_preset);
+  const showInspectionPhase = isInspectionWorkspace(
+    activeWorkspace?.industry_preset
+  );
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -52,9 +58,12 @@ export default function JobsPage() {
         <h1 className="text-3xl font-bold">Jobs</h1>
         <p className="text-muted-foreground">
           Jobs are workspace projects. Approve an estimate to create one.
-          Assign a tech, set route order, paint phase, inspection phase
-          (scheduled → report pending → delivered), closing date, weather hold,
-          and mark urgent for rush/same-day.
+          Assign a tech, set route order
+          {showPaintPhase ? ", paint phase" : ""}
+          {showInspectionPhase
+            ? ", inspection phase (scheduled → report pending → delivered)"
+            : ""}
+          , closing date, weather hold, and mark urgent for rush/same-day.
         </p>
       </div>
       <Table>
@@ -64,8 +73,8 @@ export default function JobsPage() {
             <TableHead>Route #</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Due</TableHead>
-            <TableHead>Phase</TableHead>
-            <TableHead>Inspection</TableHead>
+            {showPaintPhase ? <TableHead>Phase</TableHead> : null}
+            {showInspectionPhase ? <TableHead>Inspection</TableHead> : null}
             <TableHead>Close</TableHead>
             <TableHead>Weather</TableHead>
             <TableHead>Flags</TableHead>
@@ -106,52 +115,56 @@ export default function JobsPage() {
               <TableCell>
                 {j.due_date ? new Date(j.due_date).toLocaleDateString() : "—"}
               </TableCell>
-              <TableCell>
-                <select
-                  className="rounded border bg-background px-2 py-1 text-sm"
-                  value={j.work_phase ?? ""}
-                  onChange={async (e) => {
-                    await fetch(`/api/projects/${j.id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        work_phase: e.target.value || null,
-                      }),
-                    });
-                    load();
-                  }}
-                >
-                  <option value="">—</option>
-                  {JOB_WORK_PHASES.map((p) => (
-                    <option key={p} value={p}>
-                      {JOB_WORK_PHASE_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </TableCell>
-              <TableCell>
-                <select
-                  className="rounded border bg-background px-2 py-1 text-sm"
-                  value={j.inspection_phase ?? ""}
-                  onChange={async (e) => {
-                    await fetch(`/api/projects/${j.id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        inspection_phase: e.target.value || null,
-                      }),
-                    });
-                    load();
-                  }}
-                >
-                  <option value="">—</option>
-                  {INSPECTION_PHASES.map((p) => (
-                    <option key={p} value={p}>
-                      {INSPECTION_PHASE_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </TableCell>
+              {showPaintPhase ? (
+                <TableCell>
+                  <select
+                    className="rounded border bg-background px-2 py-1 text-sm"
+                    value={j.work_phase ?? ""}
+                    onChange={async (e) => {
+                      await fetch(`/api/projects/${j.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          work_phase: e.target.value || null,
+                        }),
+                      });
+                      load();
+                    }}
+                  >
+                    <option value="">—</option>
+                    {JOB_WORK_PHASES.map((p) => (
+                      <option key={p} value={p}>
+                        {JOB_WORK_PHASE_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </TableCell>
+              ) : null}
+              {showInspectionPhase ? (
+                <TableCell>
+                  <select
+                    className="rounded border bg-background px-2 py-1 text-sm"
+                    value={j.inspection_phase ?? ""}
+                    onChange={async (e) => {
+                      await fetch(`/api/projects/${j.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          inspection_phase: e.target.value || null,
+                        }),
+                      });
+                      load();
+                    }}
+                  >
+                    <option value="">—</option>
+                    {INSPECTION_PHASES.map((p) => (
+                      <option key={p} value={p}>
+                        {INSPECTION_PHASE_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </TableCell>
+              ) : null}
               <TableCell>
                 <input
                   className="rounded border bg-background px-2 py-1 text-sm"

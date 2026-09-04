@@ -145,7 +145,18 @@ export function resolveIndustryPreset(
   value: string | null | undefined
 ): string | null {
   if (!value) return null;
-  return LEGACY_INDUSTRY_PRESET_MAP[value] ?? value;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const legacy = LEGACY_INDUSTRY_PRESET_MAP[trimmed];
+  if (legacy) return legacy;
+  const lower = trimmed.toLowerCase();
+  const hit = INDUSTRY_PRESETS.find(
+    (p) =>
+      p.value === trimmed ||
+      p.value === lower ||
+      p.label.toLowerCase() === lower
+  );
+  return hit?.value ?? trimmed;
 }
 
 export function isIndustryPreset(value: string): boolean {

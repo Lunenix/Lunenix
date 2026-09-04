@@ -21,7 +21,15 @@ export function isFieldServiceWorkspace(
 }
 
 export function isRoofingWorkspace(industryPreset?: string | null): boolean {
-  return industryPreset === "roofing_exterior_repair";
+  return resolveIndustryPreset(industryPreset) === "roofing_exterior_repair";
+}
+
+export function isPaintingWorkspace(industryPreset?: string | null): boolean {
+  return resolveIndustryPreset(industryPreset) === "painting_drywall";
+}
+
+export function isInspectionWorkspace(industryPreset?: string | null): boolean {
+  return resolveIndustryPreset(industryPreset) === "inspection_service";
 }
 
 export function isRentalWorkspace(industryPreset?: string | null): boolean {
