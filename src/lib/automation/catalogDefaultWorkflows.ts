@@ -48,6 +48,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "event_venue") return "Venue:";
   if (resolved === "bridal_shop") return "Bridal:";
   if (resolved === "caterer") return "Catering:";
+  if (resolved === "private_chef_services") return "Chef:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;
@@ -876,6 +877,139 @@ function cateringWorkflows(): CatalogWorkflowDef[] {
   ];
 }
 
+function chefWorkflows(): CatalogWorkflowDef[] {
+  const prefix = "Chef:";
+  return [
+    {
+      name: named(prefix, "New inquiry"),
+      description: "When an inquiry lands, capture source and service type.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Inquiry",
+      actions: [
+        task(
+          "New chef inquiry: {{lead.title}}",
+          "Set lead source: weekly meal prep, dinner party, special occasion, recurring household chef, or referral. Capture service type, household size, dietary needs, kitchen access, budget, and contact. Email to book an intro call or in-home consult. Two-way SMS is not live.",
+          0
+        ),
+        email(
+          "Thanks for contacting {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We received your private chef inquiry. Reply with the service you want (weekly meal prep, dinner party, or recurring in-home chef), household size, dietary needs, and a few times for an intro call or in-home consultation.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Schedule consultation"),
+      description: "On Consultation, book the intro or in-home visit.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Consultation",
+      actions: [
+        task(
+          "Schedule chef consult: {{lead.title}}",
+          "On Visits, log the consult date and service type. On Households, capture dietary profile. Send confirmation and a reminder. Two-way texting is not live.",
+          0
+        ),
+        email(
+          "Your consultation is booked — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We have your intro consultation on the calendar. Reply if the time changes. Please note allergies, household size, and kitchen access in advance.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Send estimate"),
+      description:
+        "On Proposal Sent, quote per-meal, weekly package, or event pricing.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Proposal Sent",
+      actions: [
+        task(
+          "Send chef estimate: {{lead.title}}",
+          "On Estimates, quote per-meal, weekly package, or per-event pricing. Email it. Track sent/viewed/approved/expired on the estimate. On approval, add a Recurring plan or a scheduled visit. This does not auto-create Stripe subscriptions. Luna never collects cards.",
+          0
+        ),
+        email(
+          "Your chef estimate from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready. Please review and reply to approve. Recurring meal-prep clients typically invoice on a weekly cycle; dinner parties invoice per event. Grocery cost-plus can be itemized separately.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Menu approval"),
+      description: "After Contract Signed, draft the menu for approval.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Contract Signed",
+      actions: [
+        task(
+          "Menu, access, and shopping: {{lead.title}}",
+          "On Menus, draft weekly or event dishes and mark Pending for approval. On Access notes, record entry, kitchen on hand, pets, and storage. On Shopping, type the list from the approved menu — recipes are not auto-scaled. OCR is not auto-filled.",
+          1
+        ),
+        email(
+          "Menu ready for approval — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your menu is ready for review. Please approve before we shop and cook. Reply with any dish changes, allergies, or presentation notes.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Visit day"),
+      description: "On Day-Of, shop, cook, label, and photograph.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Day-Of",
+      actions: [
+        task(
+          "Chef visit checklist: {{lead.title}}",
+          "Move the visit scheduled → shopping → cooking → complete. Shop, prep, cook, package/label, clean kitchen. Photograph finished dishes. Log labels with date made, reheat, shelf life, and allergy precautions. Two-way SMS is not live.",
+          0
+        ),
+        email(
+          "Chef arriving today — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your chef visit is today. We will shop, cook, label, and leave the kitchen clean. Reply if access or timing changed.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Follow-up"),
+      description: "On Follow-Up, invoice and books.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Follow-Up",
+      actions: [
+        task(
+          "Invoice the visit: {{lead.title}}",
+          "Invoice per visit or weekly cycle. For cost-plus, itemize groceries vs chef fee on the visit and on Books. Watch aging. Flag skipped visits and menus still pending approval.",
+          1
+        ),
+        email(
+          "Thank you from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Thank you for having us in your kitchen. Your invoice is coming next. Grocery receipts can be itemized separately from the chef fee when we bill cost-plus.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After contract signed (e-sign)"),
+      description: "When an e-sign contract completes, start household ops.",
+      trigger_type: "contract_signed",
+      actions: [
+        task(
+          "Start chef service from signed contract",
+          "Add a Recurring plan or a scheduled visit, invoice the first cycle or deposit, and open the household profile and first menu.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After invoice sent"),
+      description: "When an invoice is sent, follow AR.",
+      trigger_type: "invoice_sent",
+      actions: [
+        task(
+          "Follow up on chef invoice",
+          "Watch aging. Send a reminder if overdue. Weekly clients often auto-bill on a cycle you invoice — Stripe subscriptions are not auto-created.",
+          3
+        ),
+      ],
+    },
+  ];
+}
+
 function eventPack(prefix: string, label: string): CatalogWorkflowDef[] {
   return [
     {
@@ -1381,6 +1515,7 @@ export function catalogWorkflowsForPreset(preset: string): CatalogWorkflowDef[] 
   if (resolved === "event_venue") return venueWorkflows();
   if (resolved === "bridal_shop") return bridalWorkflows();
   if (resolved === "caterer") return cateringWorkflows();
+  if (resolved === "private_chef_services") return chefWorkflows();
   const sector = industrySectorId(resolved);
   if (sector === "home_field") return fieldPack(prefix, label);
   if (sector === "creative_professional") return creativePack(prefix, label);

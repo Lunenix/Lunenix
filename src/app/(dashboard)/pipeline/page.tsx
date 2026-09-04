@@ -28,6 +28,10 @@ import {
   CATERING_LEAD_SOURCES,
   isCatererWorkspace,
 } from "@/lib/cateringService";
+import {
+  CHEF_LEAD_SOURCES,
+  isPrivateChefWorkspace,
+} from "@/lib/chefService";
 
 export default function PipelinePage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
@@ -153,7 +157,9 @@ export default function PipelinePage() {
           contacts={contacts}
           showArchived={showArchived}
           sourceSuggestions={
-            isCatererWorkspace(activeWorkspace.industry_preset)
+            isPrivateChefWorkspace(activeWorkspace.industry_preset)
+              ? [...CHEF_LEAD_SOURCES]
+              : isCatererWorkspace(activeWorkspace.industry_preset)
               ? [...CATERING_LEAD_SOURCES]
               : isBridalShopWorkspace(activeWorkspace.industry_preset)
               ? [...BRIDAL_LEAD_SOURCES]

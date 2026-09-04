@@ -1,0 +1,13 @@
+"use client";
+
+import { BarOpsPage, type BarField } from "@/components/bar/BarOpsPage";
+
+export function ChefOpsPage(props: {
+  title: string;
+  description: string;
+  kind: string;
+  wrap: string;
+  fields: BarField[];
+}) {
+  return <BarOpsPage {...props} apiBase="/api/chef" />;
+}

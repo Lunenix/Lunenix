@@ -10,6 +10,7 @@ import { eventPlannerPack } from "@/lib/verticals/packs/event-planner";
 import { eventVenuePack } from "@/lib/verticals/packs/event-venue";
 import { bridalShopPack } from "@/lib/verticals/packs/bridal-shop";
 import { catererPack } from "@/lib/verticals/packs/caterer";
+import { privateChefPack } from "@/lib/verticals/packs/private-chef";
 import { SUPER_ADMIN_TOOLS } from "@/lib/luna-super-admin-tools";
 
 /** Nav/ops packs keyed by pack id (`field`, `bar`, …). Not an industries table. */
@@ -211,6 +212,30 @@ registerVerticalPack({
   ],
 });
 
+registerVerticalPack({
+  id: "chef",
+  presets: ["private_chef_services"],
+  sector: "event_wedding",
+  workflowPrefix: "Chef:",
+  hideProjectsNav: true,
+  nav: [
+    { href: "/chef", label: "Chef ops", icon: "ChefHat" },
+    { href: "/events", label: "Visits", icon: "PartyPopper" },
+    { href: "/households", label: "Households", icon: "Home" },
+    { href: "/chef-style", label: "Inspiration", icon: "Images" },
+    { href: "/chef-menus", label: "Menus", icon: "Salad" },
+    { href: "/chef-plans", label: "Recurring", icon: "Repeat" },
+    { href: "/access-notes", label: "Access notes", icon: "KeyRound" },
+    { href: "/shopping", label: "Shopping", icon: "ShoppingCart" },
+    { href: "/labels", label: "Labels", icon: "Tag" },
+    { href: "/chef-staff", label: "Chefs", icon: "UserCog" },
+    { href: "/chef-kit", label: "Chef kit", icon: "Refrigerator" },
+    { href: "/estimates", label: "Estimates", icon: "ClipboardSignature" },
+    { href: "/inventory", label: "Inventory", icon: "Package" },
+    { href: "/books", label: "Books", icon: "BookOpen" },
+  ],
+});
+
 /** Catalog sector label. Tool packs key off `industry_preset`, not this string. */
 export const EVENT_WEDDING_CATEGORY = "Event & Wedding Services";
 
@@ -226,6 +251,7 @@ const VERTICAL_TOOL_REGISTRY: Record<string, VerticalLunaPack> = {
   [eventVenuePack.key]: eventVenuePack,
   [bridalShopPack.key]: bridalShopPack,
   [catererPack.key]: catererPack,
+  [privateChefPack.key]: privateChefPack,
 };
 
 /** Resolve a Luna tool pack by `industry_preset` slug or catalog label. */

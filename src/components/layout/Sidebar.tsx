@@ -103,6 +103,12 @@ import {
   Soup,
   CookingPot,
   Thermometer,
+  ChefHat,
+  Home,
+  Salad,
+  ShoppingCart,
+  Tag,
+  Refrigerator,
 } from "lucide-react";
 
 const coreNav = [
@@ -184,6 +190,14 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   CookingPot,
   Thermometer,
   Warehouse,
+  ChefHat,
+  Home,
+  Salad,
+  Repeat,
+  KeyRound,
+  ShoppingCart,
+  Tag,
+  Refrigerator,
 };
 
 const restNav = [

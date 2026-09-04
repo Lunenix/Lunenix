@@ -1677,6 +1677,23 @@ export interface CateringEvent {
   created_at: string;
 }
 
+export interface ChefVisit {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  title: string;
+  visit_on: string | null;
+  starts_at: string | null;
+  service_type: string;
+  household_size: number | null;
+  grocery_cost: number | null;
+  chef_fee: number | null;
+  status: string;
+  photo_url: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SteelWeldLog {
   id: string;
   workspace_id: string;

@@ -5,9 +5,11 @@ import { BarOpsPage } from "@/components/bar/BarOpsPage";
 import { PlannerOpsPage } from "@/components/planner/PlannerOpsPage";
 import { VenueOpsPage } from "@/components/venue/VenueOpsPage";
 import { CateringOpsPage } from "@/components/catering/CateringOpsPage";
+import { ChefOpsPage } from "@/components/chef/ChefOpsPage";
 import { isEventPlannerWorkspace } from "@/lib/plannerService";
 import { isEventVenueWorkspace } from "@/lib/venueService";
 import { isCatererWorkspace } from "@/lib/cateringService";
+import { isPrivateChefWorkspace } from "@/lib/chefService";
 import {
   BAR_CONSULT_KIND_LABELS,
   BAR_CONSULT_KINDS,
@@ -44,9 +46,58 @@ import {
   CATERING_STYLE_LABELS,
   CATERING_STYLES,
 } from "@/lib/cateringService";
+import {
+  CHEF_SERVICE_TYPE_LABELS,
+  CHEF_SERVICE_TYPES,
+  CHEF_VISIT_STATUS_LABELS,
+  CHEF_VISIT_STATUSES,
+} from "@/lib/chefService";
 
 function opts(values: readonly string[], labels: Record<string, string>) {
   return values.map((value) => ({ value, label: labels[value] ?? value }));
+}
+
+function ChefVisits() {
+  return (
+    <ChefOpsPage
+      title="Visits"
+      description="Consults, meal-prep days, and dinner parties: date, household size, service type, grocery cost vs chef fee, visit checklist, and dish photos. Status moves scheduled → shopping → cooking → complete. Recurring plans do not auto-create these rows. Two-way SMS is not live. Luna never collects cards."
+      kind="visits"
+      wrap="events"
+      fields={[
+        { key: "title", label: "Visit / household", kind: "text", required: true },
+        { key: "visit_on", label: "Visit date", kind: "date" },
+        { key: "starts_at", label: "Start time", kind: "datetime-local", list: false },
+        {
+          key: "service_type",
+          label: "Service type",
+          kind: "select",
+          options: opts(CHEF_SERVICE_TYPES, CHEF_SERVICE_TYPE_LABELS),
+        },
+        { key: "household_size", label: "Household size", kind: "number" },
+        { key: "lead_source", label: "Lead source", kind: "text", list: false },
+        { key: "budget_range", label: "Budget range", kind: "text", list: false },
+        { key: "dietary_notes", label: "Dietary / allergies", kind: "textarea" },
+        { key: "kitchen_access", label: "Kitchen access", kind: "textarea", list: false },
+        { key: "grocery_cost", label: "Grocery cost", kind: "number" },
+        { key: "chef_fee", label: "Chef fee", kind: "number" },
+        {
+          key: "checklist",
+          label: "Visit checklist (shop, prep, cook, package, clean)",
+          kind: "textarea",
+          list: false,
+        },
+        { key: "photo_url", label: "Finished dish photo URL", kind: "text", list: false },
+        {
+          key: "status",
+          label: "Status",
+          kind: "select",
+          options: opts(CHEF_VISIT_STATUSES, CHEF_VISIT_STATUS_LABELS),
+        },
+        { key: "notes", label: "Notes", kind: "textarea", list: false },
+      ]}
+    />
+  );
 }
 
 function CateringEvents() {
@@ -330,6 +381,9 @@ function BarEvents() {
 
 export default function EventsPage() {
   const { activeWorkspace } = useWorkspace();
+  if (isPrivateChefWorkspace(activeWorkspace?.industry_preset)) {
+    return <ChefVisits />;
+  }
   if (isCatererWorkspace(activeWorkspace?.industry_preset)) {
     return <CateringEvents />;
   }
