@@ -1,5 +1,56 @@
 import { NextResponse } from "next/server";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
+import {
+  PHOTO_EDIT_STATUS_LABELS,
+  PHOTO_SHOOT_STATUS_LABELS,
+  PHOTO_SHOOT_TYPE_LABELS,
+  type PhotoEditStatus,
+  type PhotoShootStatus,
+  type PhotoShootType,
+} from "@/lib/photoService";
+import { contactDisplayName } from "@/types/database";
+
+type ContactJoin = {
+  type: "person" | "organization" | "lead";
+  first_name: string | null;
+  last_name: string | null;
+  organization_name: string | null;
+  email: string | null;
+};
+
+function clientLabel(
+  title: string,
+  contact: ContactJoin | ContactJoin[] | null
+): string {
+  const row = Array.isArray(contact) ? contact[0] : contact;
+  if (row) return contactDisplayName(row);
+  return title;
+}
+
+function safeHttpUrl(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  try {
+    const u = new URL(raw.trim());
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function latestMatch<T extends { title: string }>(
+  rows: T[],
+  needles: string[]
+): T | null {
+  const lowered = needles.map((n) => n.toLowerCase()).filter(Boolean);
+  if (!lowered.length) return null;
+  return (
+    rows.find((row) => {
+      const t = row.title.toLowerCase();
+      return lowered.some((n) => t.includes(n) || n.includes(t));
+    }) ?? null
+  );
+}
 
 export async function GET(request: Request) {
   const auth = await verifyWorkspaceAccess(request);
@@ -9,8 +60,11 @@ export async function GET(request: Request) {
   const [shoots, shots, edits, galleries, gear, invoices] = await Promise.all([
     supabase
       .from("photo_shoots")
-      .select("id, title, status")
-      .eq("workspace_id", workspaceId),
+      .select(
+        "id, title, status, shoot_type, hours, contacts(type, first_name, last_name, organization_name, email)"
+      )
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false }),
     supabase
       .from("photo_shots")
       .select("id, title, status")
@@ -18,11 +72,13 @@ export async function GET(request: Request) {
     supabase
       .from("photo_edits")
       .select("id, title, status")
-      .eq("workspace_id", workspaceId),
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false }),
     supabase
       .from("photo_galleries")
-      .select("id, title, status")
-      .eq("workspace_id", workspaceId),
+      .select("id, title, status, gallery_url")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false }),
     supabase
       .from("photo_gear")
       .select("id, title, qty, reorder_below")
@@ -42,6 +98,44 @@ export async function GET(request: Request) {
   const overdue = inv.filter((i: { status: string }) => i.status === "overdue");
   const sent = inv.filter((i: { status: string }) => i.status === "sent");
 
+  const pipeline = shootRows
+    .filter((s: { status: string }) =>
+      ["booked", "shooting", "editing"].includes(s.status)
+    )
+    .map(
+      (s: {
+        id: string;
+        title: string;
+        status: string;
+        shoot_type: string;
+        hours: number | null;
+        contacts: ContactJoin | ContactJoin[] | null;
+      }) => {
+        const client = clientLabel(s.title, s.contacts);
+        const edit = latestMatch(editRows, [client, s.title]);
+        const gallery = latestMatch(galleryRows, [client, s.title]);
+        const typeKey = s.shoot_type as PhotoShootType;
+        const statusKey = s.status as PhotoShootStatus;
+        const editKey = (edit?.status ?? null) as PhotoEditStatus | null;
+        return {
+          id: s.id,
+          client,
+          title: s.title,
+          session_type: PHOTO_SHOOT_TYPE_LABELS[typeKey] ?? s.shoot_type,
+          coverage_hours: s.hours,
+          shoot_status: PHOTO_SHOOT_STATUS_LABELS[statusKey] ?? s.status,
+          editing_stage: editKey
+            ? PHOTO_EDIT_STATUS_LABELS[editKey]
+            : s.status === "editing"
+              ? "Editing"
+              : "Not in queue yet",
+          gallery_url: safeHttpUrl(
+            (gallery as { gallery_url?: string | null } | null)?.gallery_url
+          ),
+        };
+      }
+    );
+
   return NextResponse.json({
     shoots: {
       delivered: shootRows.filter((s: { status: string }) => s.status === "delivered")
@@ -60,6 +154,7 @@ export async function GET(request: Request) {
       overdue_invoices: overdue.length,
       open_invoices: sent.length,
     },
+    pipeline,
     alerts: [
       ...overdue.map((i: { invoice_number?: string }) => ({
         kind: "invoice",

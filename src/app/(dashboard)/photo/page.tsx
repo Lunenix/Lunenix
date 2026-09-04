@@ -5,11 +5,16 @@ import Link from "next/link";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import {
+  PhotographyPipeline,
+  type PhotoPipelineSession,
+} from "@/components/photo/PhotographyPipeline";
 
 type Overview = {
   shoots: { delivered: number; open: number };
   production: { planned_shots: number; queued_edits: number };
   money: { overdue_invoices: number; open_invoices: number };
+  pipeline: PhotoPipelineSession[];
   alerts: { kind: string; label: string; href: string }[];
 };
 
@@ -84,6 +89,7 @@ export default function PhotoOpsHubPage() {
           </CardContent>
         </Card>
       </div>
+      <PhotographyPipeline sessions={data.pipeline ?? []} />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Alerts</CardTitle>
