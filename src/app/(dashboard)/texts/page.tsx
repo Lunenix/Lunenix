@@ -26,6 +26,7 @@ import { Loader2 } from "lucide-react";
 export default function TextsPage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
   const [platformOk, setPlatformOk] = useState(false);
+  const [webhookOk, setWebhookOk] = useState(false);
   const [deepLink, setDeepLink] = useState<string | null>(null);
   const [botUsername, setBotUsername] = useState<string | null>(null);
   const [threads, setThreads] = useState<SmsThread[]>([]);
@@ -51,6 +52,7 @@ export default function TextsPage() {
     const cj = await c.json().catch(() => ({}));
     if (s.ok) {
       setPlatformOk(Boolean(sj.platform_configured));
+      setWebhookOk(Boolean(sj.webhook_ok));
       setDeepLink(typeof sj.deep_link === "string" ? sj.deep_link : null);
       setBotUsername(typeof sj.bot_username === "string" ? sj.bot_username : null);
     }
@@ -136,31 +138,36 @@ export default function TextsPage() {
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           {!platformOk ? (
             <p>
-              Set <code className="text-xs">TELEGRAM_BOT_TOKEN</code> and{" "}
-              <code className="text-xs">TELEGRAM_WEBHOOK_SECRET</code> on the
-              server. Point the bot webhook to{" "}
-              <code className="text-xs">/api/telegram/webhook</code>. Optional:{" "}
-              <code className="text-xs">TELEGRAM_BOT_USERNAME</code> for the
-              deep link below.
+              Set <code className="text-xs">TELEGRAM_BOT_TOKEN</code> on the
+              server. That is the same token used for task reminder pings.
             </p>
           ) : deepLink ? (
-            <p>
-              Share this link so a client starts a thread in this workspace
-              {botUsername ? ` (@${botUsername})` : ""}:{" "}
-              <a
-                className="text-foreground underline"
-                href={deepLink}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {deepLink}
-              </a>
-            </p>
+            <div className="space-y-2">
+              <p>
+                Bot token is live
+                {botUsername ? ` (@${botUsername})` : ""}. Share this link so a
+                client starts a thread in this workspace:{" "}
+                <a
+                  className="text-foreground underline"
+                  href={deepLink}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {deepLink}
+                </a>
+              </p>
+              {!webhookOk ? (
+                <p>
+                  Inbound replies are not registered yet. Open this page on the
+                  production https URL so Lunenix can set the Telegram webhook
+                  from the bot token.
+                </p>
+              ) : null}
+            </div>
           ) : (
             <p>
-              Bot token is set. Add{" "}
-              <code className="text-xs">TELEGRAM_BOT_USERNAME</code> to show a
-              t.me start link for this workspace.
+              Bot token is set. Open Texts on production so the app can read
+              the bot username from Telegram.
             </p>
           )}
         </CardContent>

@@ -9,11 +9,11 @@ import {
   recordHubMessage,
   upsertTelegramThread,
 } from "@/lib/sms-persist";
-import { telegramBotConfigured } from "@/lib/notify/telegram";
+import { telegramBotConfigured, telegramWebhookSecret } from "@/lib/notify/telegram";
 import { timingSafeEqual } from "crypto";
 
 function secretOk(header: string | null): boolean {
-  const expected = process.env.TELEGRAM_WEBHOOK_SECRET?.trim() ?? "";
+  const expected = telegramWebhookSecret();
   if (!expected) return false;
   const provided = header ?? "";
   const a = Buffer.from(provided);
