@@ -7,6 +7,7 @@ export type CalendarEvent = {
   date: string;
   href: string;
   status: string;
+  contactId?: string | null;
 };
 
 export function ymdFromUnknown(value: unknown): string | null {

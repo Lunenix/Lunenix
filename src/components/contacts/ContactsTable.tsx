@@ -19,6 +19,7 @@ import {
   Search,
   RefreshCw,
   Mail,
+  MessageSquare,
   Building,
   Loader2,
   Download,
@@ -27,6 +28,7 @@ import {
   ArchiveRestore,
 } from "lucide-react";
 import { ContactSheet } from "@/components/contacts/ContactSheet";
+import { SendTextDialog } from "@/components/texts/SendTextDialog";
 import {
   contactDisplayName,
   isArchived,
@@ -64,6 +66,7 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [textContact, setTextContact] = useState<Contact | null>(null);
   const [excelBusy, setExcelBusy] = useState<"export" | "import" | null>(null);
   const [excelMessage, setExcelMessage] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -352,28 +355,42 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
                         {new Date(contact.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          disabled={archiveBusyId === contact.id}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            void setContactArchived(
-                              contact,
-                              !isArchived(contact)
-                            );
-                          }}
-                        >
-                          {archiveBusyId === contact.id ? (
-                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                          ) : isArchived(contact) ? (
-                            <ArchiveRestore className="mr-1 h-3.5 w-3.5" />
-                          ) : (
-                            <Archive className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          {isArchived(contact) ? "Restore" : "Archive"}
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setTextContact(contact);
+                            }}
+                          >
+                            <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                            Text
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            disabled={archiveBusyId === contact.id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void setContactArchived(
+                                contact,
+                                !isArchived(contact)
+                              );
+                            }}
+                          >
+                            {archiveBusyId === contact.id ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : isArchived(contact) ? (
+                              <ArchiveRestore className="mr-1 h-3.5 w-3.5" />
+                            ) : (
+                              <Archive className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            {isArchived(contact) ? "Restore" : "Archive"}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -383,6 +400,16 @@ export function ContactsTable({ workspaceId }: ContactsTableProps) {
           )}
         </CardContent>
       </Card>
+
+      <SendTextDialog
+        open={Boolean(textContact)}
+        onOpenChange={(open) => {
+          if (!open) setTextContact(null);
+        }}
+        workspaceId={workspaceId}
+        contactId={textContact?.id}
+        contactLabel={textContact ? contactDisplayName(textContact) : null}
+      />
 
       <ContactSheet
         open={sheetOpen}

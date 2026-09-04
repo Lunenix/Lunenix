@@ -31,7 +31,8 @@ import {
   type Contact,
   type ScheduleEvent,
 } from "@/types/database";
-import { Loader2 } from "lucide-react";
+import { SendTextDialog } from "@/components/texts/SendTextDialog";
+import { Loader2, MessageSquare } from "lucide-react";
 
 export default function SchedulePage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
@@ -45,6 +46,8 @@ export default function SchedulePage() {
   const [location, setLocation] = useState("");
   const [contactId, setContactId] = useState("");
   const [notes, setNotes] = useState("");
+  const [textEvent, setTextEvent] = useState<ScheduleEvent | null>(null);
+  const [textPickerOpen, setTextPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -133,8 +136,16 @@ export default function SchedulePage() {
         <h1 className="text-2xl font-bold tracking-tight">Schedule</h1>
         <p className="text-sm text-muted-foreground">
           Bookings for {activeWorkspace.name}. They also appear on Calendar.
-          Confirm with a client from Texts (Telegram).
+          Text a contact here or from Texts (Telegram).
         </p>
+        <Button
+          variant="outline"
+          className="mt-3"
+          onClick={() => setTextPickerOpen(true)}
+        >
+          <MessageSquare className="mr-2 h-4 w-4" />
+          Send text
+        </Button>
       </div>
 
       <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2 lg:grid-cols-3">
@@ -214,12 +225,13 @@ export default function SchedulePage() {
             <TableHead>Title</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead className="text-right"> </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {events.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-muted-foreground">
+              <TableCell colSpan={5} className="text-muted-foreground">
                 No bookings yet.
               </TableCell>
             </TableRow>
@@ -255,11 +267,50 @@ export default function SchedulePage() {
                     </SelectContent>
                   </Select>
                 </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={!event.contact_id}
+                    onClick={() => setTextEvent(event)}
+                  >
+                    <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                    Text
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+
+      <SendTextDialog
+        open={Boolean(textEvent)}
+        onOpenChange={(open) => {
+          if (!open) setTextEvent(null);
+        }}
+        workspaceId={activeWorkspace.id}
+        contactId={textEvent?.contact_id}
+        contactLabel={
+          textEvent?.contact ? contactDisplayName(textEvent.contact) : null
+        }
+        defaultBody={
+          textEvent
+            ? `Hi${
+                textEvent.contact
+                  ? ` ${contactDisplayName(textEvent.contact)}`
+                  : ""
+              }, confirming your booking "${textEvent.title}" on ${new Date(textEvent.starts_at).toLocaleString()}.`
+            : undefined
+        }
+      />
+      <SendTextDialog
+        open={textPickerOpen}
+        onOpenChange={setTextPickerOpen}
+        workspaceId={activeWorkspace.id}
+        contacts={contacts}
+      />
     </div>
   );
 }
