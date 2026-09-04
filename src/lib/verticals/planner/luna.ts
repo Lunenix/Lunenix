@@ -76,8 +76,12 @@ async function resolveContact(
     return { error: "I could not find that contact in this workspace." };
   }
   if (rows.length > 1) {
+    const labels = rows.map(
+      (r: Parameters<typeof contactDisplayName>[0] & { id: string }) =>
+        contactDisplayName(r)
+    );
     return {
-      error: `Several contacts match. Which one: ${rows.map((r: { first_name?: string }) => contactDisplayName(r)).join(", ")}?`,
+      error: `Several contacts match. Which one: ${labels.join(", ")}?`,
     };
   }
   return { id: rows[0].id, label: contactDisplayName(rows[0]) };
