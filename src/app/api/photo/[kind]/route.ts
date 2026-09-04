@@ -47,6 +47,18 @@ function num(body: Record<string, unknown>, key: string) {
   return Number.isFinite(n) ? n : null;
 }
 
+function bool(body: Record<string, unknown>, key: string, fallback = false) {
+  const v = body[key];
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number" && Number.isFinite(v)) return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(s)) return true;
+    if (["false", "no", "0", ""].includes(s)) return false;
+  }
+  return fallback;
+}
+
 function payloadFor(
   kind: Kind,
   workspaceId: string,
@@ -65,6 +77,7 @@ function payloadFor(
       shoot_type: inList(PHOTO_SHOOT_TYPES, body.shoot_type, "wedding"),
       coverage: inList(PHOTO_COVERAGE, body.coverage, "photo"),
       hours: num(body, "hours"),
+      second_shooter: bool(body, "second_shooter"),
       lead_source: str(body, "lead_source"),
       must_haves: str(body, "must_haves"),
       status: inList(PHOTO_SHOOT_STATUSES, body.status, "inquiry"),

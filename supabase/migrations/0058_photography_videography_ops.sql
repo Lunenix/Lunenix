@@ -29,10 +29,11 @@ CREATE TABLE IF NOT EXISTS public.photo_shoots (
   starts_at TIMESTAMPTZ,
   venue_name TEXT,
   shoot_type TEXT NOT NULL DEFAULT 'wedding'
-    CHECK (shoot_type IN ('wedding', 'engagement', 'family', 'commercial', 'other')),
+    CHECK (shoot_type IN ('wedding', 'engagement', 'family', 'commercial', 'headshots', 'event', 'other')),
   coverage TEXT NOT NULL DEFAULT 'photo'
     CHECK (coverage IN ('photo', 'video', 'both')),
   hours NUMERIC,
+  second_shooter BOOLEAN NOT NULL DEFAULT false,
   lead_source TEXT,
   must_haves TEXT,
   status TEXT NOT NULL DEFAULT 'inquiry'

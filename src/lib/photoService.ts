@@ -19,6 +19,8 @@ export const PHOTO_SHOOT_TYPES = [
   "engagement",
   "family",
   "commercial",
+  "headshots",
+  "event",
   "other",
 ] as const;
 export type PhotoShootType = (typeof PHOTO_SHOOT_TYPES)[number];
@@ -27,6 +29,8 @@ export const PHOTO_SHOOT_TYPE_LABELS: Record<PhotoShootType, string> = {
   engagement: "Engagement",
   family: "Family / portrait",
   commercial: "Commercial",
+  headshots: "Headshots",
+  event: "Event",
   other: "Other",
 };
 
@@ -112,4 +116,53 @@ export function photoShootDateFields(body: Record<string, unknown>): {
     shoot_on: d ? d.slice(0, 10) : null,
     starts_at: trimStr(body.starts_at) ?? trimStr(body.consult_at),
   };
+}
+
+/** Map spoken session types onto photo_shoots.shoot_type. */
+export function mapPhotoSessionType(raw: unknown): PhotoShootType {
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (s.includes("wedding")) return "wedding";
+  if (s.includes("engagement")) return "engagement";
+  if (s.includes("headshot")) return "headshots";
+  if (s.includes("commercial")) return "commercial";
+  if (s.includes("portrait") || s.includes("family")) return "family";
+  if (s.includes("event")) return "event";
+  return "other";
+}
+
+/** Map culling/edit labels onto photo_edits.status. */
+export function mapPhotoEditStage(raw: unknown): PhotoEditStatus {
+  const s = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (
+    s.includes("deliver") ||
+    s.includes("ready") ||
+    s.includes("complete")
+  ) {
+    return "delivered";
+  }
+  if (
+    s.includes("cull") ||
+    s.includes("pending") ||
+    s === "queued"
+  ) {
+    return "queued";
+  }
+  return "in_progress";
+}
+
+export function photoShotListFromArgs(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean)
+      .slice(0, 40);
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    return raw
+      .split(/\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 40);
+  }
+  return [];
 }

@@ -92,6 +92,15 @@ function PhotoShoots() {
           options: opts(PHOTO_COVERAGE, PHOTO_COVERAGE_LABELS),
         },
         { key: "hours", label: "Hours", kind: "number" },
+        {
+          key: "second_shooter",
+          label: "Second shooter",
+          kind: "select",
+          options: [
+            { value: "false", label: "No" },
+            { value: "true", label: "Yes" },
+          ],
+        },
         { key: "lead_source", label: "Lead source", kind: "text", list: false },
         { key: "must_haves", label: "Must-have shots", kind: "textarea" },
         {
