@@ -1,0 +1,17 @@
+{
+  "name": "Lunenix",
+  "install": "npm install",
+  "ports": [
+    {
+      "name": "next-dev",
+      "port": 3000
+    }
+  ],
+  "terminals": [
+    {
+      "name": "next-dev",
+      "command": "npm run dev",
+      "description": "Next.js 14 development server on http://localhost:3000. Requires Supabase env vars (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY) for full auth/database functionality."
+    }
+  ]
+}
