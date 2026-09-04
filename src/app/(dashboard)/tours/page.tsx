@@ -6,7 +6,7 @@ export default function VenueToursPage() {
   return (
     <VenueOpsPage
       title="Tours"
-      description="Tour time, talking points, setup photos (URL), and client questions. Confirmation is email — two-way SMS is not live."
+      description="Tour time, talking points, setup photos (URL), and client questions. Confirm on Schedule and text from Texts."
       kind="tours"
       wrap="rows"
       fields={[

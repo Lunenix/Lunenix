@@ -1723,3 +1723,70 @@ export interface SteelWeldLog {
   created_at: string;
   project?: { id: string; name: string } | null;
 }
+
+export type ScheduleEventStatus =
+  | "requested"
+  | "scheduled"
+  | "confirmed"
+  | "cancelled"
+  | "completed";
+
+export interface ScheduleEvent {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  location: string | null;
+  notes: string | null;
+  status: ScheduleEventStatus;
+  created_at: string;
+  updated_at: string;
+  contact?: Pick<
+    Contact,
+    | "id"
+    | "type"
+    | "first_name"
+    | "last_name"
+    | "organization_name"
+    | "email"
+    | "phone"
+  > | null;
+}
+
+export interface WorkspaceSmsSettings {
+  workspace_id: string;
+  from_e164: string | null;
+  enabled: boolean;
+  updated_at: string | null;
+}
+
+export interface SmsThread {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  contact_phone: string;
+  last_message_at: string;
+  created_at: string;
+  contact?: Pick<
+    Contact,
+    | "id"
+    | "type"
+    | "first_name"
+    | "last_name"
+    | "organization_name"
+    | "email"
+    | "phone"
+  > | null;
+}
+
+export interface SmsMessage {
+  id: string;
+  workspace_id: string;
+  thread_id: string;
+  direction: "inbound" | "outbound";
+  body: string;
+  provider_sid: string | null;
+  created_at: string;
+}

@@ -91,7 +91,9 @@ const BASE_SYSTEM_PROMPT =
   "When they ask to edit a contract after create, call update_contract. " +
   "When they ask to send a document for e-sign, call send_esign. The PDF and fields must already exist. " +
   "When they ask what is on the calendar, this week, or upcoming deadlines, call get_calendar. " +
-  "A meeting is a task with a due date. To put it on the workspace calendar only, call create_task with a title and due_date as YYYY-MM-DD. " +
+  "For appointments, visits, or meetings with a start time, call create_booking. Do not use create_task for those. " +
+  "To list upcoming bookings, call list_bookings. " +
+  "To send a two-way text to a contact, call send_sms. The contact must already have a phone number. Do not read the number aloud. " +
   "A task client is a contact. Pass contact_name or contact_email on create_task or update_task. " +
   "When they ask to email a calendar invite, call send_calendar_invite. That creates the dated task and emails a calendar file. It is not Google Calendar. " +
   "When they ask to change, complete, or delete a task, call update_task, complete_task, or delete_task. " +
@@ -248,7 +250,7 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
   {
     name: "create_task",
     description:
-      "Create a task in the current workspace. A meeting is a dated task. Optional client is a contact (contact_name or contact_email). Use send_calendar_invite if they also want an emailed calendar file.",
+      "Create a task in the current workspace. Optional client is a contact (contact_name or contact_email). For timed appointments use create_booking. Use send_calendar_invite if they also want an emailed calendar file.",
     parametersJsonSchema: {
       type: "object",
       properties: {
@@ -332,7 +334,7 @@ const LUNA_TOOLS: FunctionDeclaration[] = [
   {
     name: "get_calendar",
     description:
-      "List dated tasks, invoices, and projects on this workspace calendar for the next two weeks.",
+      "List dated tasks, invoices, projects, and bookings on this workspace calendar for the next two weeks.",
     parametersJsonSchema: { type: "object", properties: {} },
   },
   {

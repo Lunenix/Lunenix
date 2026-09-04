@@ -1,4 +1,4 @@
-export type CalendarKind = "task" | "invoice" | "project";
+export type CalendarKind = "task" | "invoice" | "project" | "booking";
 
 export type CalendarEvent = {
   id: string;

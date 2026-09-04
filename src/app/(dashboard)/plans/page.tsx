@@ -104,8 +104,8 @@ export default function RecurringPlansPage() {
         <p className="text-muted-foreground">
           Set visit frequency (including quarterly), skip until a date, and a
           seasonal toggle (mosquito/termite/rodent season). Due visits create a
-          task (and a draft invoice if auto-bill is on). Two-way texting is not
-          live — confirm by email.
+          task (and a draft invoice if auto-bill is on). Confirm visits from
+          Schedule and Texts.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

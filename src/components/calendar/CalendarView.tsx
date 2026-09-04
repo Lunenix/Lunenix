@@ -20,6 +20,7 @@ const KIND_LABEL: Record<CalendarKind, string> = {
   task: "Task",
   invoice: "Invoice",
   project: "Project",
+  booking: "Booking",
 };
 
 function padDay(n: number): string {
@@ -118,7 +119,7 @@ export function CalendarView() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
           <p className="text-sm text-muted-foreground">
-            Task, invoice, and project dates for {activeWorkspace.name}
+            Bookings, tasks, invoices, and projects for {activeWorkspace.name}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -226,8 +227,8 @@ export function CalendarView() {
           <CardContent className="space-y-3">
             {selectedEvents.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nothing dated this day. Ask Luna to add a task with a due date,
-                or set due dates on invoices and projects.
+                Nothing dated this day. Add a booking on Schedule, or set due
+                dates on tasks, invoices, and projects.
               </p>
             ) : (
               selectedEvents.map((event) => (

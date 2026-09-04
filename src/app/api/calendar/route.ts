@@ -14,7 +14,7 @@ function parseBound(raw: string | null, fallback: string): string {
 
 /**
  * GET /api/calendar?workspaceId=&from=YYYY-MM-DD&to=YYYY-MM-DD
- * Dated tasks, invoices, and projects in this workspace only.
+ * Dated tasks, invoices, projects, and bookings in this workspace only.
  */
 export async function GET(request: Request) {
   const auth = await verifyWorkspaceAccess(request);
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
   const { supabase, workspaceId } = auth;
 
-  const [tasksRes, invoicesRes, projectsRes] = await Promise.all([
+  const [tasksRes, invoicesRes, projectsRes, bookingsRes] = await Promise.all([
     supabase
       .from("tasks")
       .select("id, title, status, due_date")
@@ -59,6 +59,13 @@ export async function GET(request: Request) {
       .not("due_date", "is", null)
       .gte("due_date", from)
       .lte("due_date", to)
+      .limit(500),
+    supabase
+      .from("schedule_events")
+      .select("id, title, status, starts_at")
+      .eq("workspace_id", workspaceId)
+      .gte("starts_at", `${from}T00:00:00`)
+      .lte("starts_at", `${to}T23:59:59.999`)
       .limit(500),
   ]);
 
@@ -114,6 +121,19 @@ export async function GET(request: Request) {
       title: typeof row.name === "string" ? row.name : "Project",
       date,
       href: `/projects/${row.id}`,
+      status: typeof row.status === "string" ? row.status : "",
+    });
+  }
+
+  for (const row of bookingsRes.data ?? []) {
+    const date = ymdFromUnknown(row.starts_at);
+    if (!date) continue;
+    events.push({
+      id: `booking:${row.id}`,
+      kind: "booking",
+      title: typeof row.title === "string" ? row.title : "Booking",
+      date,
+      href: "/schedule",
       status: typeof row.status === "string" ? row.status : "",
     });
   }

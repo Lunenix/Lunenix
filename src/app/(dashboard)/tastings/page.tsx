@@ -6,7 +6,7 @@ export default function TastingsPage() {
   return (
     <CateringOpsPage
       title="Tastings"
-      description="Tasting time and client feedback. Confirmation is email — two-way SMS is not live."
+      description="Tasting time and client feedback. Confirm on Schedule and text from Texts."
       kind="tastings"
       wrap="rows"
       fields={[

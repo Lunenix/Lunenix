@@ -111,6 +111,8 @@ import {
   Clapperboard,
   Film,
   Aperture,
+  CalendarClock,
+  MessageSquare,
 } from "lucide-react";
 
 const coreNav = [
@@ -190,6 +192,8 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   Layers,
   ClipboardCheck,
   CalendarRange,
+  CalendarClock,
+  MessageSquare,
 };
 
 const restNav = [
@@ -202,6 +206,8 @@ const restNav = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/automation", label: "Automation", icon: Zap },
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/schedule", label: "Schedule", icon: CalendarClock },
+  { href: "/texts", label: "Texts", icon: MessageSquare },
   { href: "/settings/email", label: "Settings", icon: Settings },
   { href: "/settings/alerts", label: "Alerts", icon: Bell },
   { href: "/settings/workspaces", label: "Workspaces", icon: Building2 },

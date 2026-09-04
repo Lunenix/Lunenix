@@ -45,6 +45,7 @@ import { executeBridalLunaTool } from "@/lib/verticals/bridal/luna";
 import { executeCateringLunaTool } from "@/lib/verticals/catering/luna";
 import { executeChefLunaTool } from "@/lib/verticals/chef/luna";
 import { executePhotoLunaTool } from "@/lib/verticals/photo/luna";
+import { executeHubScheduleSmsTool } from "@/lib/hubScheduleSms/luna";
 import { executeSuperAdminLunaTool } from "@/lib/luna-super-admin";
 
 /** Minimal query client. Callers pass the authenticated Supabase server client. */
@@ -1798,6 +1799,24 @@ export async function executeLunaTool(
     );
     if (adminPack) return adminPack;
 
+    const hubPack = await executeHubScheduleSmsTool(
+      supabase,
+      workspace_id,
+      name,
+      args
+    );
+    if (hubPack) {
+      if ("ok" in hubPack && hubPack.ok) {
+        return lunaMutationOk(
+          supabase,
+          workspace_id,
+          name,
+          hubPack.summary
+        );
+      }
+      return hubPack;
+    }
+
     const photoPack = await executePhotoLunaTool(
       supabase,
       workspace_id,
@@ -1958,7 +1977,7 @@ export async function executeLunaTool(
     if (name === "get_calendar") {
       const from = todayIsoDate();
       const to = plusDaysIsoDate(14);
-      const [tasksRes, invoicesRes, projectsRes] = await Promise.all([
+      const [tasksRes, invoicesRes, projectsRes, bookingsRes] = await Promise.all([
         supabase
           .from("tasks")
           .select("title, status, due_date")
@@ -1986,6 +2005,14 @@ export async function executeLunaTool(
           .lte("due_date", to)
           .order("due_date", { ascending: true })
           .limit(20),
+        supabase
+          .from("schedule_events")
+          .select("title, status, starts_at")
+          .eq("workspace_id", workspace_id)
+          .gte("starts_at", from)
+          .lte("starts_at", `${to}T23:59:59`)
+          .order("starts_at", { ascending: true })
+          .limit(20),
       ]);
       const lines: string[] = [];
       for (const row of tasksRes.data ?? []) {
@@ -2006,6 +2033,12 @@ export async function executeLunaTool(
         if (!due) continue;
         const pname = typeof row.name === "string" ? row.name : "Project";
         lines.push(`Project ${pname} due ${due}`);
+      }
+      for (const row of bookingsRes.data ?? []) {
+        const due = ymdFromUnknown(row.starts_at);
+        if (!due) continue;
+        const title = typeof row.title === "string" ? row.title : "Booking";
+        lines.push(`Booking ${title} on ${due}`);
       }
       if (lines.length === 0) {
         return {
@@ -2310,7 +2343,7 @@ export async function executeLunaTool(
       );
     }
 
-    if (name === "create_task" || name === "schedule_event") {
+    if (name === "create_task") {
       const title =
         argString(args, "title") ||
         argString(args, "summary") ||

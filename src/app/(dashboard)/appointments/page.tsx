@@ -14,7 +14,7 @@ export default function BridalAppointmentsPage() {
   return (
     <BridalOpsPage
       title="Appointments"
-      description="Fitting or browse times, wedding date, party size, budget, and style prefs. Confirmation is email — two-way SMS is not live."
+      description="Fitting or browse times, wedding date, party size, budget, and style prefs. Confirm on Schedule and text from Texts."
       kind="appointments"
       wrap="rows"
       fields={[
