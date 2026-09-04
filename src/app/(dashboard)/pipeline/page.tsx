@@ -24,6 +24,10 @@ import {
   BRIDAL_LEAD_SOURCES,
   isBridalShopWorkspace,
 } from "@/lib/bridalService";
+import {
+  CATERING_LEAD_SOURCES,
+  isCatererWorkspace,
+} from "@/lib/cateringService";
 
 export default function PipelinePage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
@@ -149,7 +153,9 @@ export default function PipelinePage() {
           contacts={contacts}
           showArchived={showArchived}
           sourceSuggestions={
-            isBridalShopWorkspace(activeWorkspace.industry_preset)
+            isCatererWorkspace(activeWorkspace.industry_preset)
+              ? [...CATERING_LEAD_SOURCES]
+              : isBridalShopWorkspace(activeWorkspace.industry_preset)
               ? [...BRIDAL_LEAD_SOURCES]
               : isEventVenueWorkspace(activeWorkspace.industry_preset)
               ? [...VENUE_LEAD_SOURCES]

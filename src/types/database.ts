@@ -1661,6 +1661,22 @@ export interface BridalItem {
   created_at: string;
 }
 
+export interface CateringEvent {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  title: string;
+  event_on: string | null;
+  venue_name: string | null;
+  guest_count: number | null;
+  service_style: string;
+  status: string;
+  food_cost: number | null;
+  package_price: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SteelWeldLog {
   id: string;
   workspace_id: string;

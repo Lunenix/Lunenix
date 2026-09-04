@@ -4,8 +4,10 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { BarOpsPage } from "@/components/bar/BarOpsPage";
 import { PlannerOpsPage } from "@/components/planner/PlannerOpsPage";
 import { VenueOpsPage } from "@/components/venue/VenueOpsPage";
+import { CateringOpsPage } from "@/components/catering/CateringOpsPage";
 import { isEventPlannerWorkspace } from "@/lib/plannerService";
 import { isEventVenueWorkspace } from "@/lib/venueService";
+import { isCatererWorkspace } from "@/lib/cateringService";
 import {
   BAR_CONSULT_KIND_LABELS,
   BAR_CONSULT_KINDS,
@@ -34,9 +36,93 @@ import {
   VENUE_TIER_LABELS,
   VENUE_TIERS,
 } from "@/lib/venueService";
+import {
+  CATERING_EVENT_STATUS_LABELS,
+  CATERING_EVENT_STATUSES,
+  CATERING_EVENT_TYPE_LABELS,
+  CATERING_EVENT_TYPES,
+  CATERING_STYLE_LABELS,
+  CATERING_STYLES,
+} from "@/lib/cateringService";
 
 function opts(values: readonly string[], labels: Record<string, string>) {
   return values.map((value) => ({ value, label: labels[value] ?? value }));
+}
+
+function CateringEvents() {
+  return (
+    <CateringOpsPage
+      title="Events"
+      description="Consultations, tastings, and booked service: date, venue, guests, dietary counts, service style, load-in/out, staffing, food cost vs package price. Final headcount is a flag — confirm it before the event. Two-way SMS is not live. Luna never collects cards."
+      kind="events"
+      wrap="events"
+      fields={[
+        { key: "title", label: "Event name", kind: "text", required: true },
+        { key: "event_on", label: "Event date", kind: "date" },
+        { key: "venue_name", label: "Venue", kind: "text" },
+        { key: "venue_address", label: "Venue address", kind: "text", list: false },
+        { key: "guest_count", label: "Guest count", kind: "number" },
+        {
+          key: "headcount_confirmed",
+          label: "Final headcount confirmed",
+          kind: "select",
+          options: [
+            { value: "false", label: "No" },
+            { value: "true", label: "Yes" },
+          ],
+        },
+        {
+          key: "event_type",
+          label: "Event type",
+          kind: "select",
+          options: opts(CATERING_EVENT_TYPES, CATERING_EVENT_TYPE_LABELS),
+        },
+        { key: "lead_source", label: "Lead source", kind: "text", list: false },
+        { key: "budget_range", label: "Budget range", kind: "text", list: false },
+        {
+          key: "service_style",
+          label: "Service style",
+          kind: "select",
+          options: opts(CATERING_STYLES, CATERING_STYLE_LABELS),
+        },
+        { key: "dietary_notes", label: "Dietary notes", kind: "textarea", list: false },
+        { key: "vegan_count", label: "Vegan count", kind: "number", list: false },
+        { key: "gf_count", label: "Gluten-free count", kind: "number", list: false },
+        { key: "nut_free_count", label: "Nut-free count", kind: "number", list: false },
+        { key: "tasting_at", label: "Tasting", kind: "datetime-local", list: false },
+        { key: "load_in_at", label: "Load-in", kind: "datetime-local", list: false },
+        { key: "service_start_at", label: "Service start", kind: "datetime-local", list: false },
+        { key: "service_end_at", label: "Service end", kind: "datetime-local", list: false },
+        { key: "load_out_at", label: "Load-out", kind: "datetime-local", list: false },
+        { key: "staff_notes", label: "Staff assignment", kind: "textarea", list: false },
+        { key: "equipment_checklist", label: "Equipment packed", kind: "textarea", list: false },
+        { key: "route_notes", label: "Route / holding temps", kind: "textarea", list: false },
+        {
+          key: "deposit_paid",
+          label: "Deposit paid",
+          kind: "select",
+          options: [
+            { value: "false", label: "No" },
+            { value: "true", label: "Yes" },
+          ],
+        },
+        { key: "retainer_amount", label: "Deposit amount", kind: "number" },
+        { key: "package_price", label: "Package price", kind: "number", list: false },
+        { key: "food_cost", label: "Food cost", kind: "number", list: false },
+        { key: "labor_cost", label: "Labor cost", kind: "number", list: false },
+        { key: "rental_cost", label: "Rental cost", kind: "number", list: false },
+        { key: "must_haves", label: "Must-haves", kind: "textarea", list: false },
+        { key: "avoid_items", label: "Avoid", kind: "textarea", list: false },
+        {
+          key: "status",
+          label: "Status",
+          kind: "select",
+          options: opts(CATERING_EVENT_STATUSES, CATERING_EVENT_STATUS_LABELS),
+        },
+        { key: "notes", label: "Notes", kind: "textarea", list: false },
+      ]}
+    />
+  );
 }
 
 function VenueEvents() {
@@ -244,6 +330,9 @@ function BarEvents() {
 
 export default function EventsPage() {
   const { activeWorkspace } = useWorkspace();
+  if (isCatererWorkspace(activeWorkspace?.industry_preset)) {
+    return <CateringEvents />;
+  }
   if (isEventVenueWorkspace(activeWorkspace?.industry_preset)) {
     return <VenueEvents />;
   }

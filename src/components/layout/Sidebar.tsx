@@ -99,6 +99,10 @@ import {
   MapPinned,
   Shirt,
   Scissors,
+  UtensilsCrossed,
+  Soup,
+  CookingPot,
+  Thermometer,
 } from "lucide-react";
 
 const coreNav = [
@@ -175,6 +179,11 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   Shirt,
   Scissors,
   UsersRound,
+  UtensilsCrossed,
+  Soup,
+  CookingPot,
+  Thermometer,
+  Warehouse,
 };
 
 const restNav = [

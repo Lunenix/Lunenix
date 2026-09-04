@@ -47,6 +47,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "event_planner") return "Planner:";
   if (resolved === "event_venue") return "Venue:";
   if (resolved === "bridal_shop") return "Bridal:";
+  if (resolved === "caterer") return "Catering:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;
@@ -747,6 +748,134 @@ function bridalWorkflows(): CatalogWorkflowDef[] {
   ];
 }
 
+function cateringWorkflows(): CatalogWorkflowDef[] {
+  const prefix = "Catering:";
+  return [
+    {
+      name: named(prefix, "New inquiry"),
+      description: "When an inquiry lands, capture source and event basics.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Inquiry",
+      actions: [
+        task(
+          "New catering inquiry: {{lead.title}}",
+          "Set lead source: wedding, corporate, private party, referral, or venue partnership. Capture date, venue, guest count, event type, budget, and dietary notes. Email to book a consult or tasting. Two-way SMS is not live.",
+          0
+        ),
+        email(
+          "Thanks for contacting {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We received your catering inquiry. Reply with your event date, guest count, venue, and a few times for a consultation or tasting.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Schedule tasting"),
+      description: "On Consultation, book the tasting.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Consultation",
+      actions: [
+        task(
+          "Schedule tasting: {{lead.title}}",
+          "On Tastings, log time and menu notes. On Events, capture dietary counts. Send confirmation. Two-way texting is not live.",
+          0
+        ),
+        email(
+          "Your tasting is booked — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We have your tasting on the calendar. Reply if the time changes. Please note allergies in advance.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Send estimate"),
+      description: "On Proposal Sent, quote guests plus menu plus staffing.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Proposal Sent",
+      actions: [
+        task(
+          "Send catering estimate: {{lead.title}}",
+          "Confirm guest count, service style, and menu. On Estimates, quote package plus staffing. Email it. On approval, book the event and invoice the deposit. Two-way SMS is not live. Luna never collects cards.",
+          0
+        ),
+        email(
+          "Your catering estimate from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready from guest count, menu, and service style. Please review and reply to approve. A deposit invoice follows approval.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Booked kitchen ops"),
+      description: "After Contract Signed, order food and plan prep.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Contract Signed",
+      actions: [
+        task(
+          "Prep, orders, and licenses: {{lead.title}}",
+          "On Food orders, scale ingredients to guest count in notes. On Kitchen prep, work backward from service. Confirm health licenses and COI. Ask for final headcount. OCR is not auto-filled.",
+          1
+        ),
+        email(
+          "Final headcount due — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Please confirm final headcount and remaining dietary counts so we can order and staff. Final payment is due before the event.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Service day"),
+      description: "On Day-Of, pack, route, and log temps.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Day-Of",
+      actions: [
+        task(
+          "Service day checklist: {{lead.title}}",
+          "Confirm load-in, staff, and packed equipment on Events. On Service log, record presentation photos and holding temperatures. Two-way SMS is not live. GPS routing is not live.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Follow-up"),
+      description: "On Follow-Up, books, thank-you, and review.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Follow-Up",
+      actions: [
+        task(
+          "Close the event: {{lead.title}}",
+          "Invoice overages if headcount changed. Enter food cost vs package price on Events. Tag receipts on Books. Request a review.",
+          1
+        ),
+        email(
+          "Thank you from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Thank you for having us. If guest count changed we will send any remaining balance. We would love a review when you have a moment.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After contract signed (e-sign)"),
+      description: "When an e-sign contract completes, start kitchen ops.",
+      trigger_type: "contract_signed",
+      actions: [
+        task(
+          "Start catering from signed contract",
+          "Book the event, invoice the deposit, and open food orders and prep tasks.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After invoice sent"),
+      description: "When an invoice is sent, follow AR.",
+      trigger_type: "invoice_sent",
+      actions: [
+        task(
+          "Follow up on catering invoice",
+          "Watch aging. Send a reminder if overdue. Flag final payment due before the event.",
+          3
+        ),
+      ],
+    },
+  ];
+}
+
 function eventPack(prefix: string, label: string): CatalogWorkflowDef[] {
   return [
     {
@@ -1251,6 +1380,7 @@ export function catalogWorkflowsForPreset(preset: string): CatalogWorkflowDef[] 
   if (resolved === "event_planner") return plannerWorkflows();
   if (resolved === "event_venue") return venueWorkflows();
   if (resolved === "bridal_shop") return bridalWorkflows();
+  if (resolved === "caterer") return cateringWorkflows();
   const sector = industrySectorId(resolved);
   if (sector === "home_field") return fieldPack(prefix, label);
   if (sector === "creative_professional") return creativePack(prefix, label);
