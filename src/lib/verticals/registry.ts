@@ -11,6 +11,7 @@ import { eventVenuePack } from "@/lib/verticals/packs/event-venue";
 import { bridalShopPack } from "@/lib/verticals/packs/bridal-shop";
 import { catererPack } from "@/lib/verticals/packs/caterer";
 import { privateChefPack } from "@/lib/verticals/packs/private-chef";
+import { photographyVideographyPack } from "@/lib/verticals/packs/photography-videography";
 import { SUPER_ADMIN_TOOLS } from "@/lib/luna-super-admin-tools";
 
 /** Nav/ops packs keyed by pack id (`field`, `bar`, …). Not an industries table. */
@@ -236,6 +237,29 @@ registerVerticalPack({
   ],
 });
 
+registerVerticalPack({
+  id: "photo",
+  presets: ["photography_videography"],
+  sector: "event_wedding",
+  workflowPrefix: "Photo:",
+  hideProjectsNav: true,
+  nav: [
+    { href: "/photo", label: "Photo ops", icon: "Camera" },
+    { href: "/events", label: "Shoots", icon: "PartyPopper" },
+    { href: "/photo-style", label: "Mood boards", icon: "Images" },
+    { href: "/shot-list", label: "Shot list", icon: "Clapperboard" },
+    { href: "/edits", label: "Edits", icon: "Film" },
+    { href: "/galleries", label: "Galleries", icon: "Aperture" },
+    { href: "/print-orders", label: "Prints", icon: "ShoppingBag" },
+    { href: "/releases", label: "Releases", icon: "ScrollText" },
+    { href: "/photo-crew", label: "Crew", icon: "UserCog" },
+    { href: "/photo-gear", label: "Gear", icon: "Package" },
+    { href: "/estimates", label: "Estimates", icon: "ClipboardSignature" },
+    { href: "/inventory", label: "Inventory", icon: "Package" },
+    { href: "/books", label: "Books", icon: "BookOpen" },
+  ],
+});
+
 /** Catalog sector label. Tool packs key off `industry_preset`, not this string. */
 export const EVENT_WEDDING_CATEGORY = "Event & Wedding Services";
 
@@ -252,6 +276,7 @@ const VERTICAL_TOOL_REGISTRY: Record<string, VerticalLunaPack> = {
   [bridalShopPack.key]: bridalShopPack,
   [catererPack.key]: catererPack,
   [privateChefPack.key]: privateChefPack,
+  [photographyVideographyPack.key]: photographyVideographyPack,
 };
 
 /** Resolve a Luna tool pack by `industry_preset` slug or catalog label. */

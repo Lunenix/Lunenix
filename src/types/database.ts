@@ -1694,6 +1694,22 @@ export interface ChefVisit {
   created_at: string;
 }
 
+export interface PhotoShoot {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  title: string;
+  shoot_on: string | null;
+  starts_at: string | null;
+  venue_name: string | null;
+  shoot_type: string;
+  coverage: string;
+  hours: number | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SteelWeldLog {
   id: string;
   workspace_id: string;

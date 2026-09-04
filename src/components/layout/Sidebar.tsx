@@ -109,6 +109,9 @@ import {
   ShoppingCart,
   Tag,
   Refrigerator,
+  Clapperboard,
+  Film,
+  Aperture,
 } from "lucide-react";
 
 const coreNav = [
@@ -198,6 +201,9 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   ShoppingCart,
   Tag,
   Refrigerator,
+  Clapperboard,
+  Film,
+  Aperture,
 };
 
 const restNav = [

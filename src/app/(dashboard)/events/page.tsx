@@ -6,10 +6,12 @@ import { PlannerOpsPage } from "@/components/planner/PlannerOpsPage";
 import { VenueOpsPage } from "@/components/venue/VenueOpsPage";
 import { CateringOpsPage } from "@/components/catering/CateringOpsPage";
 import { ChefOpsPage } from "@/components/chef/ChefOpsPage";
+import { PhotoOpsPage } from "@/components/photo/PhotoOpsPage";
 import { isEventPlannerWorkspace } from "@/lib/plannerService";
 import { isEventVenueWorkspace } from "@/lib/venueService";
 import { isCatererWorkspace } from "@/lib/cateringService";
 import { isPrivateChefWorkspace } from "@/lib/chefService";
+import { isPhotographyWorkspace } from "@/lib/photoService";
 import {
   BAR_CONSULT_KIND_LABELS,
   BAR_CONSULT_KINDS,
@@ -52,9 +54,56 @@ import {
   CHEF_VISIT_STATUS_LABELS,
   CHEF_VISIT_STATUSES,
 } from "@/lib/chefService";
+import {
+  PHOTO_COVERAGE,
+  PHOTO_COVERAGE_LABELS,
+  PHOTO_SHOOT_STATUS_LABELS,
+  PHOTO_SHOOT_STATUSES,
+  PHOTO_SHOOT_TYPE_LABELS,
+  PHOTO_SHOOT_TYPES,
+} from "@/lib/photoService";
 
 function opts(values: readonly string[], labels: Record<string, string>) {
   return values.map((value) => ({ value, label: labels[value] ?? value }));
+}
+
+function PhotoShoots() {
+  return (
+    <PhotoOpsPage
+      title="Shoots"
+      description="Consults and booked coverage: date, venue, photo vs video, hours, must-haves. Status moves inquiry → booked → on shoot → editing → delivered. Galleries are URLs, not a hosted proofing site. Two-way SMS is not live. Luna never collects cards."
+      kind="shoots"
+      wrap="events"
+      fields={[
+        { key: "title", label: "Shoot / couple", kind: "text", required: true },
+        { key: "shoot_on", label: "Shoot date", kind: "date" },
+        { key: "starts_at", label: "Call time", kind: "datetime-local", list: false },
+        { key: "venue_name", label: "Venue", kind: "text" },
+        {
+          key: "shoot_type",
+          label: "Shoot type",
+          kind: "select",
+          options: opts(PHOTO_SHOOT_TYPES, PHOTO_SHOOT_TYPE_LABELS),
+        },
+        {
+          key: "coverage",
+          label: "Coverage",
+          kind: "select",
+          options: opts(PHOTO_COVERAGE, PHOTO_COVERAGE_LABELS),
+        },
+        { key: "hours", label: "Hours", kind: "number" },
+        { key: "lead_source", label: "Lead source", kind: "text", list: false },
+        { key: "must_haves", label: "Must-have shots", kind: "textarea" },
+        {
+          key: "status",
+          label: "Status",
+          kind: "select",
+          options: opts(PHOTO_SHOOT_STATUSES, PHOTO_SHOOT_STATUS_LABELS),
+        },
+        { key: "notes", label: "Notes", kind: "textarea", list: false },
+      ]}
+    />
+  );
 }
 
 function ChefVisits() {
@@ -381,6 +430,9 @@ function BarEvents() {
 
 export default function EventsPage() {
   const { activeWorkspace } = useWorkspace();
+  if (isPhotographyWorkspace(activeWorkspace?.industry_preset)) {
+    return <PhotoShoots />;
+  }
   if (isPrivateChefWorkspace(activeWorkspace?.industry_preset)) {
     return <ChefVisits />;
   }

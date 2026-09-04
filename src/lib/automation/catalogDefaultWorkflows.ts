@@ -49,6 +49,7 @@ export function workflowNamePrefix(preset: string): string {
   if (resolved === "bridal_shop") return "Bridal:";
   if (resolved === "caterer") return "Catering:";
   if (resolved === "private_chef_services") return "Chef:";
+  if (resolved === "photography_videography") return "Photo:";
   if (resolved === CUSTOM_INDUSTRY_PRESET) return "Other:";
   const label =
     INDUSTRY_PRESETS.find((p) => p.value === resolved)?.label ?? resolved;
@@ -1010,6 +1011,138 @@ function chefWorkflows(): CatalogWorkflowDef[] {
   ];
 }
 
+function photoWorkflows(): CatalogWorkflowDef[] {
+  const prefix = "Photo:";
+  return [
+    {
+      name: named(prefix, "New inquiry"),
+      description: "When an inquiry lands, capture source and shoot type.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Inquiry",
+      actions: [
+        task(
+          "New photo inquiry: {{lead.title}}",
+          "Set lead source: wedding, engagement, family/portrait, commercial, or referral. Capture date, venue, photo vs video coverage, hours, and must-have shots. Email to book a consult. Two-way SMS is not live.",
+          0
+        ),
+        email(
+          "Thanks for contacting {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We received your photography/videography inquiry. Reply with your date, venue, whether you need photo, video, or both, and a few times for a consultation.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Schedule consultation"),
+      description: "On Consultation, book the intro call or meeting.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Consultation",
+      actions: [
+        task(
+          "Schedule photo consult: {{lead.title}}",
+          "On Shoots, log the consult. On Mood boards, collect inspiration URLs. Send confirmation. Two-way texting is not live.",
+          0
+        ),
+        email(
+          "Your consultation is booked — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We have your consultation on the calendar. Reply if the time changes. Bring inspiration photos if you have them.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Send estimate"),
+      description: "On Proposal Sent, quote coverage hours and add-ons.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Proposal Sent",
+      actions: [
+        task(
+          "Send photo estimate: {{lead.title}}",
+          "On Estimates, quote hours, coverage, and second shooter if needed. Email it. On approval, book the shoot. Luna never collects cards.",
+          0
+        ),
+        email(
+          "Your photography estimate from {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Your estimate is ready. Please review coverage hours and delivery timing, then reply to approve. A contract follows approval.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Shot list"),
+      description: "After Contract Signed, build the shot list.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Contract Signed",
+      actions: [
+        task(
+          "Shot list and crew: {{lead.title}}",
+          "On Shot list, log must-have scenes. On Crew, assign a second shooter if needed. On Gear, pack bodies and lights. This is not a live camera ingest.",
+          1
+        ),
+        email(
+          "Shot list next — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>Please send must-have family groupings and any shots we should not miss. We will confirm call times before the day.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Shoot day"),
+      description: "On Day-Of, run the shot list.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Day-Of",
+      actions: [
+        task(
+          "Shoot day checklist: {{lead.title}}",
+          "Move the shoot to On shoot. Work the shot list planned → captured. Confirm call times and venue access. Two-way SMS is not live.",
+          0
+        ),
+        email(
+          "See you today — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We are on site for your shoot today. Reply only if timing or access changed.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "Follow-up"),
+      description: "On Follow-Up, edit, gallery, and invoice.",
+      trigger_type: "lead_stage_change",
+      toStageName: "Follow-Up",
+      actions: [
+        task(
+          "Edit and deliver: {{lead.title}}",
+          "Queue the job on Edits. When ready, log the gallery URL and expiry on Galleries — this is not a hosted gallery. Invoice remaining balance. Flag print/album orders.",
+          1
+        ),
+        email(
+          "Gallery coming soon — {{workspace.name}}",
+          "<p>Hi {{contact.first_name}},</p><p>We are editing your gallery. You will get a delivery link when it is ready. Print and album orders can follow from that gallery.</p><p>{{workspace.name}}</p>"
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After contract signed (e-sign)"),
+      description: "When an e-sign contract completes, book the shoot.",
+      trigger_type: "contract_signed",
+      actions: [
+        task(
+          "Book shoot from signed contract",
+          "Set the shoot to booked, invoice the retainer, and open the shot list.",
+          0
+        ),
+      ],
+    },
+    {
+      name: named(prefix, "After invoice sent"),
+      description: "When an invoice is sent, follow AR.",
+      trigger_type: "invoice_sent",
+      actions: [
+        task(
+          "Follow up on photo invoice",
+          "Watch aging. Send a reminder if overdue. Flag gallery expiry if delivery is pending payment.",
+          3
+        ),
+      ],
+    },
+  ];
+}
+
 function eventPack(prefix: string, label: string): CatalogWorkflowDef[] {
   return [
     {
@@ -1516,6 +1649,7 @@ export function catalogWorkflowsForPreset(preset: string): CatalogWorkflowDef[] 
   if (resolved === "bridal_shop") return bridalWorkflows();
   if (resolved === "caterer") return cateringWorkflows();
   if (resolved === "private_chef_services") return chefWorkflows();
+  if (resolved === "photography_videography") return photoWorkflows();
   const sector = industrySectorId(resolved);
   if (sector === "home_field") return fieldPack(prefix, label);
   if (sector === "creative_professional") return creativePack(prefix, label);
