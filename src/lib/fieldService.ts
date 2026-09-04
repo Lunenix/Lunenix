@@ -32,6 +32,10 @@ export function isInspectionWorkspace(industryPreset?: string | null): boolean {
   return resolveIndustryPreset(industryPreset) === "inspection_service";
 }
 
+export function isCleaningWorkspace(industryPreset?: string | null): boolean {
+  return resolveIndustryPreset(industryPreset) === "cleaning_services";
+}
+
 export function isRentalWorkspace(industryPreset?: string | null): boolean {
   return resolveIndustryPreset(industryPreset) === "rental_company";
 }

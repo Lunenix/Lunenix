@@ -5,6 +5,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isCleaningWorkspace } from "@/lib/fieldService";
 import type { TechnicianProfile } from "@/types/database";
 
 export default function TeamFieldPage() {
@@ -46,13 +47,17 @@ export default function TeamFieldPage() {
     load();
   }
 
+  const isCleaning = isCleaningWorkspace(activeWorkspace?.industry_preset);
+  const teamLabel = isCleaning ? "Cleaners" : "Techs";
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Techs</h1>
+        <h1 className="text-3xl font-bold">{teamLabel}</h1>
         <p className="text-muted-foreground">
-          Availability, licenses, E&O, and CE dates before dispatch. Do not
-          paste license numbers into Luna chat. Assign the inspector on the job.
+          {isCleaning
+            ? "Availability, background/training, and who can take the next clean. Assign the same cleaner on Recurring when the client prefers it."
+            : "Availability, licenses, E&O, and CE dates before dispatch. Do not paste license numbers into Luna chat. Assign the inspector on the job."}
         </p>
       </div>
       <div className="max-w-md space-y-3">
@@ -96,7 +101,9 @@ export default function TeamFieldPage() {
           />
           Available for dispatch
         </label>
-        <Button onClick={save}>Save my tech profile</Button>
+        <Button onClick={save}>
+          {isCleaning ? "Save my cleaner profile" : "Save my tech profile"}
+        </Button>
       </div>
       <ul className="space-y-2 text-sm">
         {techs.map((t) => (

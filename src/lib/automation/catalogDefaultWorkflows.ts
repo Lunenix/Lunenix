@@ -1548,7 +1548,7 @@ export function cleaningWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "Create job and assign cleaner: {{lead.title}}",
-          "Create the job. Assign a cleaner. Prefer the same team on Recurring plans for return visits. Check availability and background/training on Techs.",
+          "Create the job. Assign a cleaner. Prefer the same team on Recurring plans for return visits. Check availability and background/training on Cleaners.",
           1
         ),
         task(

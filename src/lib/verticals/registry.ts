@@ -52,8 +52,19 @@ const FIELD_CORE_NAV: VerticalNavItem[] = [
   { href: "/inventory", label: "Inventory", icon: "Package" },
   { href: "/books", label: "Books", icon: "BookOpen" },
   { href: "/mileage", label: "Mileage", icon: "MapPin" },
-  { href: "/team", label: "Techs", icon: "HardHat" },
 ];
+
+const TEAM_TECHS: VerticalNavItem = {
+  href: "/team",
+  label: "Techs",
+  icon: "HardHat",
+};
+
+const TEAM_CLEANERS: VerticalNavItem = {
+  href: "/team",
+  label: "Cleaners",
+  icon: "HardHat",
+};
 
 const FIELD_TRADE_NAV: Record<string, VerticalNavItem[]> = {
   hvac: [
@@ -61,45 +72,55 @@ const FIELD_TRADE_NAV: Record<string, VerticalNavItem[]> = {
     { href: "/materials", label: "Materials", icon: "Truck" },
     { href: "/change-orders", label: "Change orders", icon: "FilePen" },
     { href: "/plans", label: "Recurring", icon: "Repeat" },
+    TEAM_TECHS,
   ],
   electrician: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    TEAM_TECHS,
   ],
   plumbing: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    TEAM_TECHS,
   ],
   handyman: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    TEAM_TECHS,
   ],
   landscaping_lawn_care: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
     { href: "/plans", label: "Recurring", icon: "Repeat" },
+    TEAM_TECHS,
   ],
   roofing_exterior_repair: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
     { href: "/claims", label: "Claims", icon: "Shield" },
     { href: "/materials", label: "Materials", icon: "Truck" },
+    TEAM_TECHS,
   ],
   painting_drywall: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
     { href: "/colors", label: "Colors", icon: "Palette" },
     { href: "/prep", label: "Prep", icon: "Paintbrush" },
+    TEAM_TECHS,
   ],
   pest_control: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
     { href: "/treatments", label: "Treatments", icon: "Bug" },
     { href: "/access", label: "Access", icon: "KeyRound" },
     { href: "/plans", label: "Recurring", icon: "Repeat" },
+    TEAM_TECHS,
   ],
   inspection_service: [
     { href: "/findings", label: "Findings", icon: "ClipboardCheck" },
     { href: "/reports", label: "Reports", icon: "FileText" },
     { href: "/addons", label: "Add-ons", icon: "Layers" },
+    TEAM_TECHS,
   ],
   rental_company: [
     { href: "/fleet", label: "Fleet", icon: "Warehouse" },
     { href: "/rentals", label: "Rentals", icon: "CalendarRange" },
     { href: "/maintenance", label: "Maintenance", icon: "Cog" },
+    TEAM_TECHS,
   ],
   contractors_construction: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
@@ -109,11 +130,13 @@ const FIELD_TRADE_NAV: Record<string, VerticalNavItem[]> = {
     { href: "/daily-logs", label: "Daily logs", icon: "Notebook" },
     { href: "/draws", label: "Draws", icon: "Landmark" },
     { href: "/materials", label: "Materials", icon: "Truck" },
+    TEAM_TECHS,
   ],
   woodworking_custom_carpentry: [
     { href: "/designs", label: "Designs", icon: "PencilRuler" },
     { href: "/selections", label: "Selections", icon: "TreePine" },
     { href: "/shop", label: "Shop", icon: "Hammer" },
+    TEAM_TECHS,
   ],
   steelworking_metal_fabrication: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
@@ -122,15 +145,18 @@ const FIELD_TRADE_NAV: Record<string, VerticalNavItem[]> = {
     { href: "/fab", label: "Fab", icon: "Factory" },
     { href: "/welds", label: "Welds", icon: "Flame" },
     { href: "/materials", label: "Materials", icon: "Truck" },
+    TEAM_TECHS,
   ],
   cleaning_services: [
     { href: "/plans", label: "Recurring", icon: "Repeat" },
     { href: "/access", label: "Access", icon: "KeyRound" },
+    TEAM_CLEANERS,
   ],
   interior_design_services: [
     { href: "/designs", label: "Designs", icon: "PencilRuler" },
     { href: "/selections", label: "Selections", icon: "TreePine" },
     { href: "/colors", label: "Colors", icon: "Palette" },
+    TEAM_TECHS,
   ],
 };
 
