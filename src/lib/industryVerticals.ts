@@ -160,6 +160,16 @@ export function normalizeIndustryCustomLabel(
   return trimmed || null;
 }
 
+export function industryPresetsInSector(
+  sectorId: IndustrySectorId
+): string[] {
+  return (
+    INDUSTRY_SECTORS.find((s) => s.id === sectorId)?.verticals.map(
+      (v) => v.value
+    ) ?? []
+  );
+}
+
 export function industrySectorId(
   preset?: string | null
 ): IndustrySectorId | null {

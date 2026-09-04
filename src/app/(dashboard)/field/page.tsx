@@ -12,6 +12,7 @@ import {
   isSteelworkingWorkspace,
   isWoodworkingWorkspace,
 } from "@/lib/fieldService";
+import { verticalNavFor } from "@/lib/verticals/registry";
 
 type Overview = {
   estimates: { draft: number; sent: number; approved: number };
@@ -76,27 +77,26 @@ export default function FieldOpsPage() {
     );
   }
 
+  const preset = activeWorkspace.industry_preset;
+  const fieldShortcuts = verticalNavFor(preset).filter(
+    (item) => item.href !== "/field"
+  );
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Field operations</h1>
         <p className="text-muted-foreground">
-          {isSteelworkingWorkspace(activeWorkspace.industry_preset)
+          {isSteelworkingWorkspace(preset)
             ? "Lead → consult/photos → drawings and PE stamp → metal specs with quote-valid dates → quote → mill order, permits, fab queue → weld/NDT logs → erection → punch → invoice. Approval still creates a job."
-            : isWoodworkingWorkspace(activeWorkspace.industry_preset)
+            : isWoodworkingWorkspace(preset)
             ? "Lead → consult/photos → designs and wood/finish/hardware sign-off → quote → materials and shop queue → fab photos → delivery/install → punch → invoice. Approval still creates a job."
-            : isConstructionWorkspace(activeWorkspace.industry_preset)
+            : isConstructionWorkspace(preset)
             ? "Lead → site visit → photos → bid → contract → permits/phases/subs → daily logs and draws → punch → close. Change orders need approval before extra work."
-            : "Lead → visit → photos → estimate → job / recurring plan → invoice. Rental workspaces track assets on Fleet and Rentals instead of jobs as the core loop."}{" "}
+            : "Lead → visit → photos → estimate → job / recurring plan → invoice. Use the links below for this trade only."}{" "}
           Email customers from Estimates. Two-way SMS needs a text provider
           later. Receipt OCR is not auto-filled. Ask Luna for weather before
-          dispatch; toggle weather hold on Jobs. Roofing: Claims and Materials.
-          Painting: Colors and Prep. Pest: Treatments, Access, Recurring.
-          Inspection: Findings, Reports, Add-ons. Rental: Fleet, Rentals,
-          Maintenance. General contractors: Change orders, Subs, Phases, Daily
-          logs, Draws, plus Permits and Materials. Woodworking: Designs,
-          Selections, Shop. Steel: Drawings, Specs, Fab, Welds, plus Permits
-          and Materials.
+          dispatch; toggle weather hold on Jobs.
         </p>
       </div>
 
@@ -185,93 +185,11 @@ export default function FieldOpsPage() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild>
-          <Link href="/estimates">Estimates</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/jobs">Jobs</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/inventory">Inventory</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/books">Books</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/mileage">Mileage</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/permits">Permits</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/claims">Claims</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/materials">Materials</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/colors">Colors</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/prep">Prep</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/treatments">Treatments</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/access">Access</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/findings">Findings</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/fleet">Fleet</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/rentals">Rentals</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/maintenance">Maintenance</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/change-orders">Change orders</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/subs">Subs</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/phases">Phases</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/daily-logs">Daily logs</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/draws">Draws</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/designs">Designs</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/selections">Selections</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/shop">Shop</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/drawings">Drawings</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/specs">Specs</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/fab">Fab</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/welds">Welds</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/plans">Recurring</Link>
-        </Button>
+        {fieldShortcuts.map((item) => (
+          <Button key={item.href} asChild variant={item.href === "/estimates" ? "default" : "outline"}>
+            <Link href={item.href}>{item.label}</Link>
+          </Button>
+        ))}
         <Button asChild variant="outline">
           <Link href="/pipeline">Pipeline</Link>
         </Button>

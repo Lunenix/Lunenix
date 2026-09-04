@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AddCompanyModal } from "@/components/workspace/AddCompanyModal";
 import { ThemeToggleMenuItem } from "@/components/theme-toggle";
-import { isFieldServiceWorkspace } from "@/lib/fieldService";
 import { getVerticalPacks, shouldHideProjectsNav } from "@/lib/verticals/registry";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -120,43 +119,28 @@ const coreNav = [
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
 ];
 
-const fieldNav = [
-  { href: "/field", label: "Field ops", icon: Wrench },
-  { href: "/estimates", label: "Estimates", icon: ClipboardSignature },
-  { href: "/jobs", label: "Jobs", icon: FolderKanban },
-  { href: "/inventory", label: "Inventory", icon: Package },
-  { href: "/books", label: "Books", icon: BookOpen },
-  { href: "/mileage", label: "Mileage", icon: MapPin },
-  { href: "/permits", label: "Permits", icon: ClipboardList },
-  { href: "/change-orders", label: "Change orders", icon: FilePen },
-  { href: "/subs", label: "Subs", icon: UsersRound },
-  { href: "/phases", label: "Phases", icon: ChartGantt },
-  { href: "/daily-logs", label: "Daily logs", icon: Notebook },
-  { href: "/draws", label: "Draws", icon: Landmark },
-  { href: "/designs", label: "Designs", icon: PencilRuler },
-  { href: "/selections", label: "Selections", icon: TreePine },
-  { href: "/shop", label: "Shop", icon: Hammer },
-  { href: "/drawings", label: "Drawings", icon: Compass },
-  { href: "/specs", label: "Specs", icon: Cylinder },
-  { href: "/fab", label: "Fab", icon: Factory },
-  { href: "/welds", label: "Welds", icon: Flame },
-  { href: "/claims", label: "Claims", icon: Shield },
-  { href: "/materials", label: "Materials", icon: Truck },
-  { href: "/colors", label: "Colors", icon: Palette },
-  { href: "/prep", label: "Prep", icon: Paintbrush },
-  { href: "/treatments", label: "Treatments", icon: Bug },
-  { href: "/access", label: "Access", icon: KeyRound },
-  { href: "/findings", label: "Findings", icon: ClipboardCheck },
-  { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/addons", label: "Add-ons", icon: Layers },
-  { href: "/fleet", label: "Fleet", icon: Warehouse },
-  { href: "/rentals", label: "Rentals", icon: CalendarRange },
-  { href: "/maintenance", label: "Maintenance", icon: Cog },
-  { href: "/plans", label: "Recurring", icon: Repeat },
-  { href: "/team", label: "Techs", icon: HardHat },
-];
-
 const PACK_ICONS: Record<string, LucideIcon> = {
+  Wrench,
+  FolderKanban,
+  MapPin,
+  FilePen,
+  Notebook,
+  PencilRuler,
+  TreePine,
+  Hammer,
+  Compass,
+  Cylinder,
+  Factory,
+  Flame,
+  Shield,
+  Truck,
+  Palette,
+  Paintbrush,
+  Bug,
+  HardHat,
+  ClipboardList,
+  FileText,
+  Repeat,
   Wine,
   PartyPopper,
   Martini,
@@ -196,7 +180,6 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   ChefHat,
   Home,
   Salad,
-  Repeat,
   KeyRound,
   ShoppingCart,
   Tag,
@@ -206,6 +189,7 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   Aperture,
   Layers,
   ClipboardCheck,
+  CalendarRange,
 };
 
 const restNav = [
@@ -250,22 +234,17 @@ export function Sidebar({
   const router = useRouter();
   const { workspaces, activeWorkspace, setActiveWorkspace, isLoading } =
     useWorkspace();
-  const fieldService = isFieldServiceWorkspace(
-    activeWorkspace?.industry_preset
-  );
-  const packNav = getVerticalPacks(activeWorkspace?.industry_preset)
-    .filter((pack) => pack.id !== "field")
-    .flatMap((pack) =>
+  const packNav = getVerticalPacks(activeWorkspace?.industry_preset).flatMap(
+    (pack) =>
       pack.nav.map((item) => ({
         href: item.href,
         label: item.label,
         icon: PACK_ICONS[item.icon] ?? ClipboardList,
       }))
-    );
+  );
   const hideProjects = shouldHideProjectsNav(activeWorkspace?.industry_preset);
   const navItems = [
     ...coreNav,
-    ...(fieldService ? fieldNav : []),
     ...packNav,
     ...restNav.filter((item) => !(hideProjects && item.href === "/projects")),
   ];

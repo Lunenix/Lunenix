@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
+import { getVerticalPacks } from "@/lib/verticals/registry";
 import {
   monthlyRecurringAmount,
   suggestedTaxSetAside,
@@ -33,6 +34,12 @@ export async function GET(request: Request) {
   const auth = await verifyWorkspaceAccess(request);
   if (auth.errorResponse) return auth.errorResponse;
   const { supabase, workspaceId } = auth;
+
+  const { data: workspaceRow } = await supabase
+    .from("workspaces")
+    .select("industry_preset")
+    .eq("id", workspaceId)
+    .maybeSingle();
 
   const [
     estimates,
@@ -276,7 +283,7 @@ export async function GET(request: Request) {
     (s) => Number(s.quantity) <= Number(s.reorder_at)
   );
 
-  return NextResponse.json({
+  const body = {
     estimates: {
       draft: est.filter((e) => e.status === "draft").length,
       sent: est.filter((e) => e.status === "sent" || e.status === "viewed")
@@ -662,5 +669,24 @@ export async function GET(request: Request) {
           href: "/welds",
         })),
     ],
+  };
+  const preset =
+    typeof workspaceRow?.industry_preset === "string"
+      ? workspaceRow.industry_preset
+      : null;
+  const allowedHrefs = new Set(
+    getVerticalPacks(preset).flatMap((pack) => pack.nav.map((n) => n.href))
+  );
+  allowedHrefs.add("/invoices");
+  allowedHrefs.add("/pipeline");
+  body.alerts = body.alerts.filter((a) => {
+    if (a.href.startsWith("/invoices/") || a.href.startsWith("/projects/")) {
+      return true;
+    }
+    return allowedHrefs.has(a.href);
   });
+  if (!allowedHrefs.has("/fleet")) {
+    delete (body as { fleet?: unknown }).fleet;
+  }
+  return NextResponse.json(body);
 }

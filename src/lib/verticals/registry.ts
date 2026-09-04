@@ -1,5 +1,6 @@
 import {
   INDUSTRY_PRESETS,
+  industryPresetsInSector,
   industrySectorId,
   resolveIndustryPreset,
 } from "@/lib/industryVerticals";
@@ -52,48 +53,112 @@ export function shouldHideProjectsNav(
   return getVerticalPacks(industryPreset).some((pack) => pack.hideProjectsNav);
 }
 
-/** Home & Field extras. Per-trade workflow prefixes stay in catalogDefaultWorkflows until moved. */
-registerVerticalPack({
-  id: "field",
-  presets: [],
-  sector: "home_field",
-  hideProjectsNav: true,
-  nav: [
-    { href: "/field", label: "Field ops", icon: "Wrench" },
-    { href: "/estimates", label: "Estimates", icon: "ClipboardSignature" },
-    { href: "/jobs", label: "Jobs", icon: "FolderKanban" },
-    { href: "/inventory", label: "Inventory", icon: "Package" },
-    { href: "/books", label: "Books", icon: "BookOpen" },
-    { href: "/mileage", label: "Mileage", icon: "MapPin" },
+const FIELD_CORE_NAV: VerticalNavItem[] = [
+  { href: "/field", label: "Field ops", icon: "Wrench" },
+  { href: "/estimates", label: "Estimates", icon: "ClipboardSignature" },
+  { href: "/jobs", label: "Jobs", icon: "FolderKanban" },
+  { href: "/inventory", label: "Inventory", icon: "Package" },
+  { href: "/books", label: "Books", icon: "BookOpen" },
+  { href: "/mileage", label: "Mileage", icon: "MapPin" },
+  { href: "/team", label: "Techs", icon: "HardHat" },
+];
+
+const FIELD_TRADE_NAV: Record<string, VerticalNavItem[]> = {
+  hvac: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    { href: "/materials", label: "Materials", icon: "Truck" },
+    { href: "/change-orders", label: "Change orders", icon: "FilePen" },
+    { href: "/plans", label: "Recurring", icon: "Repeat" },
+  ],
+  electrician: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+  ],
+  plumbing: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+  ],
+  handyman: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+  ],
+  landscaping_lawn_care: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    { href: "/plans", label: "Recurring", icon: "Repeat" },
+  ],
+  roofing_exterior_repair: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    { href: "/claims", label: "Claims", icon: "Shield" },
+    { href: "/materials", label: "Materials", icon: "Truck" },
+  ],
+  painting_drywall: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    { href: "/colors", label: "Colors", icon: "Palette" },
+    { href: "/prep", label: "Prep", icon: "Paintbrush" },
+  ],
+  pest_control: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
+    { href: "/treatments", label: "Treatments", icon: "Bug" },
+    { href: "/access", label: "Access", icon: "KeyRound" },
+    { href: "/plans", label: "Recurring", icon: "Repeat" },
+  ],
+  inspection_service: [
+    { href: "/findings", label: "Findings", icon: "ClipboardCheck" },
+    { href: "/reports", label: "Reports", icon: "FileText" },
+    { href: "/addons", label: "Add-ons", icon: "Layers" },
+  ],
+  rental_company: [
+    { href: "/fleet", label: "Fleet", icon: "Warehouse" },
+    { href: "/rentals", label: "Rentals", icon: "CalendarRange" },
+    { href: "/maintenance", label: "Maintenance", icon: "Cog" },
+  ],
+  contractors_construction: [
     { href: "/permits", label: "Permits", icon: "ClipboardList" },
     { href: "/change-orders", label: "Change orders", icon: "FilePen" },
     { href: "/subs", label: "Subs", icon: "UsersRound" },
     { href: "/phases", label: "Phases", icon: "ChartGantt" },
     { href: "/daily-logs", label: "Daily logs", icon: "Notebook" },
     { href: "/draws", label: "Draws", icon: "Landmark" },
+    { href: "/materials", label: "Materials", icon: "Truck" },
+  ],
+  woodworking_custom_carpentry: [
     { href: "/designs", label: "Designs", icon: "PencilRuler" },
     { href: "/selections", label: "Selections", icon: "TreePine" },
     { href: "/shop", label: "Shop", icon: "Hammer" },
+  ],
+  steelworking_metal_fabrication: [
+    { href: "/permits", label: "Permits", icon: "ClipboardList" },
     { href: "/drawings", label: "Drawings", icon: "Compass" },
     { href: "/specs", label: "Specs", icon: "Cylinder" },
     { href: "/fab", label: "Fab", icon: "Factory" },
     { href: "/welds", label: "Welds", icon: "Flame" },
-    { href: "/claims", label: "Claims", icon: "Shield" },
     { href: "/materials", label: "Materials", icon: "Truck" },
-    { href: "/colors", label: "Colors", icon: "Palette" },
-    { href: "/prep", label: "Prep", icon: "Paintbrush" },
-    { href: "/treatments", label: "Treatments", icon: "Bug" },
-    { href: "/access", label: "Access", icon: "KeyRound" },
-    { href: "/findings", label: "Findings", icon: "ClipboardCheck" },
-    { href: "/reports", label: "Reports", icon: "FileText" },
-    { href: "/addons", label: "Add-ons", icon: "Layers" },
-    { href: "/fleet", label: "Fleet", icon: "Warehouse" },
-    { href: "/rentals", label: "Rentals", icon: "CalendarRange" },
-    { href: "/maintenance", label: "Maintenance", icon: "Cog" },
-    { href: "/plans", label: "Recurring", icon: "Repeat" },
-    { href: "/team", label: "Techs", icon: "HardHat" },
   ],
+  cleaning_services: [
+    { href: "/plans", label: "Recurring", icon: "Repeat" },
+    { href: "/access", label: "Access", icon: "KeyRound" },
+  ],
+  interior_design_services: [
+    { href: "/designs", label: "Designs", icon: "PencilRuler" },
+    { href: "/selections", label: "Selections", icon: "TreePine" },
+    { href: "/colors", label: "Colors", icon: "Palette" },
+  ],
+};
+
+/** Shared Home & Field core. Trade extras are separate packs so nav never merges. */
+registerVerticalPack({
+  id: "field",
+  presets: industryPresetsInSector("home_field"),
+  sector: "home_field",
+  hideProjectsNav: true,
+  nav: FIELD_CORE_NAV,
 });
+
+for (const [preset, nav] of Object.entries(FIELD_TRADE_NAV)) {
+  registerVerticalPack({
+    id: `field-${preset}`,
+    presets: [preset],
+    sector: "home_field",
+    nav,
+  });
+}
 
 registerVerticalPack({
   id: "bar",
