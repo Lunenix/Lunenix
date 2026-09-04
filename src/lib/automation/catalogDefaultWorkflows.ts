@@ -1022,7 +1022,7 @@ function photoWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "New photo inquiry: {{lead.title}}",
-          "Set lead source: wedding, engagement, family/portrait, commercial, or referral. Capture date, venue, photo vs video coverage, hours, and must-have shots. Email to book a consult. Two-way SMS is not live.",
+          "Set lead source: wedding, portrait session, corporate/commercial, referral, or Instagram/portfolio. Capture date, location, session type, budget, and contact. Email to book a consult. Two-way SMS is not live.",
           0
         ),
         email(
@@ -1039,7 +1039,7 @@ function photoWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "Schedule photo consult: {{lead.title}}",
-          "On Shoots, log the consult. On Mood boards, collect inspiration URLs. Send confirmation. Two-way texting is not live.",
+          "On Shoots, log the consult date, location, session type, and budget. On Mood boards, collect inspiration URLs. Send confirmation. Two-way texting is not live.",
           0
         ),
         email(
@@ -1056,7 +1056,7 @@ function photoWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "Send photo estimate: {{lead.title}}",
-          "On Estimates, quote hours, coverage, and second shooter if needed. Email it. On approval, book the shoot. Luna never collects cards.",
+          "On Packages, confirm hours, shooters, photo vs video, and add-ons. On Estimates, quote package plus travel. Include usage rights on the contract. On approval, book the shoot and invoice the deposit. This does not auto-charge cards. Luna never collects cards.",
           0
         ),
         email(
@@ -1073,7 +1073,7 @@ function photoWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "Shot list and crew: {{lead.title}}",
-          "On Shot list, log must-have scenes. On Crew, assign a second shooter if needed. On Gear, pack bodies and lights. This is not a live camera ingest.",
+          "On Shot list, log family combinations or commercial deliverables. On Permits, check park/venue requirements. On Crew and Gear, assign shooters and check out bodies. This is not a live camera ingest.",
           1
         ),
         email(
@@ -1090,7 +1090,7 @@ function photoWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "Shoot day checklist: {{lead.title}}",
-          "Move the shoot to On shoot. Work the shot list planned → captured. Confirm call times and venue access. Two-way SMS is not live.",
+          "Move the shoot booked → on shoot → wrapped. Work the shot list. Confirm arrival and packed gear on the shoot row. Two-way SMS is not live.",
           0
         ),
         email(
@@ -1107,7 +1107,7 @@ function photoWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "Edit and deliver: {{lead.title}}",
-          "Queue the job on Edits. When ready, log the gallery URL and expiry on Galleries — this is not a hosted gallery. Invoice remaining balance. Flag print/album orders.",
+          "On Edits, move culling → editing → grading → client review. Set video rough/final if needed. On Galleries, log the proofing URL and delivery method — this is not a hosted gallery. Invoice the remaining balance before or at delivery. Flag print/album orders.",
           1
         ),
         email(
@@ -1135,7 +1135,7 @@ function photoWorkflows(): CatalogWorkflowDef[] {
       actions: [
         task(
           "Follow up on photo invoice",
-          "Watch aging. Send a reminder if overdue. Flag gallery expiry if delivery is pending payment.",
+          "Watch aging. Send a reminder if overdue. Flag turnaround dates on Edits and galleries still in draft.",
           3
         ),
       ],

@@ -8,10 +8,10 @@ export function isPhotographyWorkspace(
 
 export const PHOTO_LEAD_SOURCES = [
   "Wedding",
-  "Engagement",
-  "Family / portrait",
-  "Commercial",
+  "Portrait session",
+  "Corporate / commercial",
   "Referral",
+  "Instagram / portfolio",
 ] as const;
 
 export const PHOTO_SHOOT_TYPES = [
@@ -20,6 +20,7 @@ export const PHOTO_SHOOT_TYPES = [
   "family",
   "commercial",
   "headshots",
+  "product",
   "event",
   "other",
 ] as const;
@@ -30,6 +31,7 @@ export const PHOTO_SHOOT_TYPE_LABELS: Record<PhotoShootType, string> = {
   family: "Family / portrait",
   commercial: "Commercial",
   headshots: "Headshots",
+  product: "Product",
   event: "Event",
   other: "Other",
 };
@@ -46,6 +48,7 @@ export const PHOTO_SHOOT_STATUSES = [
   "inquiry",
   "booked",
   "shooting",
+  "wrapped",
   "editing",
   "delivered",
   "cancelled",
@@ -55,6 +58,7 @@ export const PHOTO_SHOOT_STATUS_LABELS: Record<PhotoShootStatus, string> = {
   inquiry: "Inquiry",
   booked: "Booked",
   shooting: "On shoot",
+  wrapped: "Wrapped",
   editing: "Editing",
   delivered: "Delivered",
   cancelled: "Cancelled",
@@ -68,12 +72,61 @@ export const PHOTO_SHOT_STATUS_LABELS: Record<PhotoShotStatus, string> = {
   skip: "Skip",
 };
 
-export const PHOTO_EDIT_STATUSES = ["queued", "in_progress", "delivered"] as const;
+export const PHOTO_EDIT_STATUSES = [
+  "culling",
+  "editing",
+  "grading",
+  "review",
+  "delivered",
+] as const;
 export type PhotoEditStatus = (typeof PHOTO_EDIT_STATUSES)[number];
 export const PHOTO_EDIT_STATUS_LABELS: Record<PhotoEditStatus, string> = {
-  queued: "Queued",
-  in_progress: "In progress",
-  delivered: "Delivered",
+  culling: "Culling",
+  editing: "Editing",
+  grading: "Color grading",
+  review: "Client review",
+  delivered: "Ready for delivery",
+};
+
+export const PHOTO_VIDEO_STAGES = [
+  "none",
+  "rough_cut",
+  "client_review",
+  "final_cut",
+] as const;
+export type PhotoVideoStage = (typeof PHOTO_VIDEO_STAGES)[number];
+export const PHOTO_VIDEO_STAGE_LABELS: Record<PhotoVideoStage, string> = {
+  none: "No video",
+  rough_cut: "Rough cut",
+  client_review: "Video client review",
+  final_cut: "Final cut / mix",
+};
+
+export const PHOTO_DELIVERY_METHODS = [
+  "download",
+  "usb",
+  "album",
+  "file",
+] as const;
+export type PhotoDeliveryMethod = (typeof PHOTO_DELIVERY_METHODS)[number];
+export const PHOTO_DELIVERY_METHOD_LABELS: Record<PhotoDeliveryMethod, string> =
+  {
+    download: "Download link",
+    usb: "USB",
+    album: "Album",
+    file: "Video file",
+  };
+
+export const PHOTO_PERMIT_STATUSES = [
+  "needed",
+  "submitted",
+  "approved",
+] as const;
+export type PhotoPermitStatus = (typeof PHOTO_PERMIT_STATUSES)[number];
+export const PHOTO_PERMIT_STATUS_LABELS: Record<PhotoPermitStatus, string> = {
+  needed: "Needed",
+  submitted: "Submitted",
+  approved: "Approved",
 };
 
 export const PHOTO_GALLERY_STATUSES = ["draft", "sent", "expired"] as const;
@@ -124,7 +177,8 @@ export function mapPhotoSessionType(raw: unknown): PhotoShootType {
   if (s.includes("wedding")) return "wedding";
   if (s.includes("engagement")) return "engagement";
   if (s.includes("headshot")) return "headshots";
-  if (s.includes("commercial")) return "commercial";
+  if (s.includes("product")) return "product";
+  if (s.includes("commercial") || s.includes("corporate")) return "commercial";
   if (s.includes("portrait") || s.includes("family")) return "family";
   if (s.includes("event")) return "event";
   return "other";
@@ -136,18 +190,17 @@ export function mapPhotoEditStage(raw: unknown): PhotoEditStatus {
   if (
     s.includes("deliver") ||
     s.includes("ready") ||
+    s.includes("final") ||
     s.includes("complete")
   ) {
     return "delivered";
   }
-  if (
-    s.includes("cull") ||
-    s.includes("pending") ||
-    s === "queued"
-  ) {
-    return "queued";
+  if (s.includes("review")) return "review";
+  if (s.includes("grad") || s.includes("color")) return "grading";
+  if (s.includes("cull") || s.includes("pending") || s === "queued") {
+    return "culling";
   }
-  return "in_progress";
+  return "editing";
 }
 
 export function photoShotListFromArgs(raw: unknown): string[] {

@@ -14,7 +14,7 @@ export default function ShotListPage() {
   return (
     <PhotoOpsPage
       title="Shot list"
-      description="Production shots by scene and priority. This is a typed list, not a live camera ingest or Lightroom catalog."
+      description="Family combinations, commercial deliverables, and must-haves by scene. Typed list — not a live camera ingest."
       kind="shots"
       wrap="rows"
       fields={[

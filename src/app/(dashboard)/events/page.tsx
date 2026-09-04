@@ -71,7 +71,7 @@ function PhotoShoots() {
   return (
     <PhotoOpsPage
       title="Shoots"
-      description="Consults and booked coverage: date, venue, photo vs video, hours, must-haves. Status moves inquiry → booked → on shoot → editing → delivered. Galleries are URLs, not a hosted proofing site. Two-way SMS is not live. Luna never collects cards."
+      description="Consults and booked coverage: date, location, package, add-ons, timeline, and packed gear. Status moves inquiry → booked → on shoot → wrapped → editing → delivered. Two-way SMS is not live. Luna never collects cards."
       kind="shoots"
       wrap="events"
       fields={[
@@ -102,6 +102,12 @@ function PhotoShoots() {
           ],
         },
         { key: "lead_source", label: "Lead source", kind: "text", list: false },
+        { key: "budget_range", label: "Budget range", kind: "text", list: false },
+        { key: "package_name", label: "Package", kind: "text", list: false },
+        { key: "add_ons", label: "Add-ons", kind: "textarea", list: false },
+        { key: "timeline", label: "Shoot-day timeline", kind: "textarea", list: false },
+        { key: "packed_checklist", label: "Gear packed", kind: "textarea", list: false },
+        { key: "scout_notes", label: "Location / permit notes", kind: "textarea", list: false },
         { key: "must_haves", label: "Must-have shots", kind: "textarea" },
         {
           key: "status",

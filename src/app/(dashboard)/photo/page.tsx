@@ -55,10 +55,9 @@ export default function PhotoOpsHubPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Photo ops</h1>
         <p className="text-sm text-muted-foreground">
-          Shoots, shot lists, edits, and gallery URLs. This is not Pixieset,
-          Lightroom, or a live RAW ingest. Shot metadata lives on Shot list
-          rows — not on contacts. Two-way SMS is not live. Luna never collects
-          cards.
+          Shoots, packages, shot lists, edits, gallery URLs, and permits.
+          This is not Pixieset, Lightroom, or live RAW ingest. Two-way SMS and
+          receipt OCR are not live. Luna never collects cards.
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-3">

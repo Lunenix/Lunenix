@@ -26,7 +26,7 @@ export default function PrintOrdersPage() {
           kind: "select",
           options: opts(PHOTO_ORDER_STATUSES, PHOTO_ORDER_STATUS_LABELS),
         },
-        { key: "notes", label: "Notes", kind: "textarea", list: false },
+        { key: "notes", label: "Tracking / album approval / shipping", kind: "textarea" },
       ]}
     />
   );

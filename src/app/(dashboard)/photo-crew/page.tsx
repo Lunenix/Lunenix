@@ -12,6 +12,7 @@ export default function PhotoCrewPage() {
       fields={[
         { key: "name", label: "Name", kind: "text", required: true },
         { key: "role", label: "Role", kind: "text" },
+        { key: "specialty", label: "Specialty (wedding lead, drone, video)", kind: "text" },
         { key: "rating", label: "Rating", kind: "number" },
         { key: "notes", label: "Availability / notes", kind: "textarea", list: false },
       ]}

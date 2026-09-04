@@ -204,6 +204,8 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   Clapperboard,
   Film,
   Aperture,
+  Layers,
+  ClipboardCheck,
 };
 
 const restNav = [

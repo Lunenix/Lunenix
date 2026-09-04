@@ -12,8 +12,8 @@ export default function PhotoStylePage() {
       fields={[
         { key: "title", label: "Board / couple", kind: "text", required: true },
         { key: "image_url", label: "Inspiration image URL", kind: "text" },
-        { key: "style_notes", label: "Style notes", kind: "textarea" },
-        { key: "notes", label: "Notes", kind: "textarea", list: false },
+        { key: "style_notes", label: "Style (bright & airy, moody, candid vs posed)", kind: "textarea" },
+        { key: "notes", label: "Colors / theme / notes", kind: "textarea", list: false },
       ]}
     />
   );

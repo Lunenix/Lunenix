@@ -213,6 +213,7 @@ export async function executePhotoLunaTool(
       title: `${contact.label} edits`.slice(0, 200),
       due_on: dueOn,
       status: editStatus,
+      video_stage: "none",
     });
     if (editErr) return { error: editErr.message };
 

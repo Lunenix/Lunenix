@@ -57,7 +57,8 @@ export async function GET(request: Request) {
   if (auth.errorResponse) return auth.errorResponse;
   const { supabase, workspaceId } = auth;
 
-  const [shoots, shots, edits, galleries, gear, invoices] = await Promise.all([
+  const [shoots, shots, edits, galleries, gear, invoices, permits, releases] =
+    await Promise.all([
     supabase
       .from("photo_shoots")
       .select(
@@ -71,7 +72,7 @@ export async function GET(request: Request) {
       .eq("workspace_id", workspaceId),
     supabase
       .from("photo_edits")
-      .select("id, title, status")
+      .select("id, title, status, due_on")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
@@ -87,6 +88,14 @@ export async function GET(request: Request) {
       .from("invoices")
       .select("id, status, total, invoice_number")
       .eq("workspace_id", workspaceId),
+    supabase
+      .from("photo_permits")
+      .select("id, title, status")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("photo_releases")
+      .select("id")
+      .eq("workspace_id", workspaceId),
   ]);
 
   const shootRows = shoots.data ?? [];
@@ -95,12 +104,15 @@ export async function GET(request: Request) {
   const galleryRows = galleries.data ?? [];
   const gearRows = gear.data ?? [];
   const inv = invoices.data ?? [];
+  const permitRows = permits.data ?? [];
+  const releaseRows = releases.data ?? [];
+  const today = new Date().toISOString().slice(0, 10);
   const overdue = inv.filter((i: { status: string }) => i.status === "overdue");
   const sent = inv.filter((i: { status: string }) => i.status === "sent");
 
   const pipeline = shootRows
     .filter((s: { status: string }) =>
-      ["booked", "shooting", "editing"].includes(s.status)
+      ["booked", "shooting", "wrapped", "editing"].includes(s.status)
     )
     .map(
       (s: {
@@ -141,14 +153,15 @@ export async function GET(request: Request) {
       delivered: shootRows.filter((s: { status: string }) => s.status === "delivered")
         .length,
       open: shootRows.filter((s: { status: string }) =>
-        ["inquiry", "booked", "shooting", "editing"].includes(s.status)
+        ["inquiry", "booked", "shooting", "wrapped", "editing"].includes(s.status)
       ).length,
     },
     production: {
       planned_shots: shotRows.filter((s: { status: string }) => s.status === "planned")
         .length,
-      queued_edits: editRows.filter((s: { status: string }) => s.status === "queued")
-        .length,
+      queued_edits: editRows.filter((s: { status: string }) =>
+        ["culling", "editing", "grading"].includes(s.status)
+      ).length,
     },
     money: {
       overdue_invoices: overdue.length,
@@ -162,11 +175,28 @@ export async function GET(request: Request) {
         href: "/invoices",
       })),
       ...editRows
-        .filter((e: { status: string }) => e.status === "queued")
+        .filter(
+          (e: { status: string; due_on?: string | null; title: string }) =>
+            e.status !== "delivered" && e.due_on && e.due_on < today
+        )
         .map((e: { title: string }) => ({
           kind: "edit",
-          label: `Edit queued: ${e.title}`,
+          label: `Turnaround behind: ${e.title}`,
           href: "/edits",
+        })),
+      ...editRows
+        .filter((e: { status: string }) => e.status === "culling")
+        .map((e: { title: string }) => ({
+          kind: "cull",
+          label: `Culling: ${e.title}`,
+          href: "/edits",
+        })),
+      ...galleryRows
+        .filter((g: { status: string }) => g.status === "draft")
+        .map((g: { title: string }) => ({
+          kind: "gallery",
+          label: `Gallery not delivered: ${g.title}`,
+          href: "/galleries",
         })),
       ...galleryRows
         .filter((g: { status: string }) => g.status === "expired")
@@ -175,6 +205,23 @@ export async function GET(request: Request) {
           label: `Gallery expired: ${g.title}`,
           href: "/galleries",
         })),
+      ...permitRows
+        .filter((p: { status: string }) => p.status === "needed")
+        .map((p: { title: string }) => ({
+          kind: "permit",
+          label: `Permit needed: ${p.title}`,
+          href: "/photo-permits",
+        })),
+      ...(releaseRows.length === 0 &&
+      shootRows.some((s: { status: string }) => s.status === "booked")
+        ? [
+            {
+              kind: "release",
+              label: "Booked shoot with no usage release on file",
+              href: "/releases",
+            },
+          ]
+        : []),
       ...gearRows
         .filter((e: { qty: number | null; reorder_below: number | null }) => {
           if (e.qty == null || e.reorder_below == null) return false;

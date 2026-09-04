@@ -246,8 +246,10 @@ registerVerticalPack({
   nav: [
     { href: "/photo", label: "Photo ops", icon: "Camera" },
     { href: "/events", label: "Shoots", icon: "PartyPopper" },
+    { href: "/photo-packages", label: "Packages", icon: "Layers" },
     { href: "/photo-style", label: "Mood boards", icon: "Images" },
     { href: "/shot-list", label: "Shot list", icon: "Clapperboard" },
+    { href: "/photo-permits", label: "Permits", icon: "ClipboardCheck" },
     { href: "/edits", label: "Edits", icon: "Film" },
     { href: "/galleries", label: "Galleries", icon: "Aperture" },
     { href: "/print-orders", label: "Prints", icon: "ShoppingBag" },

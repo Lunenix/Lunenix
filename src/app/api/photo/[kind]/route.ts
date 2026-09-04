@@ -3,12 +3,15 @@ import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
 import {
   PHOTO_COVERAGE,
+  PHOTO_DELIVERY_METHODS,
   PHOTO_EDIT_STATUSES,
   PHOTO_GALLERY_STATUSES,
   PHOTO_ORDER_STATUSES,
+  PHOTO_PERMIT_STATUSES,
   PHOTO_SHOOT_STATUSES,
   PHOTO_SHOOT_TYPES,
   PHOTO_SHOT_STATUSES,
+  PHOTO_VIDEO_STAGES,
   flattenPhotoSpecs,
   photoShootDateFields,
 } from "@/lib/photoService";
@@ -23,6 +26,8 @@ const KINDS = {
   gear: { table: "photo_gear", wrap: "rows", required: ["title"] },
   crew: { table: "photo_crew", wrap: "crew", required: ["name"] },
   releases: { table: "photo_releases", wrap: "rows", required: ["title"] },
+  packages: { table: "photo_packages", wrap: "rows", required: ["title"] },
+  permits: { table: "photo_permits", wrap: "rows", required: ["title"] },
 } as const;
 
 type Kind = keyof typeof KINDS;
@@ -79,6 +84,12 @@ function payloadFor(
       hours: num(body, "hours"),
       second_shooter: bool(body, "second_shooter"),
       lead_source: str(body, "lead_source"),
+      budget_range: str(body, "budget_range"),
+      package_name: str(body, "package_name"),
+      add_ons: str(body, "add_ons"),
+      timeline: str(body, "timeline"),
+      packed_checklist: str(body, "packed_checklist"),
+      scout_notes: str(body, "scout_notes"),
       must_haves: str(body, "must_haves"),
       status: inList(PHOTO_SHOOT_STATUSES, body.status, "inquiry"),
     };
@@ -105,7 +116,9 @@ function payloadFor(
       ...base,
       title: str(body, "title") ?? "",
       due_on: str(body, "due_on"),
-      status: inList(PHOTO_EDIT_STATUSES, body.status, "queued"),
+      editor_name: str(body, "editor_name"),
+      video_stage: inList(PHOTO_VIDEO_STAGES, body.video_stage, "none"),
+      status: inList(PHOTO_EDIT_STATUSES, body.status, "culling"),
     };
   }
   if (kind === "galleries") {
@@ -114,6 +127,8 @@ function payloadFor(
       title: str(body, "title") ?? "",
       gallery_url: str(body, "gallery_url"),
       expires_on: str(body, "expires_on"),
+      delivery_method: inList(PHOTO_DELIVERY_METHODS, body.delivery_method, "download"),
+      favorites: str(body, "favorites"),
       status: inList(PHOTO_GALLERY_STATUSES, body.status, "draft"),
     };
   }
@@ -130,6 +145,7 @@ function payloadFor(
       ...base,
       name: str(body, "name") ?? "",
       role: str(body, "role"),
+      specialty: str(body, "specialty"),
       rating: num(body, "rating"),
     };
   }
@@ -141,11 +157,36 @@ function payloadFor(
       signed_on: str(body, "signed_on"),
     };
   }
+  if (kind === "packages") {
+    return {
+      ...base,
+      title: str(body, "title") ?? "",
+      hours: num(body, "hours"),
+      shooters: num(body, "shooters"),
+      coverage: inList(PHOTO_COVERAGE, body.coverage, "photo"),
+      deliverables: str(body, "deliverables"),
+      add_ons: str(body, "add_ons"),
+    };
+  }
+  if (kind === "permits") {
+    return {
+      ...base,
+      title: str(body, "title") ?? "",
+      venue_name: str(body, "venue_name"),
+      status: inList(PHOTO_PERMIT_STATUSES, body.status, "needed"),
+      due_on: str(body, "due_on"),
+    };
+  }
   return {
     ...base,
     title: str(body, "title") ?? "",
     qty: num(body, "qty"),
     reorder_below: num(body, "reorder_below"),
+    serial_no: str(body, "serial_no"),
+    condition: str(body, "condition"),
+    insurance_notes: str(body, "insurance_notes"),
+    checked_out: bool(body, "checked_out"),
+    checked_to: str(body, "checked_to"),
   };
 }
 
