@@ -90,6 +90,11 @@ import {
   UserCheck,
   UserCog,
   Armchair,
+  DoorOpen,
+  CalendarCheck,
+  ScrollText,
+  Timer,
+  CircleDollarSign,
 } from "lucide-react";
 
 const coreNav = [
@@ -154,6 +159,13 @@ const PACK_ICONS: Record<string, LucideIcon> = {
   ChartGantt,
   UserCog,
   Armchair,
+  Landmark,
+  DoorOpen,
+  CalendarCheck,
+  ScrollText,
+  Timer,
+  CircleDollarSign,
+  Cog,
 };
 
 const restNav = [

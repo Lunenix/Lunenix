@@ -7,6 +7,7 @@ import type { FunctionDeclaration } from "@google/genai";
 import type { VerticalNavItem, VerticalPack } from "@/lib/verticals/types";
 import { mobileBartendingPack } from "@/lib/verticals/packs/mobile-bartending";
 import { eventPlannerPack } from "@/lib/verticals/packs/event-planner";
+import { eventVenuePack } from "@/lib/verticals/packs/event-venue";
 import { SUPER_ADMIN_TOOLS } from "@/lib/luna-super-admin-tools";
 
 /** Nav/ops packs keyed by pack id (`field`, `bar`, …). Not an industries table. */
@@ -134,6 +135,32 @@ registerVerticalPack({
   ],
 });
 
+registerVerticalPack({
+  id: "venue",
+  presets: ["event_venue"],
+  sector: "event_wedding",
+  workflowPrefix: "Venue:",
+  hideProjectsNav: true,
+  nav: [
+    { href: "/venue", label: "Venue ops", icon: "Landmark" },
+    { href: "/events", label: "Events", icon: "PartyPopper" },
+    { href: "/spaces", label: "Spaces", icon: "DoorOpen" },
+    { href: "/tours", label: "Tours", icon: "CalendarCheck" },
+    { href: "/preferred-vendors", label: "Preferred vendors", icon: "Store" },
+    { href: "/venue-policies", label: "Policies", icon: "ScrollText" },
+    { href: "/venue-compliance", label: "Insurance", icon: "ShieldCheck" },
+    { href: "/venue-layouts", label: "Layouts", icon: "LayoutGrid" },
+    { href: "/venue-staff", label: "Staff", icon: "UserCog" },
+    { href: "/turnover", label: "Turnover", icon: "Timer" },
+    { href: "/venue-maintenance", label: "Facility", icon: "Cog" },
+    { href: "/venue-day-of", label: "Condition photos", icon: "Camera" },
+    { href: "/damage-deposits", label: "Damage deposits", icon: "CircleDollarSign" },
+    { href: "/estimates", label: "Estimates", icon: "ClipboardSignature" },
+    { href: "/inventory", label: "Inventory", icon: "Package" },
+    { href: "/books", label: "Books", icon: "BookOpen" },
+  ],
+});
+
 /** Catalog sector label. Tool packs key off `industry_preset`, not this string. */
 export const EVENT_WEDDING_CATEGORY = "Event & Wedding Services";
 
@@ -146,6 +173,7 @@ type VerticalLunaPack = {
 const VERTICAL_TOOL_REGISTRY: Record<string, VerticalLunaPack> = {
   [mobileBartendingPack.key]: mobileBartendingPack,
   [eventPlannerPack.key]: eventPlannerPack,
+  [eventVenuePack.key]: eventVenuePack,
 };
 
 /** Resolve a Luna tool pack by `industry_preset` slug or catalog label. */

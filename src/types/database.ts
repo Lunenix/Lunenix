@@ -1603,6 +1603,40 @@ export interface PlannerEvent {
   created_at: string;
 }
 
+export interface VenueBooking {
+  id: string;
+  workspace_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  title: string;
+  space_name: string | null;
+  event_on: string | null;
+  event_type: string;
+  lead_source: string | null;
+  guest_count: number | null;
+  rental_tier: string;
+  included_items: string | null;
+  addons: string | null;
+  hours: number | null;
+  overtime_rate: number | null;
+  tour_at: string | null;
+  load_in_at: string | null;
+  event_start_at: string | null;
+  event_end_at: string | null;
+  load_out_at: string | null;
+  access_notes: string | null;
+  staff_notes: string | null;
+  vendor_windows: string | null;
+  deposit_paid: boolean;
+  retainer_amount: number;
+  damage_deposit_amount: number;
+  damage_deposit_status: string;
+  date_held: boolean;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface SteelWeldLog {
   id: string;
   workspace_id: string;

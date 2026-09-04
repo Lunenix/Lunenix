@@ -16,6 +16,10 @@ import {
   PLANNER_LEAD_SOURCES,
   isEventPlannerWorkspace,
 } from "@/lib/plannerService";
+import {
+  VENUE_LEAD_SOURCES,
+  isEventVenueWorkspace,
+} from "@/lib/venueService";
 
 export default function PipelinePage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
@@ -141,7 +145,9 @@ export default function PipelinePage() {
           contacts={contacts}
           showArchived={showArchived}
           sourceSuggestions={
-            isEventPlannerWorkspace(activeWorkspace.industry_preset)
+            isEventVenueWorkspace(activeWorkspace.industry_preset)
+              ? [...VENUE_LEAD_SOURCES]
+              : isEventPlannerWorkspace(activeWorkspace.industry_preset)
               ? [...PLANNER_LEAD_SOURCES]
               : isMobileBartendingWorkspace(activeWorkspace.industry_preset)
                 ? [...BAR_LEAD_SOURCES]
