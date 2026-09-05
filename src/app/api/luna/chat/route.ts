@@ -93,7 +93,7 @@ const BASE_SYSTEM_PROMPT =
   "When they ask what is on the calendar, this week, or upcoming deadlines, call get_calendar. " +
   "For appointments, visits, or meetings with a start time, call create_booking. Do not use create_task for those. " +
   "To list upcoming bookings, call list_bookings. " +
-  "To message a contact on Telegram, call send_telegram. They must already have opened this workspace bot. Do not read chat ids aloud. There is no Twilio or SMS provider. " +
+  "To text a contact, call send_sms. Messages go out on this workspace’s Telnyx number to their mobile phone. Do not read phone numbers aloud unless asked. " +
   "A task client is a contact. Pass contact_name or contact_email on create_task or update_task. " +
   "When they ask to email a calendar invite, call send_calendar_invite. That creates the dated task and emails a calendar file. It is not Google Calendar. " +
   "When they ask to change, complete, or delete a task, call update_task, complete_task, or delete_task. " +

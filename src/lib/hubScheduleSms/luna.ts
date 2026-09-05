@@ -1,7 +1,7 @@
 import "server-only";
 
 import { isScheduleStatus } from "@/lib/hubSchedule";
-import { sendWorkspaceTelegram } from "@/lib/sms-persist";
+import { sendWorkspaceSms, sendWorkspaceTelegram } from "@/lib/sms-persist";
 import { contactDisplayName } from "@/types/database";
 import type { VerticalExecutionResult } from "@/lib/verticals/types";
 
@@ -39,12 +39,12 @@ async function resolveContact(
   supabase: Db,
   workspaceId: string,
   args: Record<string, unknown>
-): Promise<{ id: string; label: string; telegramChatId: string | null } | { error: string } | null> {
+): Promise<{ id: string; label: string; phone: string | null; telegramChatId: string | null } | { error: string } | null> {
   const idRaw = str(args, "contact_id");
   if (idRaw && UUID_RE.test(idRaw)) {
     const { data, error } = await supabase
       .from("contacts")
-      .select("id, type, first_name, last_name, organization_name, email, telegram_chat_id")
+      .select("id, type, first_name, last_name, organization_name, email, phone, telegram_chat_id")
       .eq("workspace_id", workspaceId)
       .eq("id", idRaw)
       .maybeSingle();
@@ -53,6 +53,7 @@ async function resolveContact(
     return {
       id: data.id,
       label: contactDisplayName(data),
+      phone: typeof data.phone === "string" ? data.phone : null,
       telegramChatId:
         typeof data.telegram_chat_id === "string" ? data.telegram_chat_id : null,
     };
@@ -63,7 +64,7 @@ async function resolveContact(
   if (!safe) return null;
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, type, first_name, last_name, organization_name, email, telegram_chat_id")
+    .select("id, type, first_name, last_name, organization_name, email, phone, telegram_chat_id")
     .eq("workspace_id", workspaceId)
     .or(
       `first_name.ilike.%${safe}%,last_name.ilike.%${safe}%,organization_name.ilike.%${safe}%,email.ilike.%${safe}%`
@@ -85,6 +86,7 @@ async function resolveContact(
   return {
     id: row.id,
     label: contactDisplayName(row),
+    phone: typeof row.phone === "string" ? row.phone : null,
     telegramChatId:
       typeof row.telegram_chat_id === "string" ? row.telegram_chat_id : null,
   };
@@ -170,8 +172,8 @@ export async function executeHubScheduleSmsTool(
     return {
       ok: true,
       summary: lines.length
-        ? `Recent Telegram threads: ${lines.join(", ")}.`
-        : "No Telegram conversations in this workspace yet.",
+        ? `Recent SMS threads: ${lines.join(", ")}.`
+        : "No SMS conversations in this workspace yet.",
     };
   }
 
@@ -182,20 +184,30 @@ export async function executeHubScheduleSmsTool(
     }
     if ("error" in contact) return contact;
     const body = str(args, "body") || str(args, "message") || str(args, "text");
-    if (!body) return { error: "What should the Telegram message say?" };
-    if (!contact.telegramChatId) {
-      return {
-        error: `${contact.label} has not opened the workspace Telegram bot yet.`,
-      };
+    if (!body) return { error: "What should the text say?" };
+    if (contact.phone) {
+      const sent = await sendWorkspaceSms(supabase, {
+        workspaceId,
+        to: contact.phone,
+        body,
+        contactId: contact.id,
+      });
+      if ("error" in sent) return sent;
+      return { ok: true, summary: `Text sent to ${contact.label}.` };
     }
-    const sent = await sendWorkspaceTelegram(supabase, {
-      workspaceId,
-      chatId: contact.telegramChatId,
-      body,
-      contactId: contact.id,
-    });
-    if ("error" in sent) return sent;
-    return { ok: true, summary: `Telegram message sent to ${contact.label}.` };
+    if (contact.telegramChatId) {
+      const sent = await sendWorkspaceTelegram(supabase, {
+        workspaceId,
+        chatId: contact.telegramChatId,
+        body,
+        contactId: contact.id,
+      });
+      if ("error" in sent) return sent;
+      return { ok: true, summary: `Telegram message sent to ${contact.label}.` };
+    }
+    return {
+      error: `${contact.label} needs a mobile number on the contact.`,
+    };
   }
 
   const title =

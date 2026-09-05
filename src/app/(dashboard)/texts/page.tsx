@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,9 +27,8 @@ import { Loader2 } from "lucide-react";
 export default function TextsPage() {
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
   const [platformOk, setPlatformOk] = useState(false);
-  const [webhookOk, setWebhookOk] = useState(false);
-  const [deepLink, setDeepLink] = useState<string | null>(null);
-  const [botUsername, setBotUsername] = useState<string | null>(null);
+  const [fromE164, setFromE164] = useState<string | null>(null);
+  const [provisionError, setProvisionError] = useState<string | null>(null);
   const [threads, setThreads] = useState<SmsThread[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -37,6 +37,7 @@ export default function TextsPage() {
   const [newContactId, setNewContactId] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspace) return;
@@ -52,9 +53,10 @@ export default function TextsPage() {
     const cj = await c.json().catch(() => ({}));
     if (s.ok) {
       setPlatformOk(Boolean(sj.platform_configured));
-      setWebhookOk(Boolean(sj.webhook_ok));
-      setDeepLink(typeof sj.deep_link === "string" ? sj.deep_link : null);
-      setBotUsername(typeof sj.bot_username === "string" ? sj.bot_username : null);
+      setFromE164(typeof sj.from_e164 === "string" ? sj.from_e164 : null);
+      setProvisionError(
+        typeof sj.provision_error === "string" ? sj.provision_error : null
+      );
     }
     if (t.ok) setThreads(tj.threads ?? []);
     if (c.ok) setContacts(cj.contacts ?? []);
@@ -64,6 +66,36 @@ export default function TextsPage() {
   useEffect(() => {
     if (activeWorkspace) load();
   }, [activeWorkspace, load]);
+
+  useEffect(() => {
+    if (!activeWorkspace) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`sms-inbox-${activeWorkspace.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "sms_messages",
+          filter: `workspace_id=eq.${activeWorkspace.id}`,
+        },
+        () => {
+          void load();
+          if (activeId) {
+            void fetch(`/api/sms/threads/${activeId}/messages`)
+              .then((res) => res.json())
+              .then((json) => {
+                if (Array.isArray(json.messages)) setMessages(json.messages);
+              });
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [activeWorkspace, activeId, load]);
 
   const loadMessages = useCallback(async (threadId: string) => {
     const res = await fetch(`/api/sms/threads/${threadId}/messages`);
@@ -93,12 +125,30 @@ export default function TextsPage() {
     const json = await res.json().catch(() => ({}));
     setSending(false);
     if (!res.ok) {
-      toast(json.error ?? "Could not send that Telegram message.", "error");
+      toast(json.error ?? "Could not send that text.", "error");
       return;
     }
     setDraft("");
     await load();
     if (threadId) await loadMessages(threadId);
+  }
+
+  async function provision() {
+    if (!activeWorkspace) return;
+    setProvisioning(true);
+    const res = await fetch("/api/sms/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspace_id: activeWorkspace.id }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setProvisioning(false);
+    if (!res.ok) {
+      toast(json.error ?? "Could not buy a number.", "error");
+      return;
+    }
+    toast("Workspace number ready.");
+    load();
   }
 
   if (wsLoading || loading) {
@@ -113,62 +163,56 @@ export default function TextsPage() {
     return (
       <div className="flex h-64 flex-col items-center justify-center text-center">
         <p className="text-muted-foreground">
-          Create or select a workspace to message on Telegram.
+          Create or select a workspace to send texts.
         </p>
       </div>
     );
   }
 
-  const contactsWithChat = contacts.filter((c) => c.telegram_chat_id);
+  const contactsWithPhone = contacts.filter((c) => c.phone);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Texts</h1>
         <p className="text-sm text-muted-foreground">
-          Two-way Telegram for {activeWorkspace.name}. Customers open the bot
-          with this workspace link; replies land here.
+          Shared SMS inbox for {activeWorkspace.name}. Outbound uses this
+          workspace’s Telnyx number. Replies stream here for the whole team.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Telegram bot</CardTitle>
+          <CardTitle className="text-base">Workspace number</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           {!platformOk ? (
             <p>
-              Set <code className="text-xs">TELEGRAM_BOT_TOKEN</code> on the
-              server. That is the same token used for task reminder pings.
+              Set <code className="text-xs">TELNYX_API_KEY</code> (and{" "}
+              <code className="text-xs">TELNYX_MESSAGING_PROFILE_ID</code>) on
+              the server. New companies buy a local 10DLC number from the
+              company area code on create.
             </p>
-          ) : deepLink ? (
+          ) : fromE164 ? (
+            <p>
+              Sending from <span className="text-foreground">{fromE164}</span>.
+              Point the Telnyx messaging profile webhook at{" "}
+              <code className="text-xs">/api/telnyx/webhook</code>.
+            </p>
+          ) : (
             <div className="space-y-2">
               <p>
-                Bot token is live
-                {botUsername ? ` (@${botUsername})` : ""}. Share this link so a
-                client starts a thread in this workspace:{" "}
-                <a
-                  className="text-foreground underline"
-                  href={deepLink}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {deepLink}
-                </a>
+                No Telnyx number is bound yet
+                {provisionError ? `: ${provisionError}` : "."}
               </p>
-              {!webhookOk ? (
-                <p>
-                  Inbound replies are not registered yet. Open this page on the
-                  production https URL so Lunenix can set the Telegram webhook
-                  from the bot token.
-                </p>
-              ) : null}
+              <Button
+                size="sm"
+                onClick={provision}
+                disabled={provisioning}
+              >
+                {provisioning ? "Buying…" : "Buy local number"}
+              </Button>
             </div>
-          ) : (
-            <p>
-              Bot token is set. Open Texts on production so the app can read
-              the bot username from Telegram.
-            </p>
           )}
         </CardContent>
       </Card>
@@ -194,7 +238,7 @@ export default function TextsPage() {
                 >
                   {thread.contact
                     ? contactDisplayName(thread.contact)
-                    : "Telegram chat"}
+                    : thread.contact_phone || "SMS thread"}
                 </button>
               ))
             )}
@@ -230,7 +274,7 @@ export default function TextsPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Contact already linked to Telegram</Label>
+                <Label>Contact with a mobile number</Label>
                 <Select
                   value={newContactId || "none"}
                   onValueChange={(v) => setNewContactId(v === "none" ? "" : v)}
@@ -240,7 +284,7 @@ export default function TextsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Select contact</SelectItem>
-                    {contactsWithChat.map((c) => (
+                    {contactsWithPhone.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {contactDisplayName(c)}
                       </SelectItem>
@@ -252,7 +296,7 @@ export default function TextsPage() {
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Write a Telegram message…"
+              placeholder="Write a text…"
               rows={3}
             />
             <Button

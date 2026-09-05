@@ -18,6 +18,7 @@ import {
 } from "@/lib/billing/workspaceSlots";
 import type { WorkspaceWithMembership } from "@/types/database";
 import { seedIndustryDefaultWorkflows } from "@/lib/automation/hvacDefaultWorkflows";
+import { bindWorkspaceTelnyxNumber } from "@/lib/sms-persist";
 
 const LOGO_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -351,6 +352,12 @@ export async function POST(request: NextRequest) {
     await seedIndustryDefaultWorkflows(admin, workspace.id);
   } catch (e) {
     console.error("seedIndustryDefaultWorkflows failed:", e);
+  }
+
+  try {
+    await bindWorkspaceTelnyxNumber(admin, workspace.id, payload.phone);
+  } catch (e) {
+    console.error("bindWorkspaceTelnyxNumber failed:", e);
   }
 
   return NextResponse.json({ workspace: saved }, { status: 201 });

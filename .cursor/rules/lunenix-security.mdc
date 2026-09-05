@@ -8,7 +8,7 @@ alwaysApply: true
 
 ## 1. Secrets & Server-Side Isolation
 
-- Access `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SIMLI_API_KEY`, `ELEVENLABS_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, and `CRON_SECRET` only in server routes (`src/app/api/`) or server-only libs imported from those routes (`src/lib/luna-server.ts`, `src/lib/billing/`, `src/lib/supabase/server.ts`).
+- Access `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SIMLI_API_KEY`, `ELEVENLABS_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `CRON_SECRET`, `TELNYX_API_KEY`, `TELNYX_MESSAGING_PROFILE_ID`, and `TELNYX_PUBLIC_KEY` only in server routes (`src/app/api/`) or server-only libs imported from those routes (`src/lib/luna-server.ts`, `src/lib/billing/`, `src/lib/supabase/server.ts`, `src/lib/telnyx.ts`).
 - Never read those secrets in `"use client"` files. Never put them in `NEXT_PUBLIC_*`.
 - Stripe Checkout and Gemini run on the server. Luna must never collect card numbers.
 

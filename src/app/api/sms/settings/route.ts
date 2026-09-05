@@ -1,51 +1,52 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyWorkspaceAccess } from "@/lib/auth/workspace-guard";
-import { workspaceStartParam } from "@/lib/sms";
-import { getAppBaseUrl } from "@/lib/esign/helpers";
-import {
-  ensureTelegramWebhook,
-  fetchTelegramBotUsername,
-  telegramBotConfigured,
-} from "@/lib/notify/telegram";
-
-function publicAppBase(request: NextRequest): string {
-  const fromReq = getAppBaseUrl(request);
-  if (
-    fromReq.startsWith("https://") &&
-    !/localhost|127\.0\.0\.1/.test(fromReq)
-  ) {
-    return fromReq;
-  }
-  const prodHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (prodHost) {
-    return `https://${prodHost.replace(/^https?:\/\//, "")}`.replace(/\/$/, "");
-  }
-  return fromReq;
-}
+import { requireWorkspaceMember } from "@/lib/supabase/workspaceAccess";
+import { bindWorkspaceTelnyxNumber } from "@/lib/sms-persist";
+import { telnyxConfigured } from "@/lib/telnyx";
 
 export async function GET(request: NextRequest) {
   const auth = await verifyWorkspaceAccess(request);
   if (auth.errorResponse) return auth.errorResponse;
 
-  const configured = telegramBotConfigured();
-  const username = configured ? await fetchTelegramBotUsername() : null;
-  const start = workspaceStartParam(auth.workspaceId);
-  const deepLink = username
-    ? `https://t.me/${username}?start=${start}`
-    : null;
-
-  let webhookOk = false;
-  if (configured) {
-    const base = publicAppBase(request);
-    const hook = await ensureTelegramWebhook(base);
-    webhookOk = hook.ok;
-  }
+  const { data } = await auth.supabase
+    .from("workspace_sms_settings")
+    .select("from_e164, enabled, area_code, provision_error")
+    .eq("workspace_id", auth.workspaceId)
+    .maybeSingle();
 
   return NextResponse.json({
-    platform_configured: configured,
-    bot_username: username,
-    start_param: start,
-    deep_link: deepLink,
-    webhook_ok: webhookOk,
+    platform_configured: telnyxConfigured(),
+    from_e164: data?.from_e164 ?? null,
+    enabled: data?.enabled ?? true,
+    area_code: data?.area_code ?? null,
+    provision_error: data?.provision_error ?? null,
   });
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const auth = await requireWorkspaceMember(body.workspace_id);
+  if ("error" in auth) return auth.error;
+
+  const { data: ws } = await auth.supabase
+    .from("workspaces")
+    .select("phone")
+    .eq("id", auth.workspaceId)
+    .maybeSingle();
+  const phone = typeof ws?.phone === "string" ? ws.phone : "";
+  if (!phone) {
+    return NextResponse.json(
+      { error: "This workspace needs a company phone so we can match an area code." },
+      { status: 400 }
+    );
+  }
+  const result = await bindWorkspaceTelnyxNumber(
+    auth.supabase,
+    auth.workspaceId,
+    phone
+  );
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+  return NextResponse.json({ ok: true, from_e164: result.from_e164 });
 }

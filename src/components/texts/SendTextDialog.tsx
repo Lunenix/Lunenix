@@ -92,8 +92,8 @@ export function SendTextDialog({
         <DialogHeader>
           <DialogTitle>Send text</DialogTitle>
           <DialogDescription>
-            Sends on Telegram to {resolvedLabel}. They must already have opened
-            this workspace bot.
+            Sends a text from this workspace’s Telnyx number to{" "}
+            {resolvedLabel}. They need a mobile number on the contact.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

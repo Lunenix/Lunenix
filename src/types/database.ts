@@ -115,6 +115,7 @@ export interface Contact {
   email: string | null;
   phone: string | null;
   telegram_chat_id?: string | null;
+  sms_opt_in_at?: string | null;
   address: string | null;
   notes: string | null;
   avatar_url: string | null;
@@ -1762,7 +1763,8 @@ export interface SmsThread {
   id: string;
   workspace_id: string;
   contact_id: string | null;
-  telegram_chat_id: string;
+  contact_phone?: string | null;
+  telegram_chat_id?: string | null;
   last_message_at: string;
   created_at: string;
   contact?: Pick<
@@ -1785,5 +1787,6 @@ export interface SmsMessage {
   direction: "inbound" | "outbound";
   body: string;
   provider_sid: string | null;
+  sent_by_user_id?: string | null;
   created_at: string;
 }

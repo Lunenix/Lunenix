@@ -119,6 +119,7 @@ const WORKSPACE_SCOPED_TABLES = new Set([
   "schedule_events",
   "sms_threads",
   "sms_messages",
+  "workspace_sms_settings",
   "bar_events",
   "bar_menus",
   "bar_looks",

@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const { data, error } = await auth.supabase
     .from("sms_threads")
     .select(
-      "id, contact_id, telegram_chat_id, last_message_at, created_at, contact:contacts(id, type, first_name, last_name, organization_name, email, phone, telegram_chat_id)"
+      "id, contact_id, contact_phone, telegram_chat_id, last_message_at, created_at, contact:contacts(id, type, first_name, last_name, organization_name, email, phone, telegram_chat_id)"
     )
     .eq("workspace_id", auth.workspaceId)
     .order("last_message_at", { ascending: false })

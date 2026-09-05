@@ -27,6 +27,7 @@ const PUBLIC_PATHS = [
   "/api/service-plans/run",
   "/api/telegram/test",
   "/api/telegram/webhook",
+  "/api/telnyx/webhook",
   // Stripe Checkout webhooks (signed by Stripe, no session cookie).
   "/api/billing/stripe/webhook",
 ];
