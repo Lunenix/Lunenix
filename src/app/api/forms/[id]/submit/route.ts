@@ -136,6 +136,32 @@ export async function POST(
       }
     }
 
+    const phoneField = fields.find((f: FormField) => f.type === "phone");
+    const submittedPhone = phoneField ? submitted_data[phoneField.id] : null;
+    const optedIn = fields.some((f: FormField) => {
+      if (f.type !== "checkbox" && f.type !== "radio") return false;
+      const label = f.label.toLowerCase();
+      if (!/(sms|text|telegram|mobile message)/i.test(label)) return false;
+      const val = submitted_data[f.id];
+      if (val === true || val === "true" || val === "yes") return true;
+      if (Array.isArray(val)) return val.length > 0;
+      if (typeof val === "string" && val.trim()) return true;
+      return false;
+    });
+    if (contact_id && optedIn) {
+      const patch: Record<string, unknown> = {
+        sms_opt_in_at: new Date().toISOString(),
+      };
+      if (typeof submittedPhone === "string" && submittedPhone.trim()) {
+        patch.phone = submittedPhone.trim().slice(0, 40);
+      }
+      await adminClient
+        .from("contacts")
+        .update(patch)
+        .eq("id", contact_id)
+        .eq("workspace_id", form.workspace_id);
+    }
+
     // Insert the form submission
     const { data: submission, error: submissionError } = await adminClient
       .from("form_submissions")

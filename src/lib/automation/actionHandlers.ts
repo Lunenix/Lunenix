@@ -5,7 +5,7 @@
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendServerEmail } from "@/lib/email/sendServerEmail";
-import { sendWorkspaceTelegram } from "@/lib/sms-persist";
+import { sendWorkspaceSms } from "@/lib/sms-persist";
 import { contactDisplayName, type AutomationAction } from "@/types/database";
 
 // Automation runs from trusted server contexts (including public routes such
@@ -133,7 +133,7 @@ export async function handleSendEmailAction(
 
 /**
  * Send Text Action
- * Sends a Telegram message to the contact on this workflow.
+ * Sends an SMS from this workspace’s Telnyx number to the contact.
  */
 export async function handleSendTelegramAction(
   action: AutomationAction,
@@ -147,7 +147,7 @@ export async function handleSendTelegramAction(
     const contactData = context.contact as
       | {
           id?: string;
-          telegram_chat_id?: string | null;
+          phone?: string | null;
           type?: "person" | "organization" | "lead";
           first_name?: string | null;
           last_name?: string | null;
@@ -178,25 +178,25 @@ export async function handleSendTelegramAction(
       : contactData;
     const body = replaceVariables(rawBody, { ...context, contact: named });
     const supabase = await getSupabaseClient();
-    let chatId = contactData?.telegram_chat_id ?? null;
-    if (!chatId) {
+    let phone = contactData?.phone ?? null;
+    if (!phone) {
       const { data } = await supabase
         .from("contacts")
-        .select("telegram_chat_id")
+        .select("phone")
         .eq("id", contactId)
         .eq("workspace_id", context.workspace_id)
         .maybeSingle();
-      chatId = typeof data?.telegram_chat_id === "string" ? data.telegram_chat_id : null;
+      phone = typeof data?.phone === "string" ? data.phone : null;
     }
-    if (!chatId) {
+    if (!phone) {
       return {
         success: false,
-        error: "That contact has not opened the workspace Telegram bot.",
+        error: "That contact does not have a mobile number.",
       };
     }
-    const sent = await sendWorkspaceTelegram(supabase, {
+    const sent = await sendWorkspaceSms(supabase, {
       workspaceId: context.workspace_id,
-      chatId,
+      to: phone,
       body,
       contactId,
     });

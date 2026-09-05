@@ -335,10 +335,10 @@ export function WorkflowBuilder({
                           rows={4}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Sends on Telegram to the contact on this trigger. Use
-                          {" "}
+                          Sends an SMS from this workspace’s Telnyx number.
+                          Use{" "}
                           <code className="text-[11px]">{"{{contact.name}}"}</code>
-                          . They must already have opened the workspace bot.
+                          . The contact needs a mobile number.
                         </p>
                       </div>
                     )}
